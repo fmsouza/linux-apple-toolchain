@@ -1,0 +1,8 @@
+ARG BASE
+FROM ${BASE}
+ARG TARGETARCH
+COPY dist/sdk/${TARGETARCH}/darwin.xtoolsdk /tmp/darwin.xtoolsdk
+COPY dist/sdk/toolchain-meta.json /opt/xless/toolchain-meta.json
+RUN xtool sdk install /tmp/darwin.xtoolsdk && rm -rf /tmp/darwin.xtoolsdk \
+ && test -f /opt/xless/config/swiftpm/swift-sdks/darwin.artifactbundle/toolset-swb.json \
+ && chmod -R a+rX /opt/xless

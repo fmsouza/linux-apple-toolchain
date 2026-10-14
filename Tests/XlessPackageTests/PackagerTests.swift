@@ -1,0 +1,69 @@
+import Testing
+import Foundation
+@testable import XlessPackage
+@testable import XlessCore
+
+private func makeApp(_ root: URL) throws -> URL {
+    let app = root.appendingPathComponent("signed/X.app")
+    try FileManager.default.createDirectory(at: app.appendingPathComponent("Frameworks/F.framework/Versions/A"), withIntermediateDirectories: true)
+    try Data("bin".utf8).write(to: app.appendingPathComponent("X"))
+    try FileManager.default.createSymbolicLink(atPath: app.appendingPathComponent("Frameworks/F.framework/Current").path, withDestinationPath: "Versions/A")
+    return app
+}
+
+@Test func ipaHasPayloadLayoutAndKeepsSymlinks() throws {
+    let root = FileManager.default.temporaryDirectory.appendingPathComponent("pk-\(UUID())")
+    defer { try? FileManager.default.removeItem(at: root) }
+    let app = try makeApp(root)
+    let ipa = try Packager.ipa(signedApp: app, outputDir: root.appendingPathComponent("out"))
+    #expect(ipa.lastPathComponent == "X.ipa")
+    let listing = try Shell.run("unzip", ["-Z1", ipa.path], stage: .package).stdout
+    #expect(listing.contains("Payload/X.app/X"))
+    let verbose = try Shell.run("zipinfo", [ipa.path], stage: .package).stdout
+    #expect(verbose.contains("lrwx"))   // symlink preserved
+}
+
+@Test func ipaExcludesFinderAndAppleDoubleJunk() throws {
+    let root = FileManager.default.temporaryDirectory.appendingPathComponent("pk-\(UUID())")
+    defer { try? FileManager.default.removeItem(at: root) }
+    let app = try makeApp(root)
+    try Data("x".utf8).write(to: app.appendingPathComponent(".DS_Store"))
+    try Data("x".utf8).write(to: app.appendingPathComponent("._X"))
+    try Data("x".utf8).write(to: app.appendingPathComponent("Frameworks/F.framework/Versions/A/._F"))
+    try Data("x".utf8).write(to: app.appendingPathComponent("Frameworks/.DS_Store"))
+    let ipa = try Packager.ipa(signedApp: app, outputDir: root.appendingPathComponent("out"))
+    let listing = try Shell.run("unzip", ["-Z1", ipa.path], stage: .package).stdout
+    #expect(listing.contains("Payload/X.app/X"))
+    #expect(!listing.contains(".DS_Store"))
+    #expect(!listing.contains("._"))
+}
+
+private func ipaWithVersions(_ version: String, _ build: String) throws -> URL {
+    let root = FileManager.default.temporaryDirectory.appendingPathComponent("pk-\(UUID())")
+    let app = try makeApp(root)
+    try Plist.write(["CFBundleShortVersionString": version, "CFBundleVersion": build, "CFBundleExecutable": "X"],
+                    to: app.appendingPathComponent("Info.plist"), stage: .package)
+    try Plist.write(["CFBundleVersion": "999"], to: app.appendingPathComponent("Frameworks/F.framework/Versions/A/Info.plist"), stage: .package)
+    return try Packager.ipa(signedApp: app, outputDir: root.appendingPathComponent("out"))
+}
+
+@Test func uploadVersionsComeFromTheIPA() throws {
+    let ipa = try ipaWithVersions("1.2.3", "29000000")
+    let v = try IPAInfo.uploadVersions(ipa: ipa, buildOverride: nil)
+    #expect(v.version == "1.2.3" && v.build == "29000000")
+    #expect(try IPAInfo.uploadVersions(ipa: ipa, buildOverride: "29000000").build == "29000000")
+}
+
+@Test func uploadOverrideDisagreeingWithIPAFails() throws {
+    let ipa = try ipaWithVersions("1.0.0", "41")
+    do { _ = try IPAInfo.uploadVersions(ipa: ipa, buildOverride: "42"); Issue.record("expected throw") }
+    catch let e as XlessError {
+        #expect(e.description == "[upload] the .ipa has build 41 but --build-number/XLESS_BUILD_NUMBER is 42 — re-run from finalize or drop the override")
+    }
+}
+
+@Test func notarizationKeyFileIsNormalizedPEM() throws {
+    let pem = "-----BEGIN PRIVATE KEY-----\nAAAA\n-----END PRIVATE KEY-----"
+    let mangled = pem.replacingOccurrences(of: "\n", with: "\\n") + "\r\n"
+    #expect(try Packager.p8Contents(Secrets(env: ["ASC_KEY_P8": mangled])) == Data((pem + "\n").utf8))
+}

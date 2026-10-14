@@ -1,0 +1,15 @@
+# <platform|*>:<Info.plist key>   # reason
+# <platform|*>:file:<bundle-relative path>   # reason (bundle file present on one side only)
+# Only differences that are legitimate by construction belong here; real gaps get fixed in xless.
+*:CFBundleDisplayName          # xtool (iOS) and MacBuilder.baseInfoPlist (macOS) set it to the product name, which equals CFBundleName, so the same name is shown; Xcode writes it only when INFOPLIST_KEY_CFBundleDisplayName is set
+macos:NSPrincipalClass         # MacBuilder sets NSApplication, which is what AppKit uses when the key is absent; Xcode writes it only when INFOPLIST_KEY_NSPrincipalClass is set
+macos:NSHighResolutionCapable  # MacBuilder sets true (Retina-capable, the modern default); Xcode's generated plist omits it
+macos:CFBundleIconFile         # xless ships AppIcon.icns made from the 1024 icon (no macOS Assets.car by design); the sample's AppIcon set is platform "ios", so the Xcode macOS target has no catalog and no icon
+macos:file:Contents/Resources/AppIcon.icns  # same reason as macos:CFBundleIconFile
+
+# Assets.car renditions (iOS), exact Name|Idiom|Scale|PixelWidth lines: ios:car:-<line> = only in Xcode's car,
+# ios:car:+<line> = only in xless's car. Accepted for milestone 1; see docs/research/parity-known-gaps.md.
+ios:car:-AppIcon|phone|1|None        # actool's MultiSized Image rendition for the phone icon; AssetKit cannot write MultiSized Image renditions (xless ships Xcode-named loose 60x60@2x PNGs as the fallback) — AssetKit gap; revisit if App Store Connect rejects (ITMS-90562/icon issues)
+ios:car:-AppIcon|pad|1|None          # actool's MultiSized Image rendition for the pad icon; AssetKit cannot write MultiSized Image renditions (xless ships Xcode-named loose 76x76@2x~ipad PNGs as the fallback) — AssetKit gap; revisit if App Store Connect rejects (ITMS-90562/icon issues)
+ios:car:-AccentBlue|universal|1|None    # actool stores the colorset at scale 1 (colorspace srgb); AssetKit's ColorRenderer writes no scale (and assetutil reads its colorspace as generic) — AssetKit gap; revisit if App Store Connect rejects (ITMS-90562/icon issues)
+ios:car:+AccentBlue|universal|None|None # the same AccentBlue rendition as AssetKit writes it: no scale, generic colorspace — AssetKit gap; revisit if App Store Connect rejects (ITMS-90562/icon issues)

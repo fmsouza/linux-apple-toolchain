@@ -1,0 +1,63 @@
+import Foundation
+
+public struct PlatformSDKInfo: Codable, Sendable, Equatable {
+    public var sdkName: String
+    public var sdkVersion: String
+    public var sdkBuild: String
+    public var platformName: String
+    public var platformVersion: String
+    public var platformBuild: String
+
+    public init(sdkName: String, sdkVersion: String, sdkBuild: String, platformName: String, platformVersion: String, platformBuild: String) {
+        self.sdkName = sdkName; self.sdkVersion = sdkVersion; self.sdkBuild = sdkBuild
+        self.platformName = platformName; self.platformVersion = platformVersion; self.platformBuild = platformBuild
+    }
+}
+
+public struct ToolchainMeta: Codable, Sendable, Equatable {
+    public static let clangCompiler = "com.apple.compilers.llvm.clang.1_0"
+
+    public var xcodeVersion: String
+    public var xcodeBuild: String
+    public var buildMachineOSBuild: String
+    public var compiler: String
+    /// Keyed by Platform.sdkKey ("iphoneos", "macosx").
+    public var platforms: [String: PlatformSDKInfo]
+
+    public init(xcodeVersion: String, xcodeBuild: String, buildMachineOSBuild: String, compiler: String, platforms: [String: PlatformSDKInfo]) {
+        self.xcodeVersion = xcodeVersion; self.xcodeBuild = xcodeBuild
+        self.buildMachineOSBuild = buildMachineOSBuild; self.compiler = compiler; self.platforms = platforms
+    }
+
+    public func sdk(for p: Platform) throws -> PlatformSDKInfo {
+        guard let s = platforms[p.sdkKey] else {
+            throw XlessError(.sdk, "toolchain-meta.json has no \(p.sdkKey) SDK", fix: "re-run `xless sdk export` on the Mac")
+        }
+        return s
+    }
+
+    public static func load(from url: URL) throws -> ToolchainMeta {
+        guard let data = try? Data(contentsOf: url) else {
+            throw XlessError(.sdk, "toolchain metadata not found at \(url.path)", fix: "use the xless SDK image, or run `xless sdk install`")
+        }
+        do { return try JSONDecoder().decode(ToolchainMeta.self, from: data) } catch {
+            throw XlessError(.sdk, "toolchain metadata at \(url.path) is invalid: \(error)", fix: "re-run `xless sdk export` on the Mac")
+        }
+    }
+
+    public func write(to url: URL) throws {
+        let enc = JSONEncoder()
+        enc.outputFormatting = [.prettyPrinted, .sortedKeys]
+        try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try enc.encode(self).write(to: url)
+    }
+
+    /// XLESS_TOOLCHAIN_META, else /opt/xless/toolchain-meta.json if present, else $XDG_CONFIG_HOME|~/.config /xless/toolchain-meta.json.
+    public static func defaultLocation(env: [String: String] = ProcessInfo.processInfo.environment) -> URL {
+        if let p = env["XLESS_TOOLCHAIN_META"], !p.isEmpty { return URL(fileURLWithPath: p) }
+        let image = "/opt/xless/toolchain-meta.json"
+        if FileManager.default.fileExists(atPath: image) { return URL(fileURLWithPath: image) }
+        let base = env["XDG_CONFIG_HOME"].flatMap { $0.isEmpty ? nil : $0 } ?? "\(env["HOME"] ?? "~")/.config"
+        return URL(fileURLWithPath: "\(base)/xless/toolchain-meta.json")
+    }
+}

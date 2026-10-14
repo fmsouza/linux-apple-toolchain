@@ -1,0 +1,29 @@
+name: example-ios
+on: workflow_dispatch
+jobs:
+  ship:
+    runs-on: ubuntu-latest
+    container:
+      image: ${{ vars.XLESS_IMAGE }}           # e.g. ghcr.io/you/xless:xcode27.0-27A266a-v0.1.0 (private)
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.XLESS_REGISTRY_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Ship HelloShip to TestFlight
+        working-directory: samples/HelloShip
+        env:
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+          ASC_KEY_P8: ${{ secrets.ASC_KEY_P8 }}
+          XLESS_DIST_KEY: ${{ secrets.XLESS_DIST_KEY }}
+        run: |
+          # Build numbers must increase across every machine that uploads this version (ITMS-90062), so use
+          # the same monotonic scheme everywhere: minutes since 1970. (github.run_number restarts at 1.)
+          export XLESS_BUILD_NUMBER=$(( $(date +%s) / 60 ))
+          xless ship --platform ios
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: xless-ios
+          path: samples/HelloShip/.xless/build/ios/out/

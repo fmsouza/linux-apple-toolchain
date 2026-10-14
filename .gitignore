@@ -1,0 +1,15 @@
+.build/
+.swiftpm/
+.xless/
+xtool/
+dist/
+registry.env
+*.p8
+*.pem
+*.ipa
+samples/**/.build/
+samples/**/xtool/
+samples/**/*.xcodeproj
+samples/**/.bsp/
+samples/**/xtool.yml
+ThirdParty/AssetKit/Package.resolved

@@ -1,0 +1,51 @@
+ARG SWIFT_VERSION
+# Runs natively on the build host and cross-compiles with the Static Linux SDK
+# (swift build under Rosetta/QEMU emulation crashes intermittently).
+FROM --platform=$BUILDPLATFORM swift:${SWIFT_VERSION}-jammy AS build
+ARG TARGETARCH
+ARG STATIC_SDK_URL
+ARG STATIC_SDK_SHA256
+WORKDIR /src
+RUN swift sdk install "$STATIC_SDK_URL" --checksum "$STATIC_SDK_SHA256"
+COPY Package.swift Package.resolved ./
+COPY ThirdParty ThirdParty
+# GitHub rate-limits git over HTTP/2 from this git version (401)
+RUN git config --global http.version HTTP/1.1
+RUN swift package resolve
+COPY Sources Sources
+COPY Tests Tests
+RUN set -eux; \
+    case "$TARGETARCH" in arm64) A=aarch64 ;; amd64) A=x86_64 ;; *) echo "unsupported $TARGETARCH"; exit 1 ;; esac; \
+    swift build -c release --product xless --swift-sdk "${A}-swift-linux-musl"; \
+    install -m755 "$(swift build -c release --swift-sdk "${A}-swift-linux-musl" --show-bin-path)/xless" /usr/local/bin/xless
+
+FROM swift:${SWIFT_VERSION}-jammy
+ARG TARGETARCH
+ARG XTOOL_VERSION
+ARG RCODESIGN_VERSION
+ARG XTOOL_SHA256_AARCH64
+ARG XTOOL_SHA256_X86_64
+ARG RCODESIGN_SHA256_AARCH64
+ARG RCODESIGN_SHA256_X86_64
+ENV APPIMAGE_EXTRACT_AND_RUN=1 \
+    XDG_CONFIG_HOME=/opt/xless/config \
+    XLESS_TOOLCHAIN_META=/opt/xless/toolchain-meta.json
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends curl ca-certificates zip unzip librsvg2-bin squashfs-tools \
+ && rm -rf /var/lib/apt/lists/*
+RUN set -eux; \
+    case "$TARGETARCH" in arm64) A=aarch64; XSUM="$XTOOL_SHA256_AARCH64"; RSUM="$RCODESIGN_SHA256_AARCH64" ;; amd64) A=x86_64; XSUM="$XTOOL_SHA256_X86_64"; RSUM="$RCODESIGN_SHA256_X86_64" ;; *) echo "unsupported $TARGETARCH"; exit 1 ;; esac; \
+    curl -fsSL -o /tmp/xtool.AppImage "https://github.com/xtool-org/xtool/releases/download/${XTOOL_VERSION}/xtool-${A}.AppImage"; \
+    echo "${XSUM}  /tmp/xtool.AppImage" | sha256sum -c -; \
+    f=/tmp/xtool.AppImage; le() { od -An -t u$2 -j "$1" -N "$2" "$f" | tr -d ' '; }; \
+    off=$(( $(le 40 8) + $(le 58 2) * $(le 60 2) )); \
+    unsquashfs -q -o "$off" -d /opt/xtool "$f" >/dev/null; ln -s /opt/xtool/AppRun /usr/local/bin/xtool; rm /tmp/xtool.AppImage; \
+    RC="apple-codesign-${RCODESIGN_VERSION}-${A}-unknown-linux-musl"; \
+    curl -fsSL -o "/tmp/${RC}.tar.gz" "https://github.com/indygreg/apple-platform-rs/releases/download/apple-codesign%2F${RCODESIGN_VERSION}/${RC}.tar.gz"; \
+    echo "${RSUM}  /tmp/${RC}.tar.gz" | sha256sum -c -; \
+    tar -xzf "/tmp/${RC}.tar.gz" -C /tmp; install -m755 "$(find /tmp/${RC} -name rcodesign -type f | head -1)" /usr/local/bin/rcodesign; \
+    rm -rf /tmp/${RC}*
+COPY --from=build /usr/local/bin/xless /usr/local/bin/xless
+RUN mkdir -p /opt/xless/config && chmod -R a+rwX /opt/xless \
+ && xtool --help >/dev/null && rcodesign --version && xless --version
+WORKDIR /work

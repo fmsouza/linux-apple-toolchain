@@ -1,0 +1,12 @@
+{
+  "images" : [
+    {
+      "filename" : "Svg.svg",
+      "idiom" : "universal"
+    }
+  ],
+  "info" : {
+    "author" : "xtool",
+    "version" : 1
+  }
+}

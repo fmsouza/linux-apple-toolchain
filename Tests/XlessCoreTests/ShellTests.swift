@@ -1,0 +1,40 @@
+import Testing
+import Foundation
+@testable import XlessCore
+
+@Test func capturesStdout() throws {
+    let r = try Shell.run("echo", ["hi there"], stage: .build)
+    #expect(r.stdout == "hi there\n")
+}
+
+@Test func failureBecomesStageError() {
+    do { try Shell.run("sh", ["-c", "echo boom >&2; exit 3"], stage: .sign); Issue.record("expected throw") }
+    catch let e as XlessError {
+        #expect(e.stage == .sign)
+        #expect(e.cause.contains("exited with 3"))
+        #expect(e.cause.contains("boom"))
+    } catch { Issue.record("\(error)") }
+}
+
+@Test func childProcessesCannotSeeSecrets() throws {
+    // Build tools run third-party package code (macros, plugins); they must never inherit signing or API keys.
+    let names = ["XLESS_DIST_KEY", "XLESS_DIST_KEY_FILE", "ASC_KEY_P8", "XLESS_DEVID_KEY", "ASC_KEY_ID"]
+    for name in names { setenv(name, "secret-\(name)", 1) }
+    defer { for name in names { unsetenv(name) } }
+    let r = try Shell.run("sh", ["-c", "echo \"[${XLESS_DIST_KEY-}][${XLESS_DIST_KEY_FILE-}][${ASC_KEY_P8-}][${XLESS_DEVID_KEY-}][${ASC_KEY_ID-}]\""], stage: .build)
+    #expect(r.stdout == "[][][][][]\n")
+    let all = try Shell.run("env", [], stage: .build).stdout
+    #expect(!all.contains("secret-"))
+}
+
+@Test func scrubbedNamesCoverEverySecretAndItsFileVariant() {
+    for name in ["ASC_KEY_ID", "ASC_ISSUER_ID", "ASC_KEY_P8", "XLESS_DIST_KEY", "XLESS_DEVID_KEY"] {
+        #expect(Shell.scrubbedEnvironment.contains(name))
+        #expect(Shell.scrubbedEnvironment.contains("\(name)_FILE"))
+    }
+}
+
+@Test func explicitEnvEntriesStillReachTheChild() throws {
+    let r = try Shell.run("sh", ["-c", "echo \"$XLESS_DIST_KEY_FILE\""], env: ["XLESS_DIST_KEY_FILE": "/run/k.pem"], stage: .build)
+    #expect(r.stdout == "/run/k.pem\n")
+}

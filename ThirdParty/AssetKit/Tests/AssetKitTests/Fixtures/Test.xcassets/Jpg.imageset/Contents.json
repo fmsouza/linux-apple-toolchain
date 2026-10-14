@@ -1,0 +1,13 @@
+{
+  "images" : [
+    {
+      "filename" : "Jpg@2x.jpg",
+      "idiom" : "universal",
+      "scale" : "2x"
+    }
+  ],
+  "info" : {
+    "author" : "xtool",
+    "version" : 1
+  }
+}

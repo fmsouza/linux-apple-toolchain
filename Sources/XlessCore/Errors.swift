@@ -1,0 +1,34 @@
+public enum Stage: String, Sendable, CaseIterable, Comparable {
+    case config, sdk, build, assets, finalize, sign, package, upload
+
+    public var exitCode: Int32 {
+        switch self {
+        case .config: 10
+        case .sdk: 11
+        case .build: 12
+        case .assets: 13
+        case .finalize: 14
+        case .sign: 15
+        case .package: 16
+        case .upload: 17
+        }
+    }
+
+    public static func < (a: Stage, b: Stage) -> Bool {
+        allCases.firstIndex(of: a)! < allCases.firstIndex(of: b)!
+    }
+}
+
+public struct XlessError: Error, CustomStringConvertible, Equatable, Sendable {
+    public let stage: Stage
+    public let cause: String
+    public let fix: String
+
+    public init(_ stage: Stage, _ cause: String, fix: String) {
+        self.stage = stage
+        self.cause = cause
+        self.fix = fix
+    }
+
+    public var description: String { "[\(stage.rawValue)] \(cause) — \(fix)" }
+}

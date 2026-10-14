@@ -1,0 +1,12 @@
+import ArgumentParser
+import XlessCore
+
+struct Xless: AsyncParsableCommand {
+    static let configuration = CommandConfiguration(
+        commandName: "xless",
+        abstract: "Build, sign and ship Apple-platform apps from Linux.",
+        version: XlessVersion.current,
+        subcommands: [ShipCommand.self, BuildCommand.self, AssetsCommand.self, FinalizeCommand.self, SignCommand.self,
+                      PackageCommand.self, UploadCommand.self, InspectCommand.self, SDKCommand.self]
+    )
+}

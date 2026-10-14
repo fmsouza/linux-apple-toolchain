@@ -1,0 +1,8 @@
+*
+!Package.swift
+!Package.resolved
+!Sources
+!Tests
+!ThirdParty
+ThirdParty/**/.build
+ThirdParty/**/.swiftpm
