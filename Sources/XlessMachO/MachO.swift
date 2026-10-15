@@ -49,6 +49,22 @@ public enum MachO {
         return le == mhMagic64 || be == fatMagic
     }
 
+    /// True when `data` is a thin 64-bit Mach-O image, or a fat file whose slices are all 64-bit images.
+    /// A thin `ar` archive, or a fat wrapper whose slices are `ar` archives (CocoaPods xcframework statics
+    /// such as onnxruntime), is a static library: it has no load commands to stamp, so this is false.
+    /// A fat file mixing images and non-images is unexpected and throws. Files that are not Mach-O at all are false.
+    public static func containsLoadableImage(_ data: Data) throws -> Bool {
+        guard data.count >= 4, let le = try? data.u32(0), let be = try? data.u32(0, bigEndian: true) else { return false }
+        if le == mhMagic64 { return true }
+        guard be == fatMagic, data.count >= 8, let n = try? data.u32(4, bigEndian: true), (1...32).contains(n) else { return false }
+        let flags = try slices(data).map { r in r.count >= 4 && (try? data.u32(r.lowerBound)) == mhMagic64 }
+        if flags.allSatisfy({ $0 }) { return true }
+        if flags.contains(true) {
+            throw MachOError.unsupported("fat binary mixes Mach-O images and non-image slices")
+        }
+        return false
+    }
+
     static func slices(_ data: Data) throws -> [Range<Int>] {
         let le = try data.u32(0)
         if le == mhMagic64 { return [0..<data.count] }
@@ -93,6 +109,46 @@ public enum MachO {
                                     minos: try data.u32(off + 12), sdk: try data.u32(off + 16)))
         }
         return out
+    }
+
+    static let lcLoadDylib: UInt32 = 0xc
+    static let lcLoadWeakDylib: UInt32 = 0x80000018
+    static let lcReexportDylib: UInt32 = 0x8000001f
+    static let lcRpath: UInt32 = 0x8000001c
+
+    /// Names of the load commands whose type is in `kinds`, in load-command order. Thin 64-bit only; a fat binary uses its first slice.
+    static func pathCommands(_ data: Data, _ kinds: Set<UInt32>) throws -> [String] {
+        guard let r = try slices(data).first else { return [] }
+        let b = r.lowerBound
+        guard r.count >= 32 else { throw MachOError.truncated }
+        guard try data.u32(b) == mhMagic64 else { throw MachOError.unsupported("non-64-bit slice") }
+        let ncmds = Int(try data.u32(b + 16))
+        var off = b + 32
+        var out: [String] = []
+        for _ in 0..<ncmds {
+            guard off + 8 <= r.upperBound else { throw MachOError.truncated }
+            let cmd = try data.u32(off)
+            let size = Int(try data.u32(off + 4))
+            guard size >= 8, off + size <= r.upperBound else { throw MachOError.truncated }
+            if kinds.contains(cmd) {
+                guard size >= 12 else { throw MachOError.truncated }
+                let nameOff = Int(try data.u32(off + 8))
+                guard nameOff >= 12, nameOff <= size else { throw MachOError.truncated }
+                let bytes = data[(off + nameOff)..<(off + size)].prefix { $0 != 0 }
+                out.append(String(decoding: bytes, as: UTF8.self))
+            }
+            off += size
+        }
+        return out
+    }
+
+    /// LC_LOAD_DYLIB, LC_LOAD_WEAK_DYLIB and LC_REEXPORT_DYLIB names, in load-command order.
+    public static func linkedLibraries(in data: Data) throws -> [String] {
+        try pathCommands(data, [lcLoadDylib, lcLoadWeakDylib, lcReexportDylib])
+    }
+
+    public static func rpaths(in data: Data) throws -> [String] {
+        try pathCommands(data, [lcRpath])
     }
 
     /// Rewrites LC_BUILD_VERSION.sdk in every slice. Returns the number of commands patched.

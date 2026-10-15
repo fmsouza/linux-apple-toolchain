@@ -8,6 +8,11 @@ public struct PlatformConfig: Sendable, Equatable, Decodable {
     public var distribution: Distribution?
     /// Optional per-platform bundle identifier override.
     public var bundleID: String?
+
+    public init(minimumOS: String, product: String, entitlements: String? = nil, distribution: Distribution? = nil, bundleID: String? = nil) {
+        self.minimumOS = minimumOS; self.product = product; self.entitlements = entitlements
+        self.distribution = distribution; self.bundleID = bundleID
+    }
 }
 
 /// Optional `testflight:` block: deliver each uploaded build to internal TestFlight groups.
@@ -30,6 +35,9 @@ public struct TestFlightConfig: Sendable, Equatable, Decodable {
     }
 }
 
+/// How `build` is validated: `.fixed` is 1–3 dot-separated integers; `.dated` is `<version>.<YYYYMMDDNN>` (Tauri overlays).
+public enum BuildScheme: Sendable, Equatable { case fixed, dated }
+
 public struct ProjectConfig: Sendable, Equatable {
     public var bundleID: String
     public var teamID: String
@@ -44,6 +52,16 @@ public struct ProjectConfig: Sendable, Equatable {
     public var testflight: TestFlightConfig? = nil
     /// Value stamped as `ITSAppUsesNonExemptEncryption` (export compliance) when set.
     public var usesNonExemptEncryption: Bool? = nil
+    public var buildScheme: BuildScheme = .fixed
+
+    public init(bundleID: String, teamID: String, version: String, build: String, platforms: [Platform: PlatformConfig],
+                assets: String? = nil, privacyManifest: String? = nil, infoPlist: String? = nil, launchStoryboard: String? = nil,
+                testflight: TestFlightConfig? = nil, usesNonExemptEncryption: Bool? = nil, buildScheme: BuildScheme = .fixed) {
+        self.bundleID = bundleID; self.teamID = teamID; self.version = version; self.build = build; self.platforms = platforms
+        self.assets = assets; self.privacyManifest = privacyManifest; self.infoPlist = infoPlist
+        self.launchStoryboard = launchStoryboard; self.testflight = testflight
+        self.usesNonExemptEncryption = usesNonExemptEncryption; self.buildScheme = buildScheme
+    }
 
     public func platform(_ p: Platform) throws -> PlatformConfig {
         guard let c = platforms[p] else {
@@ -84,7 +102,7 @@ private struct RawConfig: Decodable {
 }
 
 extension ProjectConfig {
-    public static func parse(yaml: String, buildOverride: String? = nil) throws -> ProjectConfig {
+    public static func parse(yaml: String, buildOverride: String? = nil, buildScheme: BuildScheme = .fixed) throws -> ProjectConfig {
         let raw: RawConfig
         do {
             raw = try YAMLDecoder().decode(RawConfig.self, from: yaml)
@@ -103,7 +121,7 @@ extension ProjectConfig {
             build: buildOverride ?? raw.build.value, platforms: platforms,
             assets: raw.assets, privacyManifest: raw.privacyManifest, infoPlist: raw.infoPlist,
             launchStoryboard: raw.launchStoryboard, testflight: raw.testflight,
-            usesNonExemptEncryption: raw.usesNonExemptEncryption)
+            usesNonExemptEncryption: raw.usesNonExemptEncryption, buildScheme: buildScheme)
         try config.validate()
         return config
     }
@@ -115,7 +133,7 @@ extension ProjectConfig {
         return try parse(yaml: text, buildOverride: buildOverride)
     }
 
-    func validate() throws {
+    public func validate() throws {
         if platforms.isEmpty {
             throw XlessError(.config, "no platforms configured", fix: "add platforms.ios and/or platforms.macos")
         }
@@ -128,8 +146,18 @@ extension ProjectConfig {
         if version.wholeMatch(of: /\d+(\.\d+){0,2}/) == nil {
             throw XlessError(.config, "version '\(version)' is invalid", fix: "use 1–3 dot-separated integers, e.g. 1.0.0")
         }
-        if build.wholeMatch(of: /\d+(\.\d+){0,2}/) == nil {
-            throw XlessError(.config, "build '\(build)' is invalid", fix: "use 1–3 dot-separated integers")
+        switch buildScheme {
+        case .fixed:
+            if build.wholeMatch(of: /\d+(\.\d+){0,2}/) == nil {
+                throw XlessError(.config, "build '\(build)' is invalid", fix: "use 1–3 dot-separated integers")
+            }
+        case .dated:
+            // `<version>.<YYYYMMDDNN>` of this very version: anything else could sort above the dated builds of the version.
+            let prefix = version + "."
+            if !build.hasPrefix(prefix) || build.dropFirst(prefix.count).wholeMatch(of: /20\d{6}(0[1-9]|[1-9]\d)/) == nil {
+                throw XlessError(.config, "build '\(build)' is invalid for a dated build of version \(version)",
+                                 fix: "use <version>.<YYYYMMDDNN>, e.g. \(version).2026101501 (NN is 01–99), also for --build-number/XLESS_BUILD_NUMBER")
+            }
         }
         for (p, pc) in platforms {
             if DottedVersion(pc.minimumOS) == nil {

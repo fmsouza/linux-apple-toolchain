@@ -1,12 +1,20 @@
 import ArgumentParser
+import XlessASC
 import XlessCore
 
+struct PrepareCommand: AsyncParsableCommand {
+    static let configuration = CommandConfiguration(commandName: "prepare", abstract: "Tauri overlays: check the project, sync the work copy, install dependencies and toolchains.")
+    @OptionGroup var options: ProjectOptions
+    func run() async throws { print(try await StageRunner.prepare(Context.load(options, fresh: DatedBuildNumber.isFreshRun(command: "prepare")))) }
+}
+
 struct BuildCommand: AsyncParsableCommand {
-    static let configuration = CommandConfiguration(commandName: "build", abstract: "Build an unsigned .app into .xless/build/<platform>/app.")
+    static let configuration = CommandConfiguration(commandName: "build", abstract: "Build an unsigned .app into .xless/build/<platform>/app (Tauri overlays: after prepare).")
     @OptionGroup var options: ProjectOptions
     func run() async throws {
-        let app = try await StageRunner.build(Context.load(options))
-        print(app.path)
+        let ctx = try await Context.load(options, fresh: DatedBuildNumber.isFreshRun(command: "build"))
+        if ctx.tauri != nil { _ = try await StageRunner.prepare(ctx) }
+        print(try await StageRunner.build(ctx).path)
     }
 }
 

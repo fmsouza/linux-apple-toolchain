@@ -41,3 +41,8 @@ import Foundation
     catch let e as XlessError { #expect(e.stage == .sdk) }
     catch { Issue.record("\(error)") }
 }
+
+@Test func prepareIsExit19BetweenSDKAndBuild() {
+    #expect(Stage.prepare.exitCode == 19)
+    #expect(Stage.sdk < .prepare && Stage.prepare < .build)
+}

@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  Merged into gen/apple/hello-tauri_iOS/Info.plist by `tauri ios build`.
+
+  UIScene lifecycle: iOS 27 traps at launch any app built with the iOS 27 SDK that has not adopted it. tao adopts
+  it only when UIApplicationSupportsMultipleScenes is true (it then supplies its own scene delegate), so
+  UISceneConfigurations stays empty.
+-->
+<plist version="1.0">
+<dict>
+	<key>UIApplicationSceneManifest</key>
+	<dict>
+		<key>UIApplicationSupportsMultipleScenes</key>
+		<true/>
+		<key>UISceneConfigurations</key>
+		<dict/>
+	</dict>
+</dict>
+</plist>

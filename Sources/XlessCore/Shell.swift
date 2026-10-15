@@ -14,12 +14,14 @@ public enum Shell {
     /// Runs `executable` (resolved via PATH) with `arguments`. Throws XlessError(stage) on non-zero exit.
     /// The child inherits `baseEnvironment` (default: this process's environment; tests inject one instead of mutating the process) minus `scrubbedEnvironment`, plus `env` (explicit entries win;
     /// a nil value removes a variable). passthrough: stream output to the terminal instead of capturing it.
+    /// keepErrorLine: which stderr lines may appear in the error's 20-line tail (drops known noise, e.g. a linker
+    /// warning repeated per input, so the real error stays visible).
     @discardableResult
     public static func run(
         _ executable: String, _ arguments: [String],
         cwd: URL? = nil, env: [String: String?] = [:],
         baseEnvironment: [String: String] = ProcessInfo.processInfo.environment,
-        stage: Stage, passthrough: Bool = false
+        stage: Stage, passthrough: Bool = false, keepErrorLine: (Substring) -> Bool = { _ in true }
     ) throws -> ShellResult {
         let p = Process()
         p.executableURL = URL(fileURLWithPath: "/usr/bin/env")
@@ -50,7 +52,7 @@ public enum Shell {
         let stdout = (try? String(contentsOf: outURL, encoding: .utf8)) ?? ""
         let stderr = (try? String(contentsOf: errURL, encoding: .utf8)) ?? ""
         if p.terminationStatus != 0 {
-            let tail = stderr.split(separator: "\n").suffix(20).joined(separator: "\n")
+            let tail = stderr.split(separator: "\n").filter(keepErrorLine).suffix(20).joined(separator: "\n")
             throw XlessError(stage, "`\(executable) \(arguments.joined(separator: " "))` exited with \(p.terminationStatus)\(tail.isEmpty ? "" : ":\n\(tail)")",
                              fix: "see the tool output above")
         }

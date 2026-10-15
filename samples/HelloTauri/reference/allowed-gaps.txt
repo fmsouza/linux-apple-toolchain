@@ -1,0 +1,9 @@
+# Known differences between an xless build of samples/HelloTauri (after `finalize`) and the Mac reference
+# (reference.json). One compare key per line; `#` starts a comment. Used by scripts/test-tauri-linux.sh
+# (xless tauri compare --allow-file). Explained in docs/research/parity-known-gaps.md, "Tauri iOS".
+
+# finalize stamps the overlay's usesNonExemptEncryption; tauri ios build writes no such key
+plist:ITSAppUsesNonExemptEncryption
+
+# the overlay's privacyManifest is copied into the bundle (App Store builds need one); the reference app has none
+file:PrivacyInfo.xcprivacy

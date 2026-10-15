@@ -53,7 +53,9 @@ public enum Entitlements {
                              teamID: String, bundleID: String) throws -> [String: Any] {
         for key in user.keys.sorted() where !managedKeys.contains(key) && profile[key] == nil
             && !isUngated(key) {
-            throw XlessError(.sign, "entitlement '\(key)' is not granted by the provisioning profile",
+            let manual = Capabilities.map[key] == nil
+            throw XlessError(.sign, "entitlement '\(key)' is not granted by the provisioning profile for \(bundleID)"
+                             + (manual ? "; xless cannot enable this capability automatically" : ""),
                              fix: "enable the matching capability for \(bundleID) at developer.apple.com/account/resources/identifiers, then re-run")
         }
         var out = user.filter { !managedKeys.contains($0.key) }

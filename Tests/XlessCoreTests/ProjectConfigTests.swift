@@ -98,3 +98,18 @@ func rejectsInvalidTestflight(extra: String) {
     let long = String(repeating: "x", count: 4001)
     #expect(throws: XlessError.self) { try ProjectConfig.parse(yaml: validYAML + "\ntestflight: { groups: [A], whatToTest: \(long) }\n") }
 }
+
+@Test func datedBuildSchemeAcceptsFourComponentDatedBuild() throws {
+    let c = try ProjectConfig.parse(yaml: validYAML, buildOverride: "1.0.0.2026101501", buildScheme: .dated)
+    #expect(c.build == "1.0.0.2026101501")
+    #expect(c.buildScheme == .dated)
+}
+
+@Test(arguments: ["1.0.0.2026101500", "1.0.0.1999101501", "1.0.0", "1.0.0.202610150", "2026101501", "1.0.1.2026101501", "1.0.2026101501"])
+func datedBuildSchemeRejectsBadBuild(build: String) {
+    #expect(throws: XlessError.self) { try ProjectConfig.parse(yaml: validYAML, buildOverride: build, buildScheme: .dated) }
+}
+
+@Test func fixedBuildSchemeRejectsDatedBuild() {
+    #expect(throws: XlessError.self) { try ProjectConfig.parse(yaml: validYAML, buildOverride: "1.0.0.2026101501") }
+}

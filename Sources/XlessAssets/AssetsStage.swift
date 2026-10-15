@@ -36,27 +36,23 @@ public enum AssetsStage {
         switch platform {
         case .ios:
             try checkIconsOpaque(icons)
+            let source = try iosIconSource(catalog: catalog)
             let result: CompileResult
             let scratch = FileManager.default.temporaryDirectory.appendingPathComponent("xless-assets-\(UUID().uuidString)", isDirectory: true)
             defer { try? FileManager.default.removeItem(at: scratch) }
             do {
-                let copy = try normalizedCatalogCopy(catalog, in: scratch)
+                let copy = try normalizedCatalogCopy(catalog, in: scratch, singleSizeIcon: source?.filename)
                 result = try await XCAssetCompiler(deploymentTarget: try config.platform(.ios).minimumOS).compile(catalog: copy)
             } catch {
                 throw XlessError(.assets, "AssetKit failed on \(catalog.path): \(error)", fix: "remove unsupported asset types (PDF, data sets, stickers) or report to xtool-org/AssetKit")
             }
             try result.carData.write(to: app.appendingPathComponent("Assets.car"))
-            if let icon = result.appIconBundle {
-                if let png = icons.first, isSingleSizeIcon(catalog: catalog) {
-                    for f in try XcodeAppIcon.looseFiles(name: icon.primaryIconName, icon1024: png) {
-                        try f.data.write(to: app.appendingPathComponent(f.name))
-                    }
-                    let family = (info["UIDeviceFamily"] as? [Any])?.compactMap { ($0 as? Int) ?? ($0 as? NSNumber)?.intValue } ?? [1, 2]
-                    for (k, v) in XcodeAppIcon.plistAdditions(name: icon.primaryIconName, deviceFamily: family) { info[k] = v }
-                } else {
-                    for f in icon.looseFiles { try f.data.write(to: app.appendingPathComponent(f.name)) }
-                    for (k, v) in icon.infoPlistAdditions { info[k] = v }
+            if let icon = result.appIconBundle, let source {
+                for f in try XcodeAppIcon.looseFiles(name: icon.primaryIconName, icon1024: source.png) {
+                    try f.data.write(to: app.appendingPathComponent(f.name))
                 }
+                let family = (info["UIDeviceFamily"] as? [Any])?.compactMap { ($0 as? Int) ?? ($0 as? NSNumber)?.intValue } ?? [1, 2]
+                for (k, v) in XcodeAppIcon.plistAdditions(name: icon.primaryIconName, deviceFamily: family) { info[k] = v }
                 info.removeValue(forKey: "CFBundleIconFile")
             }
         case .macos:
@@ -72,7 +68,8 @@ public enum AssetsStage {
     }
 
     /// Copies the catalog into `dir`, adding the missing "scale" to app icon entries (AssetKit requires it).
-    static func normalizedCatalogCopy(_ catalog: URL, in dir: URL) throws -> URL {
+    /// With `singleSizeIcon`, the app icon set is first rewritten to Xcode's single-size form around that file.
+    static func normalizedCatalogCopy(_ catalog: URL, in dir: URL, singleSizeIcon: String? = nil) throws -> URL {
         let fm = FileManager.default
         try fm.createDirectory(at: dir, withIntermediateDirectories: true)
         let copy = dir.appendingPathComponent(catalog.lastPathComponent, isDirectory: true)
@@ -80,7 +77,8 @@ public enum AssetsStage {
         let items = (try? fm.contentsOfDirectory(at: copy, includingPropertiesForKeys: nil)) ?? []
         for set in items where set.pathExtension == "appiconset" {
             let url = set.appendingPathComponent("Contents.json")
-            guard let data = try? Data(contentsOf: url) else { continue }
+            guard var data = try? Data(contentsOf: url) else { continue }
+            if let singleSizeIcon { data = try singleSizeContents(data, filename: singleSizeIcon) }
             try normalizedAppIconContents(data).write(to: url)
         }
         return copy
@@ -101,14 +99,49 @@ public enum AssetsStage {
         return try JSONSerialization.data(withJSONObject: root, options: [.prettyPrinted, .sortedKeys])
     }
 
+    /// `contentsJSON` reduced to one universal 1024x1024 iOS image (`XcodeAppIcon.isSingleSize` form), keeping "info".
+    static func singleSizeContents(_ contentsJSON: Data, filename: String) throws -> Data {
+        let root = (try? JSONSerialization.jsonObject(with: contentsJSON)) as? [String: Any] ?? [:]
+        var out: [String: Any] = ["images": [["filename": filename, "idiom": "universal", "platform": "ios", "size": "1024x1024"]]]
+        out["info"] = root["info"]
+        return try JSONSerialization.data(withJSONObject: out, options: [.prettyPrinted, .sortedKeys])
+    }
+
+    /// The 1024px image an iOS app icon is compiled from, or nil without an app icon set. A single-size set uses its
+    /// one image. A multi-size set uses its 1024px image (the ios-marketing one first): xless always compiles iOS icons
+    /// as Xcode's single-size form, the only form App Store Connect has validated (per-size AssetKit output was
+    /// rejected with 90023, no 152px iPad icon).
+    static func iosIconSource(catalog: URL) throws -> (filename: String, png: Data)? {
+        guard let set = appIconSet(catalog: catalog) else { return nil }
+        let data = (try? Data(contentsOf: set.appendingPathComponent("Contents.json"))) ?? Data()
+        let images = ((try? JSONSerialization.jsonObject(with: data)) as? [String: Any])?["images"] as? [[String: Any]] ?? []
+        let withFiles = images.filter { ($0["filename"] as? String).map { !$0.isEmpty } ?? false }
+        func png(_ image: [String: Any]) throws -> Data {
+            let name = image["filename"] as! String
+            guard let d = try? Data(contentsOf: set.appendingPathComponent(name)) else {
+                throw XlessError(.assets, "app icon \(name) referenced but missing", fix: "add \(set.path)/\(name)")
+            }
+            return d
+        }
+        func is1024(_ image: [String: Any]) throws -> Bool {
+            let points = (image["size"] as? String)?.split(separator: "x").first.flatMap { Double($0) }
+            let scale = (image["scale"] as? String).flatMap { Double($0.dropLast()) } ?? 1
+            if let points, points * scale == 1024 { return true }
+            let h = try? PNGHeader.parse(png(image))
+            return h?.width == 1024 && h?.height == 1024
+        }
+        let pick = try XcodeAppIcon.isSingleSize(data) ? withFiles.first
+            : withFiles.first { $0["idiom"] as? String == "ios-marketing" } ?? withFiles.first(where: is1024)
+        guard let pick else {
+            throw XlessError(.assets, "\(set.path) is a multi-size app icon set without a 1024×1024 image; iOS icons are compiled from it",
+                             fix: "add a 1024×1024 ios-marketing icon")
+        }
+        return (pick["filename"] as! String, try png(pick))
+    }
+
     static func appIconSet(catalog: URL) -> URL? {
         let items = (try? FileManager.default.contentsOfDirectory(at: catalog, includingPropertiesForKeys: nil)) ?? []
         return items.first { $0.pathExtension == "appiconset" }
-    }
-
-    static func isSingleSizeIcon(catalog: URL) -> Bool {
-        guard let set = appIconSet(catalog: catalog) else { return false }
-        return XcodeAppIcon.isSingleSize((try? Data(contentsOf: set.appendingPathComponent("Contents.json"))) ?? Data())
     }
 
     /// PNG files referenced by the catalog's single .appiconset.

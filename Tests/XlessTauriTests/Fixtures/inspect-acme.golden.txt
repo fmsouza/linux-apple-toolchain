@@ -1,0 +1,50 @@
+[project]
+overlay: acme
+bundleID: com.example.acme
+teamID: ABCDE12345
+version: 1.2.3
+product: Acme
+minimumOS: 15.0
+target: acme_iOS
+features: zeta, alpha
+entitlements: src-tauri/gen/apple/acme_iOS/acme_iOS.entitlements
+infoPlist: src-tauri/gen/apple/acme_iOS/Info.plist
+assets: src-tauri/gen/apple/Assets.xcassets
+launchStoryboard: src-tauri/gen/apple/LaunchScreen.storyboard
+privacyManifest: PrivacyInfo.xcprivacy
+usesNonExemptEncryption: (unset)
+
+[contract]
+supported: 2.12.x
+tauri: 2.13.0
+cli: 2.12.1
+status: OFF CONTRACT
+
+[sources]
+tauriDir: src-tauri
+appleDir: src-tauri/gen/apple
+frontendDist: ../dist
+beforeBuildCommand: node build.mjs
+targetSources: Assets.xcassets, Externals, LaunchScreen.storyboard, Sources, acme_iOS, models
+
+[link]
+libraries: (none)
+frameworks: x
+sdkFrameworks: CoreGraphics, Metal, UIKit, WebKit
+linkFlags: -ObjC, -lc++
+libraryPaths: $(inherited) $(PROJECT_DIR)/Externals/arm64/$(CONFIGURATION)
+headerPaths: (none)
+swiftPackages: (run xless build to discover)
+
+[binaryDependencies]
+Zed.xcframework: https://example.com/Zed.zip sha256=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa extract=Zed.xcframework to=src-tauri/gen/apple/Pods/Zed/Zed.xcframework
+
+[scripts]
+Build Rust Code: built-in (only its `tauri ios xcode-script` step is reproduced, by the build stage; the rest of the script is not executed)
+  | pnpm tauri ios xcode-script -v --platform "${PLATFORM_DISPLAY_NAME:?}" --configuration "${CONFIGURATION:?}" ${ARCHS:?}
+Patch Thing: UNHANDLED
+
+[build]
+scheme: dated
+number: (chosen when a build starts)
+next: (needs App Store Connect credentials)

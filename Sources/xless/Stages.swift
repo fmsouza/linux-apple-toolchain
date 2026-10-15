@@ -6,12 +6,20 @@ import XlessCore
 import XlessFinalize
 import XlessPackage
 import XlessSign
+import XlessTauri
 
 /// One function per stage. Each runs inside `withStage`, so every failure (including raw App Store Connect,
 /// network and file errors) prints `[stage] cause — fix` and exits with that stage's code.
 enum StageRunner {
+    /// Tauri overlays only: contract and script checks, the work copy and the toolchains the build needs.
+    static func prepare(_ ctx: Context) async throws -> String {
+        guard let tauri = ctx.tauriBuild else { return "skipped (not a Tauri project)" }
+        return try await TauriBuilder.prepare(ctx: tauri).path
+    }
+
     static func build(_ ctx: Context) async throws -> URL {
-        try await withStage(.build) {
+        if let tauri = ctx.tauriBuild { return try await TauriBuilder.build(ctx: tauri) }
+        return try await withStage(.build) {
             switch ctx.platform {
             case .ios: return try IOSBuilder.build(project: ctx.project, config: ctx.config, paths: ctx.paths)
             case .macos: return try MacBuilder.build(project: ctx.project, config: ctx.config, paths: ctx.paths)

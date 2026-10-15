@@ -6,7 +6,7 @@ struct Xless: AsyncParsableCommand {
         commandName: "xless",
         abstract: "Build, sign and ship Apple-platform apps from Linux.",
         version: XlessVersion.current,
-        subcommands: [ShipCommand.self, BuildCommand.self, AssetsCommand.self, FinalizeCommand.self, SignCommand.self,
-                      PackageCommand.self, UploadCommand.self, InspectCommand.self, SDKCommand.self, NibCommand.self, StoryboardCommand.self]
+        subcommands: [ShipCommand.self, PrepareCommand.self, BuildCommand.self, AssetsCommand.self, FinalizeCommand.self, SignCommand.self,
+                      PackageCommand.self, UploadCommand.self, InspectCommand.self, SDKCommand.self, NibCommand.self, StoryboardCommand.self, ShimCommand.self, TauriCommand.self]
     )
 }

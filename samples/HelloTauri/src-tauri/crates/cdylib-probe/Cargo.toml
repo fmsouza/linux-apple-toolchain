@@ -1,0 +1,10 @@
+[package]
+name = "cdylib-probe"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+# A dependency that declares a cdylib is still linked as an iOS dylib during `cargo rustc --crate-type staticlib`,
+# so this exercises the cargo iOS linker wrapper.
+[lib]
+crate-type = ["cdylib", "rlib"]

@@ -1,0 +1,248 @@
+{
+  "cargo": [
+    {
+      "argv": [
+        "metadata",
+        "--no-deps",
+        "--format-version",
+        "1"
+      ],
+      "cwd": "$WORK/src-tauri",
+      "env": {
+        "IPHONEOS_DEPLOYMENT_TARGET": "16.0",
+        "SDKROOT": "$DEVELOPER/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk",
+        "TAURI_CLI_VERBOSITY": "1"
+      }
+    },
+    {
+      "argv": [
+        "metadata",
+        "--no-deps",
+        "--format-version",
+        "1"
+      ],
+      "cwd": "$WORK/src-tauri",
+      "env": {
+        "IPHONEOS_DEPLOYMENT_TARGET": "16.0",
+        "SDKROOT": "$DEVELOPER/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk",
+        "TAURI_CLI_VERBOSITY": "1",
+        "TAURI_IOS_APP_NAME": "hello-tauri",
+        "TAURI_IOS_PROJECT_PATH": "$WORK/src-tauri/gen/apple"
+      }
+    },
+    {
+      "argv": [
+        "metadata",
+        "--no-deps",
+        "--format-version",
+        "1"
+      ],
+      "cwd": "$WORK/src-tauri",
+      "env": {
+        "IPHONEOS_DEPLOYMENT_TARGET": "16.0",
+        "SDKROOT": "$DEVELOPER/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk",
+        "TAURI_CLI_VERBOSITY": "1",
+        "TAURI_IOS_APP_NAME": "hello-tauri",
+        "TAURI_IOS_PROJECT_PATH": "$WORK/src-tauri/gen/apple"
+      }
+    },
+    {
+      "argv": [
+        "metadata",
+        "--no-deps",
+        "--format-version",
+        "1"
+      ],
+      "cwd": "$WORK/src-tauri",
+      "env": {
+        "IPHONEOS_DEPLOYMENT_TARGET": "16.0",
+        "SDKROOT": "$DEVELOPER/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk",
+        "TAURI_CLI_VERBOSITY": "1",
+        "TAURI_IOS_APP_NAME": "hello-tauri",
+        "TAURI_IOS_PROJECT_PATH": "$WORK/src-tauri/gen/apple"
+      }
+    },
+    {
+      "argv": [
+        "metadata",
+        "--no-deps",
+        "--format-version",
+        "1"
+      ],
+      "cwd": "$WORK/src-tauri",
+      "env": {
+        "CCHROOT": "$DARWIN_USER_CACHE_DIR/com.apple.DeveloperTools/27.0-27A266a/Xcode",
+        "IPHONEOS_DEPLOYMENT_TARGET": "16.0",
+        "SDKROOT": "$SDK",
+        "TAURI_CLI_VERBOSITY": "1",
+        "TAURI_IOS_APP_NAME": "hello-tauri",
+        "TAURI_IOS_PROJECT_PATH": "$WORK/src-tauri/gen/apple"
+      }
+    },
+    {
+      "argv": [
+        "metadata",
+        "--no-deps",
+        "--format-version",
+        "1"
+      ],
+      "cwd": "$WORK/src-tauri",
+      "env": {
+        "CCHROOT": "$DARWIN_USER_CACHE_DIR/com.apple.DeveloperTools/27.0-27A266a/Xcode",
+        "IPHONEOS_DEPLOYMENT_TARGET": "16.0",
+        "SDKROOT": "$SDK",
+        "TAURI_CLI_VERBOSITY": "1",
+        "TAURI_IOS_APP_NAME": "hello-tauri",
+        "TAURI_IOS_PROJECT_PATH": "$WORK/src-tauri/gen/apple"
+      }
+    },
+    {
+      "argv": [
+        "build",
+        "--package",
+        "hello-tauri",
+        "--manifest-path",
+        "$WORK/src-tauri/Cargo.toml",
+        "--target",
+        "aarch64-apple-ios",
+        "--features",
+        "tauri/custom-protocol tauri/custom-protocol",
+        "--lib",
+        "--release",
+        "--color",
+        "always"
+      ],
+      "cwd": "$WORK",
+      "env": {
+        "CCHROOT": "$DARWIN_USER_CACHE_DIR/com.apple.DeveloperTools/27.0-27A266a/Xcode",
+        "CFLAGS_aarch64_apple_ios": "-isysroot $SDK",
+        "CFLAGS_x86_64_apple_darwin": "-isysroot $SDK/../../../../MacOSX.platform/Developer/SDKs/MacOSX.sdk",
+        "IPHONEOS_DEPLOYMENT_TARGET": "16.0",
+        "SDKROOT": "$SDK",
+        "TAURI_CLI_VERBOSITY": "1",
+        "TAURI_IOS_APP_NAME": "hello-tauri",
+        "TAURI_IOS_PROJECT_PATH": "$WORK/src-tauri/gen/apple"
+      }
+    },
+    {
+      "argv": [
+        "metadata",
+        "--no-deps",
+        "--format-version",
+        "1"
+      ],
+      "cwd": "$WORK/src-tauri",
+      "env": {
+        "CCHROOT": "$DARWIN_USER_CACHE_DIR/com.apple.DeveloperTools/27.0-27A266a/Xcode",
+        "IPHONEOS_DEPLOYMENT_TARGET": "16.0",
+        "SDKROOT": "$SDK",
+        "TAURI_CLI_VERBOSITY": "1",
+        "TAURI_IOS_APP_NAME": "hello-tauri",
+        "TAURI_IOS_PROJECT_PATH": "$WORK/src-tauri/gen/apple"
+      }
+    }
+  ],
+  "compile": [
+    {
+      "command": "$TOOLCHAIN/usr/bin/clang -x objective-c++ -ivfsstatcache $HOME/Library/Developer/Xcode/DerivedData/SDKStatCaches.noindex/iphoneos27.0-24A430-6c78b3cbc238196c85e1bf6c792c5915.sdkstatcache -target arm64-apple-ios16.0 -fmessage-length\\=0 -fdiagnostics-show-note-include-stack -fmacro-backtrace-limit\\=0 -fno-color-diagnostics -fmodules-prune-interval\\=86400 -fmodules-prune-after\\=345600 -fbuild-session-file\\=$HOME/Library/Developer/Xcode/DerivedData/ModuleCache.noindex/Session.modulevalidation -fmodules-validate-once-per-build-session -Wnon-modular-include-in-framework-module -Werror\\=non-modular-include-in-framework-module -Wno-trigraphs -Wno-missing-field-initializers -Wno-missing-prototypes -Werror\\=return-type -Wdocumentation -Wunreachable-code -Wquoted-include-in-framework-header -Wno-implicit-atomic-properties -Werror\\=deprecated-objc-isa-usage -Wno-objc-interface-ivars -Werror\\=objc-root-class -Wno-arc-repeated-use-of-weak -Wimplicit-retain-self -Wno-non-virtual-dtor -Wno-overloaded-virtual -Wno-exit-time-destructors -Wduplicate-method-match -Wno-missing-braces -Wparentheses -Wswitch -Wunused-function -Wno-unused-label -Wno-unused-parameter -Wunused-variable -Wunused-value -Wempty-body -Wuninitialized -Wconditional-uninitialized -Wno-unknown-pragmas -Wno-shadow -Wno-four-char-constants -Wno-conversion -Wconstant-conversion -Wint-conversion -Wbool-conversion -Wenum-conversion -Wno-float-conversion -Wnon-literal-null-conversion -Wobjc-literal-conversion -Wshorten-64-to-32 -Wno-newline-eof -Wno-selector -Wno-strict-selector-match -Wundeclared-selector -Wdeprecated-implementations -Wno-c++11-extensions -Wno-implicit-fallthrough -isysroot $SDK -fstrict-aliasing -Wprotocol -Wdeprecated-declarations -Winvalid-offsetof -Wno-sign-conversion -Winfinite-recursion -Wmove -Wcomma -Wblock-capture-autoreleasing -Wstrict-prototypes -Wrange-loop-analysis -Wno-semicolon-before-method-body -Wunguarded-availability @$DERIVED/Build/Intermediates.noindex/ArchiveIntermediates/hello-tauri_iOS/IntermediateBuildFilesPath/hello-tauri.build/release-iphoneos/hello-tauri_iOS.build/Objects-normal/arm64/af3fcb34312c57c0f52879cdce924b91-common-args.resp -MMD -MT dependencies -MF $DERIVED/Build/Intermediates.noindex/ArchiveIntermediates/hello-tauri_iOS/IntermediateBuildFilesPath/hello-tauri.build/release-iphoneos/hello-tauri_iOS.build/Objects-normal/arm64/main.d --serialize-diagnostics $DERIVED/Build/Intermediates.noindex/ArchiveIntermediates/hello-tauri_iOS/IntermediateBuildFilesPath/hello-tauri.build/release-iphoneos/hello-tauri_iOS.build/Objects-normal/arm64/main.dia -c $WORK/src-tauri/gen/apple/Sources/hello-tauri/main.mm -o $DERIVED/Build/Intermediates.noindex/ArchiveIntermediates/hello-tauri_iOS/IntermediateBuildFilesPath/hello-tauri.build/release-iphoneos/hello-tauri_iOS.build/Objects-normal/arm64/main.o",
+      "responseArgs": "'-std=gnu++14' '-stdlib=libc++' -fobjc-arc -fobjc-weak -fmodules -fno-cxx-modules -gmodules '-fmodules-cache-path=$HOME/Library/Developer/Xcode/DerivedData/ModuleCache.noindex' -fpascal-strings -Os -fno-common '-DNS_BLOCK_ASSERTIONS=1' '-DOBJC_OLD_DISPATCH_PROTOTYPES=0' -g '-fvisibility=hidden' -fvisibility-inlines-hidden -iquote $DERIVED/Build/Intermediates.noindex/ArchiveIntermediates/hello-tauri_iOS/IntermediateBuildFilesPath/hello-tauri.build/release-iphoneos/hello-tauri_iOS.build/HelloTauri-generated-files.hmap -I$DERIVED/Build/Intermediates.noindex/ArchiveIntermediates/hello-tauri_iOS/IntermediateBuildFilesPath/hello-tauri.build/release-iphoneos/hello-tauri_iOS.build/HelloTauri-own-target-headers.hmap -I$DERIVED/Build/Intermediates.noindex/ArchiveIntermediates/hello-tauri_iOS/IntermediateBuildFilesPath/hello-tauri.build/release-iphoneos/hello-tauri_iOS.build/HelloTauri-all-target-headers.hmap -iquote $DERIVED/Build/Intermediates.noindex/ArchiveIntermediates/hello-tauri_iOS/IntermediateBuildFilesPath/hello-tauri.build/release-iphoneos/hello-tauri_iOS.build/HelloTauri-project-headers.hmap -I$DERIVED/Build/Intermediates.noindex/ArchiveIntermediates/hello-tauri_iOS/BuildProductsPath/release-iphoneos/include -I$DERIVED/Build/Intermediates.noindex/ArchiveIntermediates/hello-tauri_iOS/IntermediateBuildFilesPath/hello-tauri.build/release-iphoneos/hello-tauri_iOS.build/DerivedSources-normal/arm64 -I$DERIVED/Build/Intermediates.noindex/ArchiveIntermediates/hello-tauri_iOS/IntermediateBuildFilesPath/hello-tauri.build/release-iphoneos/hello-tauri_iOS.build/DerivedSources/arm64 -I$DERIVED/Build/Intermediates.noindex/ArchiveIntermediates/hello-tauri_iOS/IntermediateBuildFilesPath/hello-tauri.build/release-iphoneos/hello-tauri_iOS.build/DerivedSources -F$DERIVED/Build/Intermediates.noindex/ArchiveIntermediates/hello-tauri_iOS/BuildProductsPath/release-iphoneos -F.",
+      "responseFile": "$DERIVED/Build/Intermediates.noindex/ArchiveIntermediates/hello-tauri_iOS/IntermediateBuildFilesPath/hello-tauri.build/release-iphoneos/hello-tauri_iOS.build/Objects-normal/arm64/af3fcb34312c57c0f52879cdce924b91-common-args.resp",
+      "source": "$WORK/src-tauri/gen/apple/Sources/hello-tauri/main.mm"
+    }
+  ],
+  "link": "$TOOLCHAIN/usr/bin/clang++ -Xlinker -reproducible -target arm64-apple-ios16.0 -isysroot $SDK -Os -Xlinker -no_warn_duplicate_libraries -L$DERIVED/Build/Intermediates.noindex/ArchiveIntermediates/hello-tauri_iOS/IntermediateBuildFilesPath/EagerLinkingTBDs/release-iphoneos -L$DERIVED/Build/Intermediates.noindex/ArchiveIntermediates/hello-tauri_iOS/BuildProductsPath/release-iphoneos -L$WORK/src-tauri/gen/apple/Externals/arm64/release -L$SDK/usr/lib/swift -L$TOOLCHAIN/usr/lib/swift/iphoneos -L$TOOLCHAIN/usr/lib/swift-5.0/iphoneos -F$DERIVED/Build/Intermediates.noindex/ArchiveIntermediates/hello-tauri_iOS/IntermediateBuildFilesPath/EagerLinkingTBDs/release-iphoneos -F$DERIVED/Build/Intermediates.noindex/ArchiveIntermediates/hello-tauri_iOS/BuildProductsPath/release-iphoneos -F. -filelist $DERIVED/Build/Intermediates.noindex/ArchiveIntermediates/hello-tauri_iOS/IntermediateBuildFilesPath/hello-tauri.build/release-iphoneos/hello-tauri_iOS.build/Objects-normal/arm64/HelloTauri.LinkFileList -Xlinker -rpath -Xlinker @executable_path/Frameworks -Xlinker -dead_strip -Xlinker -object_path_lto -Xlinker $DERIVED/Build/Intermediates.noindex/ArchiveIntermediates/hello-tauri_iOS/IntermediateBuildFilesPath/hello-tauri.build/release-iphoneos/hello-tauri_iOS.build/Objects-normal/arm64/HelloTauri_lto.o -Xlinker -final_output -Xlinker /Applications/HelloTauri.app/HelloTauri -Xlinker -dependency_info -Xlinker $DERIVED/Build/Intermediates.noindex/ArchiveIntermediates/hello-tauri_iOS/IntermediateBuildFilesPath/hello-tauri.build/release-iphoneos/hello-tauri_iOS.build/Objects-normal/arm64/HelloTauri_dependency_info.dat -stdlib\\=libc++ -fobjc-arc -fobjc-link-runtime -lapp -framework CoreGraphics -framework Metal -framework MetalKit -framework QuartzCore -framework Security -framework UIKit -framework WebKit -o $DERIVED/Build/Intermediates.noindex/ArchiveIntermediates/hello-tauri_iOS/InstallationBuildProductsLocation/Applications/HelloTauri.app/HelloTauri",
+  "linkFiles": [
+    "$DERIVED/Build/Intermediates.noindex/ArchiveIntermediates/hello-tauri_iOS/IntermediateBuildFilesPath/hello-tauri.build/release-iphoneos/hello-tauri_iOS.build/Objects-normal/arm64/main.o"
+  ],
+  "swift": [
+    [
+      "-target",
+      "arm64-apple-ios16.0",
+      "-print-target-info"
+    ]
+  ],
+  "swiftBuild": [
+    {
+      "argv": [
+        "build",
+        "--sdk",
+        "$SDK",
+        "-c",
+        "release",
+        "--triple",
+        "arm64-apple-ios16.0",
+        "--build-path",
+        "$WORK/src-tauri/target/aarch64-apple-ios/release/build/tauri-92d0b1bd6baf1ee5/out/swift-rs/Tauri",
+        "-Xcc",
+        "--target=arm64-apple-ios16.0",
+        "-Xcxx",
+        "--target=arm64-apple-ios16.0"
+      ],
+      "cwd": "$HOME/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tauri-2.12.0/mobile/ios-api"
+    },
+    {
+      "argv": [
+        "build",
+        "--sdk",
+        "$SDK",
+        "-c",
+        "release",
+        "--triple",
+        "arm64-apple-ios16.0",
+        "--build-path",
+        "$WORK/src-tauri/target/aarch64-apple-ios/release/build/tauri-plugin-hello-07c853cc93f2b096/out/swift-rs/tauri-plugin-hello",
+        "-Xcc",
+        "--target=arm64-apple-ios16.0",
+        "-Xcxx",
+        "--target=arm64-apple-ios16.0"
+      ],
+      "cwd": "$WORK/src-tauri/plugins/hello-plugin/ios"
+    },
+    {
+      "argv": [
+        "build",
+        "--sdk",
+        "$SDK",
+        "-c",
+        "release",
+        "--triple",
+        "arm64-apple-ios16.0",
+        "--build-path",
+        "$WORK/src-tauri/target/aarch64-apple-ios/release/build/tauri-plugin-dialog-37370e232d5a6a28/out/swift-rs/tauri-plugin-dialog",
+        "-Xcc",
+        "--target=arm64-apple-ios16.0",
+        "-Xcxx",
+        "--target=arm64-apple-ios16.0"
+      ],
+      "cwd": "$HOME/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tauri-plugin-dialog-2.7.1/ios"
+    }
+  ],
+  "xcrun": [
+    [
+      "simctl",
+      "list",
+      "runtimes",
+      "--json"
+    ],
+    [
+      "agvtool",
+      "new-version",
+      "-all",
+      "1.0.0.1"
+    ],
+    [
+      "--sdk",
+      "macosx",
+      "--show-sdk-path"
+    ],
+    [
+      "--sdk",
+      "iphoneos",
+      "--show-sdk-path"
+    ],
+    [
+      "xcodebuild",
+      "-version"
+    ]
+  ]
+}

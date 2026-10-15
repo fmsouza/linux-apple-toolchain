@@ -1,0 +1,29 @@
+# Example xless overlay for a Tauri v2 iOS app (spec §5). An overlay lives outside the app repository; xless syncs
+# the tracked files of `source:` into a work copy (~/.cache/xless/work/<name>) and never writes to the source.
+#
+#   xless ship --config xless.overlay.example.yml
+type: tauri
+source: .                              # read-only; relative paths resolve against this file's directory
+tauri:
+  dir: src-tauri                       # default "src-tauri"
+  features: []                         # cargo features, as `tauri ios build --features`
+bundleID: com.example.hellotauri       # overrides the Tauri identifier
+teamID: ABCDE12345
+version: tauri                         # take the version from tauri.conf.json (default for type: tauri)
+build: dated                           # CFBundleVersion "<version>.<YYYYMMDDNN>"
+privacyManifest: PrivacyInfo.xcprivacy # copied into the app; relative to this file, may live outside the source
+# Extra linker flags for the app target:
+# linkFlags: ["-ObjC"]
+# Prebuilt binary dependencies replace CocoaPods. Each one is downloaded, checked and placed in the work copy:
+# binaryDependencies:
+#   - url: https://example.com/Some.xcframework.zip
+#     sha256: <pinned sha256>
+#     extract: Some.xcframework
+#     to: src-tauri/gen/apple/Pods/Some/Some.xcframework
+#     fixes: { minimumOSVersion: "16.0" }
+#     linkFlags: ["-lc++", "-weak_framework", "CoreML"]
+# project.yml build scripts other than Tauri's "Build Rust Code" must be mapped: ignore
+# scripts:
+#   "Some Script": ignore
+usesNonExemptEncryption: false
+testflight: { groups: [Internal] }

@@ -18,7 +18,7 @@ public enum Inspector {
         let base = bundle.standardizedFileURL.path
         var bins: [BinaryReport] = []
         for f in Files.regularFiles(under: bundle) {
-            guard let d = try? Data(contentsOf: f), MachO.isMachO(d) else { continue }
+            guard let d = try? Data(contentsOf: f), (try MachO.containsLoadableImage(d)) else { continue }
             let versions = try MachO.buildVersions(in: d).map {
                 "platform=\($0.platform) minos=\(MachO.decodeVersion($0.minos)) sdk=\(MachO.decodeVersion($0.sdk))"
             }

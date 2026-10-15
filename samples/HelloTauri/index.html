@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <title>HelloTauri</title>
+    <style>
+      body { font-family: -apple-system, system-ui, sans-serif; margin: 0; padding: 48px 24px; text-align: center; }
+      button { font-size: 1.1rem; padding: 0.6rem 1.2rem; margin: 0.4rem; }
+      #out { margin-top: 1.5rem; font-family: ui-monospace, monospace; }
+    </style>
+  </head>
+  <body>
+    <h1>HelloTauri</h1>
+    <button id="ping">Ping native plugin</button>
+    <button id="dialog">Show dialog</button>
+    <div id="out"></div>
+    <script>
+      const { invoke } = window.__TAURI__.core;
+      const out = document.getElementById("out");
+      document.getElementById("ping").addEventListener("click", async () => {
+        try { out.textContent = JSON.stringify(await invoke("plugin:hello|ping")); }
+        catch (e) { out.textContent = "error: " + e; }
+      });
+      document.getElementById("dialog").addEventListener("click", async () => {
+        try { await invoke("plugin:dialog|message", { message: "Hello from Tauri", title: "HelloTauri" }); out.textContent = "dialog closed"; }
+        catch (e) { out.textContent = "error: " + e; }
+      });
+    </script>
+  </body>
+</html>

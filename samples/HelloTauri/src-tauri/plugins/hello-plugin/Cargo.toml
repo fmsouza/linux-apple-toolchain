@@ -1,0 +1,15 @@
+[package]
+name = "tauri-plugin-hello"
+version = "0.1.0"
+edition = "2021"
+publish = false
+links = "tauri-plugin-hello"
+
+[lib]
+name = "tauri_plugin_hello"
+
+[dependencies]
+tauri = { version = "=2.12.0" }
+
+[build-dependencies]
+tauri-plugin = { version = "=2.6.3", features = ["build"] }

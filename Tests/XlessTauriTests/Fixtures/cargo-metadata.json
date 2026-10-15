@@ -1,0 +1,1530 @@
+{
+ "packages": [
+  {
+   "name": "hello-tauri",
+   "version": "1.0.0",
+   "id": "path+file:///WORK/src-tauri#hello-tauri@1.0.0",
+   "source": null,
+   "dependencies": [
+    {
+     "name": "serde",
+     "source": "registry+https://github.com/rust-lang/crates.io-index",
+     "req": "^1",
+     "kind": null,
+     "rename": null,
+     "optional": false,
+     "uses_default_features": true,
+     "features": [
+      "derive"
+     ],
+     "target": null,
+     "registry": null
+    },
+    {
+     "name": "serde_json",
+     "source": "registry+https://github.com/rust-lang/crates.io-index",
+     "req": "^1",
+     "kind": null,
+     "rename": null,
+     "optional": false,
+     "uses_default_features": true,
+     "features": [],
+     "target": null,
+     "registry": null
+    },
+    {
+     "name": "tauri",
+     "source": "registry+https://github.com/rust-lang/crates.io-index",
+     "req": "=2.12.0",
+     "kind": null,
+     "rename": null,
+     "optional": false,
+     "uses_default_features": true,
+     "features": [],
+     "target": null,
+     "registry": null
+    },
+    {
+     "name": "tauri-plugin-dialog",
+     "source": "registry+https://github.com/rust-lang/crates.io-index",
+     "req": "=2.7.1",
+     "kind": null,
+     "rename": null,
+     "optional": false,
+     "uses_default_features": true,
+     "features": [],
+     "target": null,
+     "registry": null
+    },
+    {
+     "name": "tauri-plugin-hello",
+     "source": null,
+     "req": "*",
+     "kind": null,
+     "rename": null,
+     "optional": false,
+     "uses_default_features": true,
+     "features": [],
+     "target": null,
+     "registry": null,
+     "path": "/WORK/src-tauri/plugins/hello-plugin"
+    },
+    {
+     "name": "tauri-build",
+     "source": "registry+https://github.com/rust-lang/crates.io-index",
+     "req": "=2.7.0",
+     "kind": "build",
+     "rename": null,
+     "optional": false,
+     "uses_default_features": true,
+     "features": [],
+     "target": null,
+     "registry": null
+    }
+   ],
+   "manifest_path": "/WORK/src-tauri/Cargo.toml",
+   "edition": "2021",
+   "links": null
+  },
+  {
+   "name": "serde",
+   "version": "1.0.228",
+   "id": "registry+https://github.com/rust-lang/crates.io-index#serde@1.0.228",
+   "source": "registry+https://github.com/rust-lang/crates.io-index",
+   "dependencies": [
+    {
+     "name": "serde_core",
+     "source": "registry+https://github.com/rust-lang/crates.io-index",
+     "req": "=1.0.228",
+     "kind": null,
+     "rename": null,
+     "optional": false,
+     "uses_default_features": false,
+     "features": [
+      "result"
+     ],
+     "target": null,
+     "registry": null
+    },
+    {
+     "name": "serde_derive",
+     "source": "registry+https://github.com/rust-lang/crates.io-index",
+     "req": "^1",
+     "kind": null,
+     "rename": null,
+     "optional": true,
+     "uses_default_features": true,
+     "features": [],
+     "target": null,
+     "registry": null
+    }
+   ],
+   "manifest_path": "/REGISTRY/serde-1.0.228/Cargo.toml",
+   "edition": "2021",
+   "links": null
+  },
+  {
+   "name": "tauri",
+   "version": "2.12.0",
+   "id": "registry+https://github.com/rust-lang/crates.io-index#tauri@2.12.0",
+   "source": "registry+https://github.com/rust-lang/crates.io-index",
+   "dependencies": [
+    {
+     "name": "anyhow",
+     "source": "registry+https://github.com/rust-lang/crates.io-index",
+     "req": "^1",
+     "kind": null,
+     "rename": null,
+     "optional": false,
+     "uses_default_features": true,
+     "features": [],
+     "target": null,
+     "registry": null
+    },
+    {
+     "name": "cookie",
+     "source": "registry+https://github.com/rust-lang/crates.io-index",
+     "req": "^0.18",
+     "kind": null,
+     "rename": null,
+     "optional": false,
+     "uses_default_features": true,
+     "features": [],
+     "target": null,
+     "registry": null
+    },
+    {
+     "name": "data-url",
+     "source": "registry+https://github.com/rust-lang/crates.io-index",
+     "req": "^0.3",
+     "kind": null,
+     "rename": null,
+     "optional": true,
+     "uses_default_features": true,
+     "features": [],
+     "target": null,
+     "registry": null
+    },
+    {
+     "name": "dirs",
+     "source": "registry+https://github.com/rust-lang/crates.io-index",
+     "req": "^7",
+     "kind": null,
+     "rename": null,
+     "optional": false,
+     "uses_default_features": true,
+     "features": [],
+     "target": null,
+     "registry": null
+    },
+    {
+     "name": "dunce",
+     "source": "registry+https://github.com/rust-lang/crates.io-index",
+     "req": "^1",
+     "kind": null,
+     "rename": null,
+     "optional": false,
+     "uses_default_features": true,
+     "features": [],
+     "target": null,
+     "registry": null
+    },
+    {
+     "name": "getrandom",
+     "source": "registry+https://github.com/rust-lang/crates.io-index",
+     "req": "^0.3",
+     "kind": null,
+     "rename": null,
+     "optional": false,
+     "uses_default_features": true,
+     "features": [],
+     "target": null,
+     "registry": null
+    },
+    {
+     "name": "glob",
+     "source": "registry+https://github.com/rust-lang/crates.io-index",
+     "req": "^0.3",
+     "kind": null,
+     "rename": null,
+     "optional": false,
+     "uses_default_features": true,
+     "features": [],
+     "target": null,
+     "registry": null
+    },
+    {
+     "name": "heck",
+     "source": "registry+https://github.com/rust-lang/crates.io-index",
+     "req": "^0.5",
+     "kind": null,
+     "rename": null,
+     "optional": false,
+     "uses_default_features": true,
+     "features": [],
+     "target": null,
+     "registry": null
+    },
+    {
+     "name": "http",
+     "source": "registry+https://github.com/rust-lang/crates.io-index",
+     "req": "^1",
+     "kind": null,
+     "rename": null,
+     "optional": false,
+     "uses_default_features": true,
+     "features": [],
+     "target": null,
+     "registry": null
+    },
+    {
+     "name": "http-range",
+     "source": "registry+https://github.com/rust-lang/crates.io-index",
+     "req": "^0.1",
+     "kind": null,
+     "rename": null,
+     "optional": true,
+     "uses_default_features": true,
+     "features": [],
+     "target": null,
+     "registry": null
+    },
+    {
+     "name": "image",
+     "source": "registry+https://github.com/rust-lang/crates.io-index",
+     "req": "^0.25",
+     "kind": null,
+     "rename": null,
+     "optional": true,
+     "uses_default_features": false,
+     "features": [],
+     "target": null,
+     "registry": null
+    },
+    {
+     "name": "log",
+     "source": "registry+https://github.com/rust-lang/crates.io-index",
+     "req": "^0.4.21",
+     "kind": null,
+     "rename": null,
+     "optional": false,
+     "uses_default_features": true,
+     "features": [],
+     "target": null,
+     "registry": null
+    },
+    {
+     "name": "mime",
+     "source": "registry+https://github.com/rust-lang/crates.io-index",
+     "req": "^0.3",
+     "kind": null,
+     "rename": null,
+     "optional": false,
+     "uses_default_features": true,
+     "features": [],
+     "target": null,
+     "registry": null
+    },
+    {
+     "name": "percent-encoding",
+     "source": "registry+https://github.com/rust-lang/crates.io-index",
+     "req": "^2",
+     "kind": null,
+     "rename": null,
+     "optional": false,
+     "uses_default_features": true,
+     "features": [],
+     "target": null,
+     "registry": null
+    },
+    {
+     "name": "raw-window-handle",
+     "source": "registry+https://github.com/rust-lang/crates.io-index",
+     "req": "^0.6",
+     "kind": null,
+     "rename": null,
+     "optional": false,
+     "uses_default_features": true,
+     "features": [
+      "std"
+     ],
+     "target": null,
+     "registry": null
+    },
+    {
+     "name": "serde",
+     "source": "registry+https://github.com/rust-lang/crates.io-index",
+     "req": "^1",
+     "kind": null,
+     "rename": null,
+     "optional": false,
+     "uses_default_features": true,
+     "features": [
+      "derive",
+      "rc"
+     ],
+     "target": null,
+     "registry": null
+    },
+    {
+     "name": "serde_json",
+     "source": "registry+https://github.com/rust-lang/crates.io-index",
+     "req": "^1",
+     "kind": null,
+     "rename": null,
+     "optional": false,
+     "uses_default_features": true,
+     "features": [
+      "raw_value"
+     ],
+     "target": null,
+     "registry": null
+    },
+    {
+     "name": "serde_repr",
+     "source": "registry+https://github.com/rust-lang/crates.io-index",
+     "req": "^0.1",
+     "kind": null,
+     "rename": null,
+     "optional": false,
+     "uses_default_features": true,
+     "features": [],
+     "target": null,
+     "registry": null
+    },
+    {
+     "name": "serialize-to-javascript",
+     "source": "registry+https://github.com/rust-lang/crates.io-index",
+     "req": "^0.1.2",
+     "kind": null,
+     "rename": null,
+     "optional": false,
+     "uses_default_features": true,
+     "features": [],
+     "target": null,
+     "registry": null
+    },
+    {
+     "name": "specta",
+     "source": "registry+https://github.com/rust-lang/crates.io-index",
+     "req": "^2.0.0-rc.16",
+     "kind": null,
+     "rename": null,
+     "optional": true,
+     "uses_default_features": false,
+     "features": [
+      "function",
+      "derive"
+     ],
+     "target": null,
+     "registry": null
+    },
+    {
+     "name": "tauri-macros",
+     "source": "registry+https://github.com/rust-lang/crates.io-index",
+     "req": "~2.7.0",
+     "kind": null,
+     "rename": null,
+     "optional": false,
+     "uses_default_features": true,
+     "features": [],
+     "target": null,
+     "registry": null
+    },
+    {
+     "name": "tauri-runtime",
+     "source": "registry+https://github.com/rust-lang/crates.io-index",
+     "req": "~2.12.0",
+     "kind": null,
+     "rename": null,
+     "optional": false,
+     "uses_default_features": true,
+     "features": [],
+     "target": null,
+     "registry": null
+    },
+    {
+     "name": "tauri-runtime-wry",
+     "source": "registry+https://github.com/rust-lang/crates.io-index",
+     "req": "~2.12.0",
+     "kind": null,
+     "rename": null,
+     "optional": true,
+     "uses_default_features": false,
+     "features": [],
+     "target": null,
+     "registry": null
+    },
+    {
+     "name": "tauri-utils",
+     "source": "registry+https://github.com/rust-lang/crates.io-index",
+     "req": "~2.10.0",
+     "kind": null,
+     "rename": null,
+     "optional": false,
+     "uses_default_features": true,
+     "features": [
+      "resources"
+     ],
+     "target": null,
+     "registry": null
+    },
+    {
+     "name": "thiserror",
+     "source": "registry+https://github.com/rust-lang/crates.io-index",
+     "req": "^2",
+     "kind": null,
+     "rename": null,
+     "optional": false,
+     "uses_default_features": true,
+     "features": [],
+     "target": null,
+     "registry": null
+    },
+    {
+     "name": "tokio",
+     "source": "registry+https://github.com/rust-lang/crates.io-index",
+     "req": "^1",
+     "kind": null,
+     "rename": null,
+     "optional": false,
+     "uses_default_features": true,
+     "features": [
+      "rt",
+      "rt-multi-thread",
+      "sync",
+      "fs",
+      "io-util"
+     ],
+     "target": null,
+     "registry": null
+    },
+    {
+     "name": "tracing",
+     "source": "registry+https://github.com/rust-lang/crates.io-index",
+     "req": "^0.1",
+     "kind": null,
+     "rename": null,
+     "optional": true,
+     "uses_default_features": true,
+     "features": [],
+     "target": null,
+     "registry": null
+    },
+    {
+     "name": "url",
+     "source": "registry+https://github.com/rust-lang/crates.io-index",
+     "req": "^2",
+     "kind": null,
+     "rename": null,
+     "optional": false,
+     "uses_default_features": true,
+     "features": [],
+     "target": null,
+     "registry": null
+    },
+    {
+     "name": "uuid",
+     "source": "registry+https://github.com/rust-lang/crates.io-index",
+     "req": "^1",
+     "kind": null,
+     "rename": null,
+     "optional": true,
+     "uses_default_features": true,
+     "features": [
+      "v4"
+     ],
+     "target": null,
+     "registry": null
+    },
+    {
+     "name": "cargo_toml",
+     "source": "registry+https://github.com/rust-lang/crates.io-index",
+     "req": "^1.0",
+     "kind": "dev",
+     "rename": null,
+     "optional": false,
+     "uses_default_features": true,
+     "features": [],
+     "target": null,
+     "registry": null
+    },
+    {
+     "name": "http-range",
+     "source": "registry+https://github.com/rust-lang/crates.io-index",
+     "req": "^0.1.5",
+     "kind": "dev",
+     "rename": null,
+     "optional": false,
+     "uses_default_features": true,
+     "features": [],
+     "target": null,
+     "registry": null
+    },
+    {
+     "name": "proptest",
+     "source": "registry+https://github.com/rust-lang/crates.io-index",
+     "req": "^1.6.0",
+     "kind": "dev",
+     "rename": null,
+     "optional": false,
+     "uses_default_features": true,
+     "features": [],
+     "target": null,
+     "registry": null
+    },
+    {
+     "name": "quickcheck",
+     "source": "registry+https://github.com/rust-lang/crates.io-index",
+     "req": "^1.0.3",
+     "kind": "dev",
+     "rename": null,
+     "optional": false,
+     "uses_default_features": true,
+     "features": [],
+     "target": null,
+     "registry": null
+    },
+    {
+     "name": "quickcheck_macros",
+     "source": "registry+https://github.com/rust-lang/crates.io-index",
+     "req": "^1.0.0",
+     "kind": "dev",
+     "rename": null,
+     "optional": false,
+     "uses_default_features": true,
+     "features": [],
+     "target": null,
+     "registry": null
+    },
+    {
+     "name": "serde",
+     "source": "registry+https://github.com/rust-lang/crates.io-index",
+     "req": "^1",
+     "kind": "dev",
+     "rename": null,
+     "optional": false,
+     "uses_default_features": true,
+     "features": [
+      "derive"
+     ],
+     "target": null,
+     "registry": null
+    },
+    {
+     "name": "serde_json",
+     "source": "registry+https://github.com/rust-lang/crates.io-index",
+     "req": "^1",
+     "kind": "dev",
+     "rename": null,
+     "optional": false,
+     "uses_default_features": true,
+     "features": [],
+     "target": null,
+     "registry": null
+    },
+    {
+     "name": "tokio",
+     "source": "registry+https://github.com/rust-lang/crates.io-index",
+     "req": "^1",
+     "kind": "dev",
+     "rename": null,
+     "optional": false,
+     "uses_default_features": true,
+     "features": [
+      "full"
+     ],
+     "target": null,
+     "registry": null
+    },
+    {
+     "name": "glob",
+     "source": "registry+https://github.com/rust-lang/crates.io-index",
+     "req": "^0.3",
+     "kind": "build",
+     "rename": null,
+     "optional": false,
+     "uses_default_features": true,
+     "features": [],
+     "target": null,
+     "registry": null
+    },
+    {
+     "name": "heck",
+     "source": "registry+https://github.com/rust-lang/crates.io-index",
+     "req": "^0.5",
+     "kind": "build",
+     "rename": null,
+     "optional": false,
+     "uses_default_features": true,
+     "features": [],
+     "target": null,
+     "registry": null
+    },
+    {
+     "name": "tauri-build",
+     "source": "registry+https://github.com/rust-lang/crates.io-index",
+     "req": "^2.7.0",
+     "kind": "build",
+     "rename": null,
+     "optional": false,
+     "uses_default_features": false,
+     "features": [],
+     "target": null,
+     "registry": null
+    },
+    {
+     "name": "tauri-utils",
+     "source": "registry+https://github.com/rust-lang/crates.io-index",
+     "req": "~2.10.0",
+     "kind": "build",
+     "rename": null,
+     "optional": false,
+     "uses_default_features": true,
+     "features": [
+      "build-2"
+     ],
+     "target": null,
+     "registry": null
+    },
+    {
+     "name": "libc",
+     "source": "registry+https://github.com/rust-lang/crates.io-index",
+     "req": "^0.2",
+     "kind": null,
+     "rename": null,
+     "optional": false,
+     "uses_default_features": true,
+     "features": [],
+     "target": "cfg(all(target_vendor = \"apple\", not(target_os = \"macos\")))",
+     "registry": null
+    },
+    {
+     "name": "objc2-ui-kit",
+     "source": "registry+https://github.com/rust-lang/crates.io-index",
+     "req": "^0.3.2",
+     "kind": null,
+     "rename": null,
+     "optional": false,
+     "uses_default_features": false,
+     "features": [
+      "UIApplication",
+      "UIResponder",
+      "UIView"
+     ],
+     "target": "cfg(all(target_vendor = \"apple\", not(target_os = \"macos\")))",
+     "registry": null
+    },
+    {
+     "name": "swift-rs",
+     "source": "registry+https://github.com/rust-lang/crates.io-index",
+     "req": "^1.0.8",
+     "kind": null,
+     "rename": null,
+     "optional": false,
+     "uses_default_features": true,
+     "features": [],
+     "target": "cfg(all(target_vendor = \"apple\", not(target_os = \"macos\")))",
+     "registry": null
+    },
+    {
+     "name": "bytes",
+     "source": "registry+https://github.com/rust-lang/crates.io-index",
+     "req": "^1",
+     "kind": null,
+     "rename": null,
+     "optional": false,
+     "uses_default_features": true,
+     "features": [
+      "serde"
+     ],
+     "target": "cfg(any(target_os = \"android\", all(target_vendor = \"apple\", not(target_os = \"macos\"))))",
+     "registry": null
+    },
+    {
+     "name": "reqwest",
+     "source": "registry+https://github.com/rust-lang/crates.io-index",
+     "req": "^0.13",
+     "kind": null,
+     "rename": null,
+     "optional": false,
+     "uses_default_features": false,
+     "features": [
+      "json",
+      "stream"
+     ],
+     "target": "cfg(any(target_os = \"android\", all(target_vendor = \"apple\", not(target_os = \"macos\"))))",
+     "registry": null
+    },
+    {
+     "name": "rustls",
+     "source": "registry+https://github.com/rust-lang/crates.io-index",
+     "req": "^0.23",
+     "kind": null,
+     "rename": null,
+     "optional": true,
+     "uses_default_features": false,
+     "features": [
+      "ring"
+     ],
+     "target": "cfg(any(target_os = \"android\", all(target_vendor = \"apple\", not(target_os = \"macos\"))))",
+     "registry": null
+    },
+    {
+     "name": "gtk",
+     "source": "registry+https://github.com/rust-lang/crates.io-index",
+     "req": "^0.18",
+     "kind": null,
+     "rename": null,
+     "optional": false,
+     "uses_default_features": true,
+     "features": [
+      "v3_24"
+     ],
+     "target": "cfg(any(target_os = \"linux\", target_os = \"dragonfly\", target_os = \"freebsd\", target_os = \"openbsd\", target_os = \"netbsd\"))",
+     "registry": null
+    },
+    {
+     "name": "webkit2gtk",
+     "source": "registry+https://github.com/rust-lang/crates.io-index",
+     "req": "^2",
+     "kind": null,
+     "rename": null,
+     "optional": true,
+     "uses_default_features": true,
+     "features": [
+      "v2_40"
+     ],
+     "target": "cfg(any(target_os = \"linux\", target_os = \"dragonfly\", target_os = \"freebsd\", target_os = \"openbsd\", target_os = \"netbsd\"))",
+     "registry": null
+    },
+    {
+     "name": "muda",
+     "source": "registry+https://github.com/rust-lang/crates.io-index",
+     "req": "^0.20",
+     "kind": null,
+     "rename": null,
+     "optional": false,
+     "uses_default_features": false,
+     "features": [
+      "serde",
+      "gtk3"
+     ],
+     "target": "cfg(any(target_os = \"linux\", target_os = \"dragonfly\", target_os = \"freebsd\", target_os = \"openbsd\", target_os = \"netbsd\", target_os = \"windows\", target_os = \"macos\"))",
+     "registry": null
+    },
+    {
+     "name": "tray-icon",
+     "source": "registry+https://github.com/rust-lang/crates.io-index",
+     "req": "^0.25",
+     "kind": null,
+     "rename": null,
+     "optional": true,
+     "uses_default_features": false,
+     "features": [
+      "serde",
+      "libappindicator"
+     ],
+     "target": "cfg(any(target_os = \"linux\", target_os = \"dragonfly\", target_os = \"freebsd\", target_os = \"openbsd\", target_os = \"netbsd\", target_os = \"windows\", target_os = \"macos\"))",
+     "registry": null
+    },
+    {
+     "name": "jni",
+     "source": "registry+https://github.com/rust-lang/crates.io-index",
+     "req": "^0.21",
+     "kind": null,
+     "rename": null,
+     "optional": false,
+     "uses_default_features": true,
+     "features": [],
+     "target": "cfg(target_os = \"android\")",
+     "registry": null
+    },
+    {
+     "name": "embed_plist",
+     "source": "registry+https://github.com/rust-lang/crates.io-index",
+     "req": "^1.2",
+     "kind": null,
+     "rename": null,
+     "optional": false,
+     "uses_default_features": true,
+     "features": [],
+     "target": "cfg(target_os = \"macos\")",
+     "registry": null
+    },
+    {
+     "name": "objc2-app-kit",
+     "source": "registry+https://github.com/rust-lang/crates.io-index",
+     "req": "^0.3.2",
+     "kind": null,
+     "rename": null,
+     "optional": false,
+     "uses_default_features": false,
+     "features": [
+      "std",
+      "NSApplication",
+      "NSColor",
+      "NSResponder",
+      "NSView",
+      "NSWindow",
+      "NSImage"
+     ],
+     "target": "cfg(target_os = \"macos\")",
+     "registry": null
+    },
+    {
+     "name": "objc2-foundation",
+     "source": "registry+https://github.com/rust-lang/crates.io-index",
+     "req": "^0.3.2",
+     "kind": null,
+     "rename": null,
+     "optional": false,
+     "uses_default_features": false,
+     "features": [
+      "std",
+      "NSData",
+      "NSEnumerator",
+      "NSThread"
+     ],
+     "target": "cfg(target_os = \"macos\")",
+     "registry": null
+    },
+    {
+     "name": "objc2-web-kit",
+     "source": "registry+https://github.com/rust-lang/crates.io-index",
+     "req": "^0.3.2",
+     "kind": null,
+     "rename": null,
+     "optional": false,
+     "uses_default_features": false,
+     "features": [
+      "objc2-app-kit",
+      "WKWebView",
+      "WKWebViewConfiguration",
+      "WKUserContentController"
+     ],
+     "target": "cfg(target_os = \"macos\")",
+     "registry": null
+    },
+    {
+     "name": "plist",
+     "source": "registry+https://github.com/rust-lang/crates.io-index",
+     "req": "^1",
+     "kind": null,
+     "rename": null,
+     "optional": false,
+     "uses_default_features": true,
+     "features": [],
+     "target": "cfg(target_os = \"macos\")",
+     "registry": null
+    },
+    {
+     "name": "window-vibrancy",
+     "source": "registry+https://github.com/rust-lang/crates.io-index",
+     "req": "^0.8.1",
+     "kind": null,
+     "rename": null,
+     "optional": false,
+     "uses_default_features": true,
+     "features": [],
+     "target": "cfg(target_os = \"macos\")",
+     "registry": null
+    },
+    {
+     "name": "objc2",
+     "source": "registry+https://github.com/rust-lang/crates.io-index",
+     "req": "^0.6",
+     "kind": null,
+     "rename": null,
+     "optional": false,
+     "uses_default_features": true,
+     "features": [],
+     "target": "cfg(target_vendor = \"apple\")",
+     "registry": null
+    },
+    {
+     "name": "webview2-com",
+     "source": "registry+https://github.com/rust-lang/crates.io-index",
+     "req": "^0.39",
+     "kind": null,
+     "rename": null,
+     "optional": true,
+     "uses_default_features": true,
+     "features": [],
+     "target": "cfg(windows)",
+     "registry": null
+    },
+    {
+     "name": "window-vibrancy",
+     "source": "registry+https://github.com/rust-lang/crates.io-index",
+     "req": "^0.8.1",
+     "kind": null,
+     "rename": null,
+     "optional": false,
+     "uses_default_features": true,
+     "features": [],
+     "target": "cfg(windows)",
+     "registry": null
+    },
+    {
+     "name": "windows",
+     "source": "registry+https://github.com/rust-lang/crates.io-index",
+     "req": "^0.62",
+     "kind": null,
+     "rename": null,
+     "optional": false,
+     "uses_default_features": true,
+     "features": [
+      "Win32_Foundation",
+      "Win32_UI",
+      "Win32_UI_WindowsAndMessaging",
+      "Win32_System_LibraryLoader",
+      "Win32_Graphics_Gdi"
+     ],
+     "target": "cfg(windows)",
+     "registry": null
+    }
+   ],
+   "manifest_path": "/REGISTRY/tauri-2.12.0/Cargo.toml",
+   "edition": "2024",
+   "links": "Tauri"
+  },
+  {
+   "name": "tauri-plugin",
+   "version": "2.6.3",
+   "id": "registry+https://github.com/rust-lang/crates.io-index#tauri-plugin@2.6.3",
+   "source": "registry+https://github.com/rust-lang/crates.io-index",
+   "dependencies": [
+    {
+     "name": "anyhow",
+     "source": "registry+https://github.com/rust-lang/crates.io-index",
+     "req": "^1",
+     "kind": null,
+     "rename": null,
+     "optional": true,
+     "uses_default_features": true,
+     "features": [],
+     "target": null,
+     "registry": null
+    },
+    {
+     "name": "glob",
+     "source": "registry+https://github.com/rust-lang/crates.io-index",
+     "req": "^0.3",
+     "kind": null,
+     "rename": null,
+     "optional": true,
+     "uses_default_features": true,
+     "features": [],
+     "target": null,
+     "registry": null
+    },
+    {
+     "name": "schemars",
+     "source": "registry+https://github.com/rust-lang/crates.io-index",
+     "req": "^0.8.21",
+     "kind": null,
+     "rename": null,
+     "optional": false,
+     "uses_default_features": true,
+     "features": [
+      "preserve_order"
+     ],
+     "target": null,
+     "registry": null
+    },
+    {
+     "name": "serde",
+     "source": "registry+https://github.com/rust-lang/crates.io-index",
+     "req": "^1",
+     "kind": null,
+     "rename": null,
+     "optional": true,
+     "uses_default_features": true,
+     "features": [],
+     "target": null,
+     "registry": null
+    },
+    {
+     "name": "serde_json",
+     "source": "registry+https://github.com/rust-lang/crates.io-index",
+     "req": "^1",
+     "kind": null,
+     "rename": null,
+     "optional": true,
+     "uses_default_features": true,
+     "features": [],
+     "target": null,
+     "registry": null
+    },
+    {
+     "name": "tauri-utils",
+     "source": "registry+https://github.com/rust-lang/crates.io-index",
+     "req": "^2.9.3",
+     "kind": null,
+     "rename": null,
+     "optional": false,
+     "uses_default_features": false,
+     "features": [
+      "build-2"
+     ],
+     "target": null,
+     "registry": null
+    },
+    {
+     "name": "walkdir",
+     "source": "registry+https://github.com/rust-lang/crates.io-index",
+     "req": "^2",
+     "kind": null,
+     "rename": null,
+     "optional": true,
+     "uses_default_features": true,
+     "features": [],
+     "target": null,
+     "registry": null
+    },
+    {
+     "name": "plist",
+     "source": "registry+https://github.com/rust-lang/crates.io-index",
+     "req": "^1",
+     "kind": null,
+     "rename": null,
+     "optional": true,
+     "uses_default_features": true,
+     "features": [],
+     "target": "cfg(target_os = \"macos\")",
+     "registry": null
+    }
+   ],
+   "manifest_path": "/REGISTRY/tauri-plugin-2.6.3/Cargo.toml",
+   "edition": "2021",
+   "links": null
+  },
+  {
+   "name": "tauri-plugin-dialog",
+   "version": "2.7.1",
+   "id": "registry+https://github.com/rust-lang/crates.io-index#tauri-plugin-dialog@2.7.1",
+   "source": "registry+https://github.com/rust-lang/crates.io-index",
+   "dependencies": [
+    {
+     "name": "log",
+     "source": "registry+https://github.com/rust-lang/crates.io-index",
+     "req": "^0.4",
+     "kind": null,
+     "rename": null,
+     "optional": false,
+     "uses_default_features": true,
+     "features": [],
+     "target": null,
+     "registry": null
+    },
+    {
+     "name": "serde",
+     "source": "registry+https://github.com/rust-lang/crates.io-index",
+     "req": "^1",
+     "kind": null,
+     "rename": null,
+     "optional": false,
+     "uses_default_features": true,
+     "features": [
+      "derive"
+     ],
+     "target": null,
+     "registry": null
+    },
+    {
+     "name": "serde_json",
+     "source": "registry+https://github.com/rust-lang/crates.io-index",
+     "req": "^1",
+     "kind": null,
+     "rename": null,
+     "optional": false,
+     "uses_default_features": true,
+     "features": [],
+     "target": null,
+     "registry": null
+    },
+    {
+     "name": "tauri",
+     "source": "registry+https://github.com/rust-lang/crates.io-index",
+     "req": "^2.10",
+     "kind": null,
+     "rename": null,
+     "optional": false,
+     "uses_default_features": false,
+     "features": [],
+     "target": null,
+     "registry": null
+    },
+    {
+     "name": "tauri-plugin-fs",
+     "source": "registry+https://github.com/rust-lang/crates.io-index",
+     "req": "^2.5.1",
+     "kind": null,
+     "rename": null,
+     "optional": false,
+     "uses_default_features": true,
+     "features": [],
+     "target": null,
+     "registry": null
+    },
+    {
+     "name": "thiserror",
+     "source": "registry+https://github.com/rust-lang/crates.io-index",
+     "req": "^2",
+     "kind": null,
+     "rename": null,
+     "optional": false,
+     "uses_default_features": true,
+     "features": [],
+     "target": null,
+     "registry": null
+    },
+    {
+     "name": "url",
+     "source": "registry+https://github.com/rust-lang/crates.io-index",
+     "req": "^2",
+     "kind": null,
+     "rename": null,
+     "optional": false,
+     "uses_default_features": true,
+     "features": [],
+     "target": null,
+     "registry": null
+    },
+    {
+     "name": "tauri",
+     "source": "registry+https://github.com/rust-lang/crates.io-index",
+     "req": "^2.10",
+     "kind": "dev",
+     "rename": null,
+     "optional": false,
+     "uses_default_features": false,
+     "features": [
+      "wry"
+     ],
+     "target": null,
+     "registry": null
+    },
+    {
+     "name": "tauri-plugin",
+     "source": "registry+https://github.com/rust-lang/crates.io-index",
+     "req": "^2.5",
+     "kind": "build",
+     "rename": null,
+     "optional": false,
+     "uses_default_features": true,
+     "features": [
+      "build"
+     ],
+     "target": null,
+     "registry": null
+    },
+    {
+     "name": "raw-window-handle",
+     "source": "registry+https://github.com/rust-lang/crates.io-index",
+     "req": "^0.6",
+     "kind": null,
+     "rename": null,
+     "optional": false,
+     "uses_default_features": true,
+     "features": [],
+     "target": "cfg(any(target_os = \"macos\", windows, target_os = \"linux\", target_os = \"dragonfly\", target_os = \"freebsd\", target_os = \"openbsd\", target_os = \"netbsd\"))",
+     "registry": null
+    },
+    {
+     "name": "rfd",
+     "source": "registry+https://github.com/rust-lang/crates.io-index",
+     "req": "^0.16",
+     "kind": null,
+     "rename": null,
+     "optional": false,
+     "uses_default_features": false,
+     "features": [
+      "common-controls-v6"
+     ],
+     "target": "cfg(any(target_os = \"macos\", windows, target_os = \"linux\", target_os = \"dragonfly\", target_os = \"freebsd\", target_os = \"openbsd\", target_os = \"netbsd\"))",
+     "registry": null
+    },
+    {
+     "name": "tauri",
+     "source": "registry+https://github.com/rust-lang/crates.io-index",
+     "req": "^2.10",
+     "kind": null,
+     "rename": null,
+     "optional": false,
+     "uses_default_features": false,
+     "features": [
+      "wry"
+     ],
+     "target": "cfg(target_os = \"ios\")",
+     "registry": null
+    }
+   ],
+   "manifest_path": "/REGISTRY/tauri-plugin-dialog-2.7.1/Cargo.toml",
+   "edition": "2021",
+   "links": "tauri-plugin-dialog"
+  },
+  {
+   "name": "tauri-plugin-fs",
+   "version": "2.5.1",
+   "id": "registry+https://github.com/rust-lang/crates.io-index#tauri-plugin-fs@2.5.1",
+   "source": "registry+https://github.com/rust-lang/crates.io-index",
+   "dependencies": [
+    {
+     "name": "anyhow",
+     "source": "registry+https://github.com/rust-lang/crates.io-index",
+     "req": "^1",
+     "kind": null,
+     "rename": null,
+     "optional": false,
+     "uses_default_features": true,
+     "features": [],
+     "target": null,
+     "registry": null
+    },
+    {
+     "name": "dunce",
+     "source": "registry+https://github.com/rust-lang/crates.io-index",
+     "req": "^1",
+     "kind": null,
+     "rename": null,
+     "optional": false,
+     "uses_default_features": true,
+     "features": [],
+     "target": null,
+     "registry": null
+    },
+    {
+     "name": "glob",
+     "source": "registry+https://github.com/rust-lang/crates.io-index",
+     "req": "^0.3",
+     "kind": null,
+     "rename": null,
+     "optional": false,
+     "uses_default_features": true,
+     "features": [],
+     "target": null,
+     "registry": null
+    },
+    {
+     "name": "log",
+     "source": "registry+https://github.com/rust-lang/crates.io-index",
+     "req": "^0.4",
+     "kind": null,
+     "rename": null,
+     "optional": false,
+     "uses_default_features": true,
+     "features": [],
+     "target": null,
+     "registry": null
+    },
+    {
+     "name": "notify",
+     "source": "registry+https://github.com/rust-lang/crates.io-index",
+     "req": "^8",
+     "kind": null,
+     "rename": null,
+     "optional": true,
+     "uses_default_features": true,
+     "features": [
+      "serde",
+      "serialization-compat-6"
+     ],
+     "target": null,
+     "registry": null
+    },
+    {
+     "name": "notify-debouncer-full",
+     "source": "registry+https://github.com/rust-lang/crates.io-index",
+     "req": "^0.6",
+     "kind": null,
+     "rename": null,
+     "optional": true,
+     "uses_default_features": true,
+     "features": [],
+     "target": null,
+     "registry": null
+    },
+    {
+     "name": "percent-encoding",
+     "source": "registry+https://github.com/rust-lang/crates.io-index",
+     "req": "^2",
+     "kind": null,
+     "rename": null,
+     "optional": false,
+     "uses_default_features": true,
+     "features": [],
+     "target": null,
+     "registry": null
+    },
+    {
+     "name": "serde",
+     "source": "registry+https://github.com/rust-lang/crates.io-index",
+     "req": "^1",
+     "kind": null,
+     "rename": null,
+     "optional": false,
+     "uses_default_features": true,
+     "features": [
+      "derive"
+     ],
+     "target": null,
+     "registry": null
+    },
+    {
+     "name": "serde_json",
+     "source": "registry+https://github.com/rust-lang/crates.io-index",
+     "req": "^1",
+     "kind": null,
+     "rename": null,
+     "optional": false,
+     "uses_default_features": true,
+     "features": [],
+     "target": null,
+     "registry": null
+    },
+    {
+     "name": "serde_repr",
+     "source": "registry+https://github.com/rust-lang/crates.io-index",
+     "req": "^0.1",
+     "kind": null,
+     "rename": null,
+     "optional": false,
+     "uses_default_features": true,
+     "features": [],
+     "target": null,
+     "registry": null
+    },
+    {
+     "name": "tauri",
+     "source": "registry+https://github.com/rust-lang/crates.io-index",
+     "req": "^2.10",
+     "kind": null,
+     "rename": null,
+     "optional": false,
+     "uses_default_features": false,
+     "features": [],
+     "target": null,
+     "registry": null
+    },
+    {
+     "name": "thiserror",
+     "source": "registry+https://github.com/rust-lang/crates.io-index",
+     "req": "^2",
+     "kind": null,
+     "rename": null,
+     "optional": false,
+     "uses_default_features": true,
+     "features": [],
+     "target": null,
+     "registry": null
+    },
+    {
+     "name": "url",
+     "source": "registry+https://github.com/rust-lang/crates.io-index",
+     "req": "^2",
+     "kind": null,
+     "rename": null,
+     "optional": false,
+     "uses_default_features": true,
+     "features": [],
+     "target": null,
+     "registry": null
+    },
+    {
+     "name": "schemars",
+     "source": "registry+https://github.com/rust-lang/crates.io-index",
+     "req": "^0.8",
+     "kind": "build",
+     "rename": null,
+     "optional": false,
+     "uses_default_features": true,
+     "features": [],
+     "target": null,
+     "registry": null
+    },
+    {
+     "name": "serde",
+     "source": "registry+https://github.com/rust-lang/crates.io-index",
+     "req": "^1",
+     "kind": "build",
+     "rename": null,
+     "optional": false,
+     "uses_default_features": true,
+     "features": [
+      "derive"
+     ],
+     "target": null,
+     "registry": null
+    },
+    {
+     "name": "tauri-plugin",
+     "source": "registry+https://github.com/rust-lang/crates.io-index",
+     "req": "^2.5",
+     "kind": "build",
+     "rename": null,
+     "optional": false,
+     "uses_default_features": true,
+     "features": [
+      "build"
+     ],
+     "target": null,
+     "registry": null
+    },
+    {
+     "name": "tauri-utils",
+     "source": "registry+https://github.com/rust-lang/crates.io-index",
+     "req": "^2.8",
+     "kind": "build",
+     "rename": null,
+     "optional": false,
+     "uses_default_features": true,
+     "features": [],
+     "target": null,
+     "registry": null
+    },
+    {
+     "name": "toml",
+     "source": "registry+https://github.com/rust-lang/crates.io-index",
+     "req": "^1.0",
+     "kind": "build",
+     "rename": null,
+     "optional": false,
+     "uses_default_features": true,
+     "features": [],
+     "target": null,
+     "registry": null
+    },
+    {
+     "name": "objc2-foundation",
+     "source": "registry+https://github.com/rust-lang/crates.io-index",
+     "req": "^0.3",
+     "kind": null,
+     "rename": null,
+     "optional": false,
+     "uses_default_features": true,
+     "features": [
+      "NSURL",
+      "NSString"
+     ],
+     "target": "cfg(target_os = \"ios\")",
+     "registry": null
+    }
+   ],
+   "manifest_path": "/REGISTRY/tauri-plugin-fs-2.5.1/Cargo.toml",
+   "edition": "2021",
+   "links": "tauri-plugin-fs"
+  },
+  {
+   "name": "tauri-plugin-hello",
+   "version": "0.1.0",
+   "id": "path+file:///WORK/src-tauri/plugins/hello-plugin#tauri-plugin-hello@0.1.0",
+   "source": null,
+   "dependencies": [
+    {
+     "name": "tauri",
+     "source": "registry+https://github.com/rust-lang/crates.io-index",
+     "req": "=2.12.0",
+     "kind": null,
+     "rename": null,
+     "optional": false,
+     "uses_default_features": true,
+     "features": [],
+     "target": null,
+     "registry": null
+    },
+    {
+     "name": "tauri-plugin",
+     "source": "registry+https://github.com/rust-lang/crates.io-index",
+     "req": "=2.6.3",
+     "kind": "build",
+     "rename": null,
+     "optional": false,
+     "uses_default_features": true,
+     "features": [
+      "build"
+     ],
+     "target": null,
+     "registry": null
+    }
+   ],
+   "manifest_path": "/WORK/src-tauri/plugins/hello-plugin/Cargo.toml",
+   "edition": "2021",
+   "links": "tauri-plugin-hello"
+  }
+ ],
+ "workspace_members": [
+  "path+file:///WORK/src-tauri/plugins/hello-plugin#tauri-plugin-hello@0.1.0",
+  "path+file:///WORK/src-tauri#hello-tauri@1.0.0"
+ ],
+ "workspace_default_members": [
+  "path+file:///WORK/src-tauri#hello-tauri@1.0.0"
+ ],
+ "resolve": null,
+ "target_directory": "/WORK/src-tauri/target",
+ "build_directory": "/WORK/src-tauri/target",
+ "version": 1,
+ "workspace_root": "/WORK/src-tauri",
+ "metadata": null
+}

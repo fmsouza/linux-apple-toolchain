@@ -115,3 +115,16 @@ private let created = #"{"data":{"type":"profiles","id":"P2","attributes":{"name
     }
     #expect(ProfileService.parseDate("garbage") == nil)
 }
+
+@Test func forceNewReplacesAnOtherwiseReusableProfile() async throws {
+    let content = Data("PROFILE".utf8).base64EncodedString()
+    let t = MockTransport([
+        (200, #"{"data":[{"type":"profiles","id":"P1","attributes":{"name":"xless a.b IOS_APP_STORE","profileState":"ACTIVE","profileType":"IOS_APP_STORE","profileContent":"\#(content)","expirationDate":"\#(future)"}}]}"#),
+        (204, ""),
+        (201, #"{"data":{"type":"profiles","id":"P2","attributes":{"profileContent":"\#(Data("FRESH".utf8).base64EncodedString())"}}}"#),
+    ])
+    let svc = ProfileService(client: ASCClient(credentials: testCreds, transport: t, sleep: { _ in }))
+    let data = try await svc.ensureProfile(bundleIDResourceID: "B1", certificateID: "C1", type: .iosAppStore, bundleIdentifier: "a.b", forceNew: true)
+    #expect(data == Data("FRESH".utf8))
+    #expect(t.requests.map { $0.httpMethod ?? "" } == ["GET", "DELETE", "POST"])
+}

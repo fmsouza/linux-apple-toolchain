@@ -39,3 +39,13 @@ import Foundation
     let r = try Shell.run("sh", ["-c", "echo \"$XLESS_DIST_KEY_FILE\""], env: ["XLESS_DIST_KEY_FILE": "/run/k.pem"], stage: .build)
     #expect(r.stdout == "/run/k.pem\n")
 }
+
+@Test func errorTailSkipsFilteredNoise() {
+    // 30 noise lines after the real error would push it out of a 20-line tail.
+    let script = "echo 'error: undefined symbol: _x' >&2; for i in $(seq 30); do echo 'warning: noise' >&2; done; exit 1"
+    do { try Shell.run("sh", ["-c", script], stage: .build, keepErrorLine: { !$0.contains("noise") }); Issue.record("expected throw") }
+    catch let e as XlessError {
+        #expect(e.cause.contains("undefined symbol: _x"))
+        #expect(!e.cause.split(separator: "\n").dropFirst().contains { $0.contains("noise") })   // line 1 is the command
+    } catch { Issue.record("\(error)") }
+}

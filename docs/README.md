@@ -7,7 +7,7 @@ xless builds, signs and ships Apple-platform apps from Linux. It takes a SwiftPM
 
 It does this without Xcode on the build machine. The Darwin SDK comes from a copy of Xcode 27.0 (27A266a) that you export once on a Mac. Only this Xcode generation is supported.
 
-Docs: [bootstrap.md](bootstrap.md) (one-time Apple setup), [xless-yml.md](xless-yml.md) (config reference), [research/](research/) (notes on App Store Connect upload, Mac App Store `.pkg`, and known parity gaps).
+Docs: [bootstrap.md](bootstrap.md) (one-time Apple setup), [xless-yml.md](xless-yml.md) (config reference), [tauri.md](tauri.md) (Tauri v2 iOS apps), [research/](research/) (notes on App Store Connect upload, Mac App Store `.pkg`, and known parity gaps).
 
 ## Apple software
 
@@ -30,10 +30,11 @@ If you push images anyway: `make sdk-push` refuses to push unless `registry.env`
 └───────────────────────────────────────────────────────────────────┘
 ```
 
-Each stage reads only the previous stage's directory under `.xless/build/<platform>/` and writes only its own, so you can resume a failed run with `xless ship --from <stage>` or run one stage on its own. A stage builds into `<dir>.partial` and renames it only on success, so a stage directory exists only if that stage succeeded; a failed stage also removes its previous output.
+Each stage reads only the previous stage's directory under `.xless/build/<platform>/` and writes only its own, so you can resume a failed run with `xless ship --from <stage>`, stop after a stage with `--to <stage>`, or run one stage on its own. A stage builds into `<dir>.partial` and renames it only on success, so a stage directory exists only if that stage succeeded; a failed stage also removes its previous output.
 
 | Stage | Command | Output | Exit code on failure |
 |---|---|---|---|
+| prepare | `xless prepare` | Tauri overlays only (`--config`, see [tauri.md](tauri.md)): work copy, dependencies, toolchains | 19 |
 | build | `xless build` | `app/` unsigned bundle | 12 |
 | assets | `xless assets` | `assets/` (iOS: `Assets.car`; macOS: `.icns`) | 13 |
 | finalize | `xless finalize` | `final/` Xcode metadata stamped, binaries patched | 14 |
@@ -41,13 +42,13 @@ Each stage reads only the previous stage's directory under `.xless/build/<platfo
 | package | `xless package` | `out/` `.ipa` or notarized `.zip` | 16 |
 | upload | `xless upload` | `upload.json` (iOS only; rewritten at every state change, so it keeps the build ID if processing fails or times out). With a [`testflight:` block](xless-yml.md#testflight) it then delivers the processed build to your TestFlight groups. | 17 |
 
-Config errors exit 10 and SDK errors exit 11. Errors are printed as `[stage] cause — fix`. Other commands: `xless inspect <bundle> --platform <p>` prints Info.plist and Mach-O build versions as JSON (useful when comparing with an Xcode build); `xless sdk meta|export|install` manage the SDK.
+Config errors exit 10, SDK errors exit 11, and `prepare` errors exit 19. Errors are printed as `[stage] cause — fix`. Other commands: `xless inspect <bundle> --platform <p>` prints Info.plist and Mach-O build versions as JSON (useful when comparing with an Xcode build); `xless sdk meta|export|install` manage the SDK.
 
 All stage commands take `--platform ios|macos`, `--project <dir>` (default `.`) and `--build-number`.
 
 ## Secrets
 
-Secrets come only from environment variables or a `NAME_FILE` variable naming a file with the value. They are never CLI flags and are never logged. xless removes them (and their `_FILE` forms) from the environment of every tool it runs, so package code executed during `build` (SwiftPM macros and plugins) cannot read them; rcodesign gets keys through mode-0600 temporary files.
+Secrets come only from environment variables or a `NAME_FILE` variable naming a file with the value. They are never CLI flags and are never logged. xless removes them (and their `_FILE` forms) from the environment of every tool it runs, so package code executed during `build` (SwiftPM macros and plugins) cannot read them from its environment; rcodesign gets keys through mode-0600 temporary files. A file named by a `_FILE` variable is another matter: code that runs on the same machine or in the same container as the build, with the same user, can still read it. `scripts/testflight.sh` with a project directory mounts the secret files into the container that also builds; with `--config` (Tauri apps) the build runs in a container without any secret ([tauri.md](tauri.md#shipping)).
 
 | Variable | Purpose | Needed for |
 |---|---|---|
@@ -81,11 +82,11 @@ For GitHub Actions see [.github/workflows/example-ios.yml](../.github/workflows/
 
 ### One command: TestFlight
 
-`make testflight PROJECT=<dir>` builds, signs, uploads and delivers an iOS project to TestFlight with `xless ship --platform ios`. It wraps [scripts/testflight.sh](../scripts/testflight.sh), which you can also call directly (extra arguments go to `xless ship`, for example `--from upload`).
+`make testflight PROJECT=<dir>` builds, signs, uploads and delivers an iOS project to TestFlight with `xless ship --platform ios`. It wraps [scripts/testflight.sh](../scripts/testflight.sh), which you can also call directly (extra arguments go to `xless ship`, for example `--from upload`). For a Tauri app described by an overlay use `make testflight CONFIG=<overlay.yml>` ([tauri.md](tauri.md#shipping)).
 
 - **Where it runs.** On macOS, inside the xless Linux image through docker (the image is `xless:local-<arch>` unless `XLESS_IMAGE` says otherwise; the docker context is `DOCKER_CONTEXT`, else `colima-xless` when that context exists, else the current one). On Linux it runs natively when `xless` is on PATH, otherwise through docker. `XLESS_USE_DOCKER=1|0` forces either.
-- **Build number.** `XLESS_BUILD_NUMBER` if set, else `$(( $(date +%s) / 60 ))`, which is monotonic across machines ([Secrets](#secrets)).
-- **Secrets.** The script reads the paths of your secret files from the environment, or from a local file that it sources first: `~/.config/xless/testflight.env` (override with `XLESS_TESTFLIGHT_ENV`; it never belongs in git). The files are mounted read-only into the container and values are never printed or put on a command line.
+- **Build number.** `XLESS_BUILD_NUMBER` if set, else `$(( $(date +%s) / 60 ))`, which is monotonic across machines ([Secrets](#secrets)). With `CONFIG=` the overlay's `build:` decides instead ([tauri.md](tauri.md#build-numbers)).
+- **Secrets.** The script reads the paths of your secret files from the environment, or from a local file that it sources first: `~/.config/xless/testflight.env` (override with `XLESS_TESTFLIGHT_ENV`; it never belongs in git). The files are mounted read-only into the container and values are never printed or put on a command line. With a project directory that is the container that also builds, so package code could read the files; with `CONFIG=` the build runs in a separate container without them ([tauri.md](tauri.md#shipping)).
 
   ```sh
   # ~/.config/xless/testflight.env

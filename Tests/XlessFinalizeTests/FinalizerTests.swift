@@ -201,3 +201,23 @@ func noBuildVersionBinary() -> Data {
     do { _ = try Finalizer.run(input: app, outputDir: out, platform: .ios, config: config(privacyLine), meta: meta); Issue.record("expected throw") }
     catch let e as XlessError { #expect(e.stage == .finalize && e.cause.contains("not a boolean")) }
 }
+
+/// Fat (cafebabe) wrapper with one arm64 slice that is an `ar` static archive, as shipped by the onnxruntime-c pod.
+func fatWrappedArchive() -> Data {
+    var slice = Data("!<arch>\n".utf8)
+    slice.append(Data("x.o/            0           0     0     100644  4         `\nabcd".utf8))
+    var d = Data()
+    func be(_ v: UInt32) { var x = v.bigEndian; withUnsafeBytes(of: &x) { d.append(contentsOf: $0) } }
+    be(0xcafebabe); be(1); be(0x0100000c); be(0); be(0x4000); be(UInt32(slice.count)); be(14)
+    d.append(Data(count: 0x4000 - d.count)); d.append(slice)
+    return d
+}
+
+@Test func staticArchiveFrameworkBinaryIsLeftAlone() throws {
+    let out = FileManager.default.temporaryDirectory.appendingPathComponent("fo-\(UUID())")
+    let archive = fatWrappedArchive()
+    let app = try iosApp(extraFiles: ["Frameworks/x.framework/x": archive])
+    let result = try Finalizer.run(input: app, outputDir: out, platform: .ios, config: config(privacyLine), meta: meta)
+    #expect(try Data(contentsOf: result.appendingPathComponent("Frameworks/x.framework/x")) == archive)
+    #expect(try MachO.buildVersions(in: Data(contentsOf: result.appendingPathComponent("X"))).first?.sdk == 0x1b0000)
+}

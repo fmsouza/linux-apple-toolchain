@@ -214,6 +214,31 @@ private func query(_ r: URLRequest, _ name: String) -> String? {
     #expect(t.requests[2].url!.path == "/v1/betaGroups" && query(t.requests[2], "cursor") == "C2")
 }
 
+@Test func groupListingNextLinkWithRawBracketsArrivesIntact() async throws {
+    // Same link parsing as the dated build lookup (ASCPaging.parseLink): raw brackets and an encoded '+' survive.
+    let first = #"{"data":[\#(group("G0", "Other"))],"links":{"self":"x","next":"https://api.appstoreconnect.apple.com/v1/betaGroups?filter[app]=APP1&limit=200&cursor=AB%2BC"}}"#
+    let t = MockTransport([(200, appJSON), (200, first), (200, groups(group("G1", "Internal"))), (204, ""), (200, testers(1))])
+    _ = try await publisher(t).publish(bundleID: "a.b", buildID: "B1", buildNumber: "7", config: TestFlightConfig(groups: ["Internal"]))
+    #expect(query(t.requests[2], "filter[app]") == "APP1" && query(t.requests[2], "cursor") == "AB+C", "\(t.requests[2].url!.absoluteString)")
+    #expect(!t.requests[2].url!.absoluteString.contains("%255B"), "double-encoded")
+}
+
+@Test func groupListingThatNeverEndsIsAnUploadErrorNotATruncation() async throws {
+    let page = #"{"data":[\#(group("G0", "Other"))],"links":{"self":"x","next":"https://api.appstoreconnect.apple.com/v1/betaGroups?filter%5Bapp%5D=APP1&cursor=C&limit=200"}}"#
+    let t = MockTransport([(200, appJSON)] + Array(repeating: (200, page), count: ASCPaging.maxPages))
+    do {
+        _ = try await publisher(t).publish(bundleID: "a.b", buildID: "B1", buildNumber: "7", config: TestFlightConfig(groups: ["Internal"]))
+        Issue.record("expected throw")
+    } catch let e as XlessError {
+        #expect(e.stage == .upload)
+        #expect(e.cause.contains("pagination did not terminate"), "\(e.cause)")
+        #expect(e.fix.contains("already uploaded and processed"))
+    }
+    // Never went on to create the group from a partial list.
+    #expect(!t.requests.contains { $0.httpMethod == "POST" })
+    #expect(t.requests.count == 1 + ASCPaging.maxPages)
+}
+
 @Test func whatToTestCreateConflictFallsBackToUpdate() async throws {
     let t = MockTransport([
         (200, appJSON), (200, noLocalizations),

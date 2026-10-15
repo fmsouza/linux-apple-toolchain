@@ -21,13 +21,22 @@ public enum SignStage {
         let certService = CertificateService(client: client)
         let profiles = ProfileService(client: client)
         let cert = try await certService.find(matching: key, kind: kind)
+        let user = try pc.entitlements.map { try Plist.read(project.appendingPathComponent($0), stage: .sign) } ?? [:]
+        let neededCapabilities = Capabilities.required(entitlements: user, platform: platform)
         let bundleResource = try await profiles.ensureBundleID(identifier: bundleID, platform: platform)
-        let profile = try await profiles.ensureProfile(bundleIDResourceID: bundleResource, certificateID: cert.id,
-                                                       type: .for(platform: platform), bundleIdentifier: bundleID)
+        let enabled = try await Capabilities.ensure(neededCapabilities.types, bundleIDResourceID: bundleResource, client: client)
+        var profile = try await profiles.ensureProfile(bundleIDResourceID: bundleResource, certificateID: cert.id,
+                                                       type: .for(platform: platform), bundleIdentifier: bundleID, forceNew: enabled)
+        var profileEntitlements = try Entitlements.extract(fromProfile: profile)
+        // A capability enabled by hand in the portal only reaches an existing profile once it is regenerated.
+        if !enabled, !Capabilities.missing(from: profileEntitlements, user: user).isEmpty {
+            profile = try await profiles.ensureProfile(bundleIDResourceID: bundleResource, certificateID: cert.id,
+                                                       type: .for(platform: platform), bundleIdentifier: bundleID, forceNew: true)
+            profileEntitlements = try Entitlements.extract(fromProfile: profile)
+        }
 
         // Every check runs before the bundle is touched.
-        let user = try pc.entitlements.map { try Plist.read(project.appendingPathComponent($0), stage: .sign) } ?? [:]
-        let profileEntitlements = try Entitlements.extract(fromProfile: profile)
+
         try Entitlements.checkTeam(profile: profileEntitlements, teamID: config.teamID)
         let ents = try Entitlements.merge(user: user, profile: profileEntitlements,
                                           platform: platform, teamID: config.teamID, bundleID: bundleID)

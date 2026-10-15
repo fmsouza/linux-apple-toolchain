@@ -73,3 +73,40 @@ func encodesVersions(s: String, v: UInt32) throws {
     withUnsafeBytes(of: &sz) { fat.replaceSubrange(20..<24, with: $0) }
     #expect(throws: MachOError.self) { try MachO.buildVersions(in: fat) }
 }
+
+/// "!<arch>\n" plus one minimal member header, as in a static library.
+func arArchive() -> Data {
+    var d = Data("!<arch>\n".utf8)
+    d.append(Data("x.o/            0           0     0     100644  4         `\nabcd".utf8))
+    return d
+}
+
+/// Fat wrapper (cafebabe) around raw slices, each tagged arm64.
+func fatWrap(_ slices: [Data]) -> Data {
+    var out = Data()
+    func be(_ v: UInt32) { var x = v.bigEndian; withUnsafeBytes(of: &x) { out.append(contentsOf: $0) } }
+    be(0xcafebabe); be(UInt32(slices.count))
+    var off = 8 + 20 * slices.count
+    var placed: [(Int, Data)] = []
+    for s in slices {
+        off = (off + 0x3fff) & ~0x3fff
+        be(0x0100000c); be(0); be(UInt32(off)); be(UInt32(s.count)); be(14)
+        placed.append((off, s)); off += s.count
+    }
+    for (o, s) in placed { out.append(Data(count: o - out.count)); out.append(s) }
+    return out
+}
+
+@Test func classifiesImagesAndArchives() throws {
+    #expect(try MachO.containsLoadableImage(try thin()))
+    #expect(try MachO.containsLoadableImage(try MachO.makeFat([try thin(), try thin(cpu: 0x01000007)])))
+    #expect(try !MachO.containsLoadableImage(arArchive()))
+    #expect(try !MachO.containsLoadableImage(fatWrap([arArchive()])))
+    #expect(try !MachO.containsLoadableImage(Data("hello world".utf8)))
+    #expect(try !MachO.containsLoadableImage(Data([0xca, 0xfe, 0xba, 0xbe, 0, 0, 0, 52, 1, 2])))   // Java class file
+}
+
+@Test func mixedFatIsAnError() throws {
+    let mixed = fatWrap([try thin(), arArchive()])
+    #expect(throws: MachOError.self) { try MachO.containsLoadableImage(mixed) }
+}

@@ -52,7 +52,11 @@ public enum Finalizer {
             do { data = try Data(contentsOf: file) } catch {
                 throw XlessError(.finalize, "cannot read \(rel): \(error)", fix: "check file permissions and disk state")
             }
-            guard MachO.isMachO(data) else { continue }
+            let isImage: Bool
+            do { isImage = try MachO.containsLoadableImage(data) } catch {
+                throw XlessError(.finalize, "cannot parse Mach-O \(rel): \(error)", fix: "report this binary to the xless maintainers")
+            }
+            guard isImage else { continue }   // static archives (also fat-wrapped) carry no LC_BUILD_VERSION
             let versions: [BuildVersion]
             do { versions = try MachO.buildVersions(in: data) } catch {
                 throw XlessError(.finalize, "cannot parse Mach-O \(rel): \(error)", fix: "report this binary to the xless maintainers")
@@ -82,7 +86,7 @@ public enum Finalizer {
         let privacy = app.appendingPathComponent(layout.resourcesDir.isEmpty ? "PrivacyInfo.xcprivacy" : "\(layout.resourcesDir)/PrivacyInfo.xcprivacy")
         if config.distribution(for: platform) == .appStore, config.privacyManifest == nil || !FileManager.default.fileExists(atPath: privacy.path) {
             throw XlessError(.finalize, "no PrivacyInfo.xcprivacy in the bundle (required for App Store uploads)",
-                             fix: "add `privacyManifest: path/to/PrivacyInfo.xcprivacy` to xless.yml")
+                             fix: "add `privacyManifest: path/to/PrivacyInfo.xcprivacy` to xless.yml (or to the Tauri overlay)")
         }
         return app
     }

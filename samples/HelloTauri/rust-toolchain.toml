@@ -1,0 +1,6 @@
+[toolchain]
+channel = "1.97.0"
+targets = ["aarch64-apple-ios"]
+# On a Mac with Xcode 27, swift-rs 1.0.8 promotes the @_cdecl exports of each Swift static library to
+# global symbols with rustup's llvm-objcopy (llvm-tools); without it the iOS link fails.
+components = ["llvm-tools"]

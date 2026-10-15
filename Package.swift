@@ -37,8 +37,13 @@ let package = Package(
             .product(name: "_CryptoExtras", package: "swift-crypto"),
         ]),
         .target(name: "XlessPackage", dependencies: ["XlessCore", "XlessSign"]),
+        .target(name: "XlessTauri", dependencies: [
+            "XlessCore", "XlessMachO",
+            .product(name: "Yams", package: "Yams"),
+            .product(name: "Crypto", package: "swift-crypto"),
+        ]),
         .executableTarget(name: "xless", dependencies: [
-            "XlessCore", "XlessSDK", "XlessBuild", "XlessAssets", "XlessFinalize", "XlessSign", "XlessASC", "XlessPackage", "XlessIB",
+            "XlessCore", "XlessTauri", "XlessSDK", "XlessBuild", "XlessAssets", "XlessFinalize", "XlessSign", "XlessASC", "XlessPackage", "XlessIB",
             .product(name: "ArgumentParser", package: "swift-argument-parser"),
         ]),
         // Research tool: compares the storyboard compiler with ibtool outputs (scripts/ib-corpus/differential.py).
@@ -65,6 +70,7 @@ let package = Package(
         ]),
         .testTarget(name: "XlessPackageTests", dependencies: ["XlessPackage", "XlessCore"]),
         .testTarget(name: "XlessIBTests", dependencies: ["XlessIB", "XlessCore"]),
+        .testTarget(name: "XlessTauriTests", dependencies: ["XlessTauri", "XlessCore", "XlessMachO", .product(name: "Crypto", package: "swift-crypto")], exclude: ["Fixtures"]),
         .testTarget(name: "XlessMachOTests", dependencies: ["XlessMachO"]),
     ]
 )

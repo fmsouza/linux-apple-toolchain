@@ -65,7 +65,11 @@ public struct ASCClient: Sendable {
 
     func send(_ method: String, _ path: String, query: [(String, String)], body: Data?, maxAttempts: Int = ASCClient.maxAttempts) async throws -> Data {
         var comps = URLComponents(url: baseURL.appendingPathComponent(path), resolvingAgainstBaseURL: false)!
-        if !query.isEmpty { comps.queryItems = query.map { URLQueryItem(name: $0.0, value: $0.1) } }
+        if !query.isEmpty {
+            comps.queryItems = query.map { URLQueryItem(name: $0.0, value: $0.1) }
+            // URLComponents leaves a literal "+" alone, which servers read as a space; paging cursors can contain one.
+            comps.percentEncodedQuery = comps.percentEncodedQuery?.replacingOccurrences(of: "+", with: "%2B")
+        }
         let (data, _) = try await withRetry(maxAttempts: maxAttempts) {
             var req = URLRequest(url: comps.url!)
             req.httpMethod = method

@@ -1,0 +1,55 @@
+import Foundation
+import XlessCore
+
+/// A Tauri app's config and Xcode project resolved into the pipeline's `ProjectConfig`.
+public struct ResolvedTauri: @unchecked Sendable {
+    public var config: ProjectConfig
+    public var tauri: TauriConfig
+    public var target: XcodeGenTarget
+    /// Relative to the repository root.
+    public var tauriDir: String
+    public var appleDir: String
+    /// The `project.yml` `name` (`tauri ios init` uses the Cargo package name); Tauri's `TAURI_IOS_APP_NAME`.
+    public var projectName: String = ""
+}
+
+public enum TauriProject {
+    public static func resolve(overlay: TauriOverlay, source: URL) throws -> ResolvedTauri {
+        let tauriDir = overlay.tauriDir
+        let appleDir = "\(tauriDir)/gen/apple"
+        let tauri = try TauriConfig.load(tauriDir: source.appendingPathComponent(tauriDir), platform: "ios")
+
+        let ymlPath = "\(appleDir)/project.yml"
+        guard let yaml = try? String(contentsOf: source.appendingPathComponent(ymlPath), encoding: .utf8) else {
+            throw XlessError(.prepare, "cannot read \(ymlPath) in \(source.path)", fix: "run `tauri ios init` in the app repository and commit gen/apple")
+        }
+        let (projectName, target) = try XcodeGenProject.parse(yaml: yaml, file: ymlPath)
+
+        func need(_ what: String, _ key: String) -> XlessError {
+            XlessError(.config, "cannot determine \(what) for overlay \(overlay.name)", fix: "set \(key) in the overlay")
+        }
+        guard let version = overlay.version ?? tauri.version ?? (target.infoProperties["CFBundleShortVersionString"] as? String) else {
+            throw need("the app version", "version")
+        }
+        guard let product = overlay.ios?.product ?? target.settings["PRODUCT_NAME"] ?? tauri.productName else {
+            throw need("the product name", "ios.product")
+        }
+        guard let minimumOS = overlay.ios?.minimumOS ?? tauri.iosMinimumSystemVersion ?? target.deploymentTarget else {
+            throw need("the minimum iOS version", "ios.minimumOS")
+        }
+        let dated = overlay.build == "dated"
+        let entitlements = overlay.ios?.entitlements ?? target.entitlementsPath.map { "\(appleDir)/\($0)" }
+        let assets = overlay.assets ?? target.sources.first { $0.path.hasSuffix(".xcassets") }.map { "\(appleDir)/\($0.path)" }
+        let storyboard = overlay.launchStoryboard ?? target.sources.first { $0.path.hasSuffix(".storyboard") }.map { "\(appleDir)/\($0.path)" }
+
+        let config = ProjectConfig(
+            bundleID: overlay.bundleID, teamID: overlay.teamID, version: version,
+            build: dated ? "\(version).2000010101" : overlay.build,   // placeholder; Context chooses the real value when a run starts
+            platforms: [.ios: PlatformConfig(minimumOS: minimumOS, product: product, entitlements: entitlements)],
+            assets: assets, privacyManifest: overlay.privacyManifest, infoPlist: overlay.infoPlist ?? "\(appleDir)/\(target.infoPath)", launchStoryboard: storyboard,
+            testflight: overlay.testflight, usesNonExemptEncryption: overlay.usesNonExemptEncryption,
+            buildScheme: dated ? .dated : .fixed)
+        try config.validate()
+        return ResolvedTauri(config: config, tauri: tauri, target: target, tauriDir: tauriDir, appleDir: appleDir, projectName: projectName)
+    }
+}

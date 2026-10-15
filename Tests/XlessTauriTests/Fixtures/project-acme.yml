@@ -1,0 +1,72 @@
+name: acme
+options:
+  bundleIdPrefix: com.example.acme
+  deploymentTarget:
+    iOS: 15.0
+fileGroups: [../../src]
+configs:
+  debug: debug
+  release: release
+settingGroups:
+  app:
+    base:
+      PRODUCT_NAME: Acme
+      PRODUCT_BUNDLE_IDENTIFIER: com.example.acme
+targetTemplates:
+  app:
+    type: application
+    sources:
+      - path: Sources
+targets:
+  acme_iOS:
+    type: application
+    platform: iOS
+    sources:
+      - path: Sources
+      - path: Assets.xcassets
+      - path: Externals
+        excludes: ["**/*.a"]
+      - path: acme_iOS
+      - path: models
+        buildPhase: resources
+        type: folder
+      - path: LaunchScreen.storyboard
+    info:
+      path: acme_iOS/Info.plist
+      properties:
+        LSRequiresIPhoneOS: true
+        UILaunchStoryboardName: LaunchScreen
+        UIRequiredDeviceCapabilities: [arm64, metal]
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationLandscapeLeft
+        CFBundleShortVersionString: 2.3.4
+    entitlements:
+      path: acme_iOS/acme_iOS.entitlements
+    settings:
+      base:
+        ARCHS: [arm64]
+        LIBRARY_SEARCH_PATHS[arch=arm64]:
+          - $(inherited)
+          - $(PROJECT_DIR)/Externals/arm64/$(CONFIGURATION)
+        LIBRARY_SEARCH_PATHS[arch=x86_64]: $(inherited) $(PROJECT_DIR)/Externals/x86_64/$(CONFIGURATION)
+        ENABLE_BITCODE: false
+      groups: [app]
+    dependencies:
+      - framework: Pods/x/x.xcframework
+        embed: true
+        codeSign: true
+      - framework: libapp.a
+        embed: false
+      - sdk: CoreGraphics.framework
+      - sdk: Metal.framework
+      - sdk: UIKit.framework
+      - sdk: WebKit.framework
+    preBuildScripts:
+      - script: |
+          pnpm tauri ios xcode-script -v --platform "${PLATFORM_DISPLAY_NAME:?}" --configuration "${CONFIGURATION:?}" ${ARCHS:?}
+        name: Build Rust Code
+        basedOnDependencyAnalysis: false
+    postCompileScripts:
+      - script: echo patch
+        name: Patch Thing

@@ -32,3 +32,45 @@ If App Store Connect reports icon issues or the colors look wrong, patch `ThirdP
 
 Then list the patch in `ThirdParty/AssetKit/README.md`, remove the matching `ios:car:` allow-list entries, and
 re-run `make parity`.
+
+## Tauri iOS
+
+`xless tauri compare samples/HelloTauri/reference/reference.json <app>` compares an xless build of
+`samples/HelloTauri` with the Mac reference (`tauri ios build` + Xcode 27.0, see docs/research/tauri-ios-contract.md).
+Run on the `assets` or `finalize` stage output (`xless build`, `xless assets`, `xless finalize`, all with `--config`),
+it reports no `lib:`, `rpath:`, `exe:` or `framework:` line: the executable's 38 linked libraries, platform, minos and
+rpath match. `make test-tauri-linux` runs this compare on the `finalize` output and ignores exactly the keys in
+`samples/HelloTauri/reference/allowed-gaps.txt`, which is the machine-readable form of this list (the `plist:DT*` keys are
+not in it, because they match after `finalize`). These differences remain, each listed with its compare key:
+
+- `plist:DTPlatformName`, `plist:DTPlatformVersion`, `plist:DTSDKName` (`assets` output only): the `finalize` stage
+  stamps these, as for every xless build (InfoPlistStamper). After `finalize` they match the reference.
+- `plist:ITSAppUsesNonExemptEncryption` (`finalize` output only): `finalize` stamps the overlay's
+  `usesNonExemptEncryption`, which App Store uploads need; `tauri ios build` writes no such key.
+- Frameworks whose binary is a static archive (for example a CocoaPods xcframework that ships a fat-wrapped `ar` archive) are
+  linked but not embedded; rcodesign 0.29.0 cannot sign them (panics in macho_signing.rs); Xcode copies them. The embedded
+  copy would never be loaded, since the code is linked into the executable. xless prints `note: <name>.framework is a static
+  library; linked, not embedded` during the build.
+- `file:PrivacyInfo.xcprivacy`: xless copies the overlay's `privacyManifest` into the bundle, because `finalize`
+  requires one for App Store builds; the HelloTauri reference app has none.
+- App icon: Tauri's `AppIcon.appiconset` is a multi-size set (one PNG per size and idiom), unlike the single-size
+  sets of the m1 samples. App Store Connect rejected AssetKit's per-size output (loose `AppIcon76x76@2x.png` without
+  `~ipad`, per-size `CFBundleIcons~ipad` entries) with 90023, "no app icon for iPad of exactly 152x152 pixels". So
+  for iOS the `assets` stage compiles every app icon set as Xcode's single-size form: a multi-size set is reduced to
+  its 1024×1024 image (the `ios-marketing` one first), and `Assets.car`, the loose `AppIcon60x60@2x.png` /
+  `AppIcon76x76@2x~ipad.png` and the `CFBundleIcons` / `CFBundleIcons~ipad` keys are exactly those of the validated
+  single-size path. The per-size PNGs are not used: the icons xless ships are renders of the 1024 icon (box-filter
+  downscales for the loose files; in `Assets.car`, the 1024 icon itself, scaled by the system). A multi-size set
+  without a 1024 image is refused (`[assets] … — fix: add a 1024×1024 ios-marketing icon`); App Store Connect
+  requires that icon anyway. The file names and Info.plist keys now match the reference, so the icon has no
+  compare keys in `allowed-gaps.txt`. macOS is unchanged (`AppIcon.icns` from every PNG in the set).
+- The executable is not stripped. Xcode strips on archive (`STRIP_INSTALLED_PRODUCT`), so the reference's executable
+  carries no local symbols, and xless's carries its symbol table. `BundleReport` does not compare sizes or symbols,
+  so this does not show up in the compare output. Spike B measured the acceptance app: stripped with `strip`, the
+  executable is 34.6 MB, against 34.4 MB for the Mac build.
+- Not compared: weak vs. strong linkage. `BundleReport` records install names only. xless's link weak-links 13
+  Swift overlays (contract doc, spike A). The empty `assets/` folder reference that both builds ship is also not
+  compared, because the report lists files only.
+- The increased memory limit capability is portal-only: the App Store Connect API has no capability type for it.
+  It must be enabled by hand for the bundle ID in the developer portal; xless refreshes the provisioning profile
+  once to pick it up (`Capabilities.map` is empty).

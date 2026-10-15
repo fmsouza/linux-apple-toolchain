@@ -1,0 +1,28 @@
+[package]
+name = "hello-tauri"
+version = "1.0.0"
+description = "Minimal Tauri v2 app used by xless to test iOS builds"
+edition = "2021"
+publish = false
+
+[lib]
+name = "hello_tauri_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "=2.7.0", features = [] }
+
+[dependencies]
+tauri = { version = "=2.12.0", features = [] }
+tauri-plugin-dialog = "=2.7.1"
+tauri-plugin-hello = { path = "plugins/hello-plugin" }
+cdylib-probe = { path = "crates/cdylib-probe" }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+[workspace]
+members = ["plugins/hello-plugin", "crates/cdylib-probe"]
+
+[profile.release]
+codegen-units = 1
+lto = true

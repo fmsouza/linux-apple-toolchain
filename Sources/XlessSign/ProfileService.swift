@@ -44,12 +44,14 @@ public struct ProfileService: Sendable {
 
     /// Returns profile bytes for an ACTIVE profile named "xless <bundle> <type>" that contains `certificateID`
     /// and is valid for 7+ more days; otherwise deletes it and creates a fresh one.
-    public func ensureProfile(bundleIDResourceID: String, certificateID: String, type: ProfileType, bundleIdentifier: String) async throws -> Data {
+    /// `forceNew` always replaces it (used after a capability was enabled, so the profile carries it).
+    public func ensureProfile(bundleIDResourceID: String, certificateID: String, type: ProfileType, bundleIdentifier: String,
+                              forceNew: Bool = false) async throws -> Data {
         let name = "xless \(bundleIdentifier) \(type.rawValue)"
         let list: ASCDocument<[ASCResource<ProfileAttributes>]> = try await client.get(
             "/v1/profiles", query: [("filter[name]", name), ("filter[profileType]", type.rawValue), ("limit", "200")])
         for p in list.data where p.attributes.name == name {
-            if p.attributes.profileState == "ACTIVE",
+            if !forceNew, p.attributes.profileState == "ACTIVE",
                let exp = p.attributes.expirationDate.flatMap(Self.parseDate), exp > now().addingTimeInterval(7 * 86400) {
                 let certs: ASCDocument<[ASCRef]> = try await client.get("/v1/profiles/\(p.id)/relationships/certificates")
                 if certs.data.contains(where: { $0.id == certificateID }) {

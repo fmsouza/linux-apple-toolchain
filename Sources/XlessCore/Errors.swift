@@ -1,10 +1,11 @@
 public enum Stage: String, Sendable, CaseIterable, Comparable {
-    case config, sdk, build, assets, finalize, sign, package, upload, ib
+    case config, sdk, prepare, build, assets, finalize, sign, package, upload, ib
 
     public var exitCode: Int32 {
         switch self {
         case .config: 10
         case .sdk: 11
+        case .prepare: 19
         case .build: 12
         case .assets: 13
         case .finalize: 14

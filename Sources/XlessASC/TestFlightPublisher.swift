@@ -95,7 +95,9 @@ public struct TestFlightPublisher: Sendable {
         return TestFlightResult(buildID: buildID, buildNumber: buildNumber, locale: config.locale, groups: groups, whatToTestSet: whatToTestSet, notes: notes)
     }
 
-    /// Every item of a paged listing: `limit=200`, following `links.next` (a full URL whose path and query are reused).
+    /// Every item of a paged listing: `limit=200`, following `links.next` (a full URL whose path and query are reused,
+    /// `ASCPaging.parseLink`). A listing that does not end within `ASCPaging.maxPages` pages is an error, never a
+    /// truncated list (a missing group would be created a second time).
     private func listAll<D: Codable & Sendable>(_ what: String, path: String, query: [(String, String)], done: String, as: D.Type) async throws -> [D] {
         var items: [D] = []
         var next: (path: String, query: [(String, String)])? = (path, query + [("limit", "200")])
@@ -105,8 +107,12 @@ public struct TestFlightPublisher: Sendable {
             items += page.data
             pages += 1
             next = nil
-            if let link = page.links?.next, pages < 1000, let comps = URLComponents(string: link) {
-                next = (comps.path, (comps.queryItems ?? []).map { ($0.name, $0.value ?? "") })
+            if let link = page.links?.next, let target = ASCPaging.parseLink(link) {
+                guard pages < ASCPaging.maxPages else {
+                    throw XlessError(.upload, "\(what): App Store Connect returned more than \(ASCPaging.maxPages) pages; pagination did not terminate",
+                                     fix: "report this as an xless bug; \(done)")
+                }
+                next = target
             }
         }
         return items
