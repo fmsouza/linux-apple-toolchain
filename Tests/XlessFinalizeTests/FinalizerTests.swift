@@ -12,10 +12,11 @@ func thinBinary(platform: UInt32, minos: String, sdk: String) throws -> Data {
     return d
 }
 
-func iosApp(minos: String = "17.0", extraFiles: [String: Data] = [:]) throws -> URL {
+func iosApp(minos: String = "17.0", extraFiles: [String: Data] = [:],
+            plist: [String: Any] = ["CFBundleExecutable": "X", "ITSAppUsesNonExemptEncryption": false]) throws -> URL {
     let app = FileManager.default.temporaryDirectory.appendingPathComponent("fin-\(UUID())/X.app")
     try FileManager.default.createDirectory(at: app, withIntermediateDirectories: true)
-    try Plist.write(["CFBundleExecutable": "X"], to: app.appendingPathComponent("Info.plist"), stage: .finalize)
+    try Plist.write(plist, to: app.appendingPathComponent("Info.plist"), stage: .finalize)
     try thinBinary(platform: 2, minos: minos, sdk: minos).write(to: app.appendingPathComponent("X"))
     try Data().write(to: app.appendingPathComponent("PrivacyInfo.xcprivacy"))
     for (path, data) in extraFiles {
@@ -137,4 +138,66 @@ func noBuildVersionBinary() -> Data {
     }
     #expect(throws: XlessError.self) { try StagePaths(project: out, platform: .ios).bundle(in: out, stage: .sign) }
     #expect(!FileManager.default.fileExists(atPath: out.path + ".partial"))
+}
+
+// MARK: export compliance (ITSAppUsesNonExemptEncryption)
+
+@Test func appStoreBuildWithoutComplianceKeyIsRefused() throws {
+    let out = FileManager.default.temporaryDirectory.appendingPathComponent("fo-\(UUID())")
+    let app = try iosApp(plist: ["CFBundleExecutable": "X"])
+    do { _ = try Finalizer.run(input: app, outputDir: out, platform: .ios, config: config(privacyLine), meta: meta); Issue.record("expected throw") }
+    catch let e as XlessError {
+        #expect(e.stage == .finalize)
+        #expect(e.cause.contains("ITSAppUsesNonExemptEncryption"))
+        #expect(e.fix.contains("usesNonExemptEncryption: false") && e.fix.contains("infoPlist"))
+    }
+}
+
+@Test func configKeyStampsComplianceKey() throws {
+    let out = FileManager.default.temporaryDirectory.appendingPathComponent("fo-\(UUID())")
+    let app = try Finalizer.run(input: iosApp(plist: ["CFBundleExecutable": "X"]), outputDir: out, platform: .ios,
+                                config: config(privacyLine + "\nusesNonExemptEncryption: false"), meta: meta)
+    #expect(try Plist.read(app.appendingPathComponent("Info.plist"), stage: .finalize)["ITSAppUsesNonExemptEncryption"] as? Bool == false)
+}
+
+@Test func configKeyTrueIsStampedToo() throws {
+    let out = FileManager.default.temporaryDirectory.appendingPathComponent("fo-\(UUID())")
+    let app = try Finalizer.run(input: iosApp(plist: ["CFBundleExecutable": "X"]), outputDir: out, platform: .ios,
+                                config: config(privacyLine + "\nusesNonExemptEncryption: true"), meta: meta)
+    #expect(try Plist.read(app.appendingPathComponent("Info.plist"), stage: .finalize)["ITSAppUsesNonExemptEncryption"] as? Bool == true)
+}
+
+@Test func userPlistValueIsKeptWhenConfigAgrees() throws {
+    let out = FileManager.default.temporaryDirectory.appendingPathComponent("fo-\(UUID())")
+    let app = try Finalizer.run(input: iosApp(plist: ["CFBundleExecutable": "X", "ITSAppUsesNonExemptEncryption": true]), outputDir: out, platform: .ios,
+                                config: config(privacyLine + "\nusesNonExemptEncryption: true"), meta: meta)
+    #expect(try Plist.read(app.appendingPathComponent("Info.plist"), stage: .finalize)["ITSAppUsesNonExemptEncryption"] as? Bool == true)
+}
+
+@Test func conflictingPlistAndConfigValuesAreRefused() throws {
+    let out = FileManager.default.temporaryDirectory.appendingPathComponent("fo-\(UUID())")
+    let app = try iosApp(plist: ["CFBundleExecutable": "X", "ITSAppUsesNonExemptEncryption": true])
+    do { _ = try Finalizer.run(input: app, outputDir: out, platform: .ios, config: config(privacyLine + "\nusesNonExemptEncryption: false"), meta: meta); Issue.record("expected throw") }
+    catch let e as XlessError {
+        #expect(e.stage == .finalize)
+        #expect(e.cause.contains("ITSAppUsesNonExemptEncryption") && e.cause.contains("usesNonExemptEncryption"))
+    }
+}
+
+@Test func macOSDeveloperIDDoesNotNeedComplianceKey() throws {
+    // macos fixture in macOSUniversalHappyPath has no key and must keep passing.
+    let app = FileManager.default.temporaryDirectory.appendingPathComponent("fin-\(UUID())/X.app")
+    let macos = app.appendingPathComponent("Contents/MacOS")
+    try FileManager.default.createDirectory(at: macos, withIntermediateDirectories: true)
+    try Plist.write(["CFBundleExecutable": "X"], to: app.appendingPathComponent("Contents/Info.plist"), stage: .finalize)
+    try thinBinary(platform: 1, minos: "14.0", sdk: "14.0").write(to: macos.appendingPathComponent("X"))
+    let out = FileManager.default.temporaryDirectory.appendingPathComponent("fo-\(UUID())")
+    _ = try Finalizer.run(input: app, outputDir: out, platform: .macos, config: config(), meta: meta)
+}
+
+@Test func nonBooleanComplianceKeyInUserPlistIsRefused() throws {
+    let out = FileManager.default.temporaryDirectory.appendingPathComponent("fo-\(UUID())")
+    let app = try iosApp(plist: ["CFBundleExecutable": "X", "ITSAppUsesNonExemptEncryption": "NO"])
+    do { _ = try Finalizer.run(input: app, outputDir: out, platform: .ios, config: config(privacyLine), meta: meta); Issue.record("expected throw") }
+    catch let e as XlessError { #expect(e.stage == .finalize && e.cause.contains("not a boolean")) }
 }

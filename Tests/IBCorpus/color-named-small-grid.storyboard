@@ -1,0 +1,469 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<document type="com.apple.InterfaceBuilder3.CocoaTouch.Storyboard.XIB" version="3.0" toolsVersion="23727" targetRuntime="iOS.CocoaTouch" propertyAccessControl="none" useAutolayout="YES" launchScreen="YES" useTraitCollections="YES" colorMatched="YES" initialViewController="01J-lp-oVM">
+    <device id="retina6_12" orientation="portrait" appearance="light"/>
+    <dependencies>
+        <deployment identifier="iOS"/>
+        <plugIn identifier="com.apple.InterfaceBuilder.IBCocoaTouchPlugin" version="23721"/>
+        <capability name="Named colors" minToolsVersion="9.0"/>
+        <capability name="documents saved in the Xcode 8 format" minToolsVersion="8.0"/>
+    </dependencies>
+    <scenes>
+        <!--View Controller-->
+        <scene sceneID="EHf-IW-A2E">
+            <objects>
+                <viewController id="01J-lp-oVM" sceneMemberID="viewController">
+                    <view key="view" contentMode="scaleToFill" id="Ze5-6b-2t3">
+                        <rect key="frame" x="0.0" y="0.0" width="393" height="852"/>
+                        <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
+                        <subviews>
+                            <view contentMode="scaleToFill" fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO" id="T00-tb-000">
+                                <rect key="frame" x="0.0" y="0.0" width="10" height="10"/>
+                                <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMaxY="YES"/>
+                                <color key="backgroundColor" name="Small00"/>
+                            </view>
+                            <view contentMode="scaleToFill" fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO" id="T01-tb-001">
+                                <rect key="frame" x="0.0" y="10" width="10" height="10"/>
+                                <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMaxY="YES"/>
+                                <color key="backgroundColor" name="Small01"/>
+                            </view>
+                            <view contentMode="scaleToFill" fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO" id="T02-tb-002">
+                                <rect key="frame" x="0.0" y="20" width="10" height="10"/>
+                                <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMaxY="YES"/>
+                                <color key="backgroundColor" name="Small02"/>
+                            </view>
+                            <view contentMode="scaleToFill" fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO" id="T03-tb-003">
+                                <rect key="frame" x="0.0" y="30" width="10" height="10"/>
+                                <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMaxY="YES"/>
+                                <color key="backgroundColor" name="Small03"/>
+                            </view>
+                            <view contentMode="scaleToFill" fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO" id="T04-tb-004">
+                                <rect key="frame" x="0.0" y="40" width="10" height="10"/>
+                                <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMaxY="YES"/>
+                                <color key="backgroundColor" name="Small04"/>
+                            </view>
+                            <view contentMode="scaleToFill" fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO" id="T05-tb-005">
+                                <rect key="frame" x="0.0" y="50" width="10" height="10"/>
+                                <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMaxY="YES"/>
+                                <color key="backgroundColor" name="Small05"/>
+                            </view>
+                            <view contentMode="scaleToFill" fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO" id="T06-tb-006">
+                                <rect key="frame" x="0.0" y="60" width="10" height="10"/>
+                                <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMaxY="YES"/>
+                                <color key="backgroundColor" name="Small06"/>
+                            </view>
+                            <view contentMode="scaleToFill" fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO" id="T07-tb-007">
+                                <rect key="frame" x="0.0" y="70" width="10" height="10"/>
+                                <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMaxY="YES"/>
+                                <color key="backgroundColor" name="Small07"/>
+                            </view>
+                            <view contentMode="scaleToFill" fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO" id="T08-tb-008">
+                                <rect key="frame" x="0.0" y="80" width="10" height="10"/>
+                                <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMaxY="YES"/>
+                                <color key="backgroundColor" name="Small08"/>
+                            </view>
+                            <view contentMode="scaleToFill" fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO" id="T09-tb-009">
+                                <rect key="frame" x="0.0" y="90" width="10" height="10"/>
+                                <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMaxY="YES"/>
+                                <color key="backgroundColor" name="Small09"/>
+                            </view>
+                            <view contentMode="scaleToFill" fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO" id="T10-tb-010">
+                                <rect key="frame" x="0.0" y="100" width="10" height="10"/>
+                                <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMaxY="YES"/>
+                                <color key="backgroundColor" name="Small10"/>
+                            </view>
+                            <view contentMode="scaleToFill" fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO" id="T11-tb-011">
+                                <rect key="frame" x="0.0" y="110" width="10" height="10"/>
+                                <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMaxY="YES"/>
+                                <color key="backgroundColor" name="Small11"/>
+                            </view>
+                            <view contentMode="scaleToFill" fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO" id="T12-tb-012">
+                                <rect key="frame" x="0.0" y="120" width="10" height="10"/>
+                                <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMaxY="YES"/>
+                                <color key="backgroundColor" name="Small12"/>
+                            </view>
+                            <view contentMode="scaleToFill" fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO" id="T13-tb-013">
+                                <rect key="frame" x="0.0" y="130" width="10" height="10"/>
+                                <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMaxY="YES"/>
+                                <color key="backgroundColor" name="Small13"/>
+                            </view>
+                            <view contentMode="scaleToFill" fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO" id="T14-tb-014">
+                                <rect key="frame" x="0.0" y="140" width="10" height="10"/>
+                                <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMaxY="YES"/>
+                                <color key="backgroundColor" name="Small14"/>
+                            </view>
+                            <view contentMode="scaleToFill" fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO" id="T15-tb-015">
+                                <rect key="frame" x="0.0" y="150" width="10" height="10"/>
+                                <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMaxY="YES"/>
+                                <color key="backgroundColor" name="Small15"/>
+                            </view>
+                            <view contentMode="scaleToFill" fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO" id="T16-tb-016">
+                                <rect key="frame" x="0.0" y="160" width="10" height="10"/>
+                                <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMaxY="YES"/>
+                                <color key="backgroundColor" name="Small16"/>
+                            </view>
+                            <view contentMode="scaleToFill" fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO" id="T17-tb-017">
+                                <rect key="frame" x="0.0" y="170" width="10" height="10"/>
+                                <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMaxY="YES"/>
+                                <color key="backgroundColor" name="Small17"/>
+                            </view>
+                            <view contentMode="scaleToFill" fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO" id="T18-tb-018">
+                                <rect key="frame" x="0.0" y="180" width="10" height="10"/>
+                                <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMaxY="YES"/>
+                                <color key="backgroundColor" name="Small18"/>
+                            </view>
+                            <view contentMode="scaleToFill" fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO" id="T19-tb-019">
+                                <rect key="frame" x="0.0" y="190" width="10" height="10"/>
+                                <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMaxY="YES"/>
+                                <color key="backgroundColor" name="Small19"/>
+                            </view>
+                            <view contentMode="scaleToFill" fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO" id="T20-tb-020">
+                                <rect key="frame" x="0.0" y="200" width="10" height="10"/>
+                                <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMaxY="YES"/>
+                                <color key="backgroundColor" name="Small20"/>
+                            </view>
+                            <view contentMode="scaleToFill" fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO" id="T21-tb-021">
+                                <rect key="frame" x="0.0" y="210" width="10" height="10"/>
+                                <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMaxY="YES"/>
+                                <color key="backgroundColor" name="Small21"/>
+                            </view>
+                            <view contentMode="scaleToFill" fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO" id="T22-tb-022">
+                                <rect key="frame" x="0.0" y="220" width="10" height="10"/>
+                                <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMaxY="YES"/>
+                                <color key="backgroundColor" name="Small22"/>
+                            </view>
+                            <view contentMode="scaleToFill" fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO" id="T23-tb-023">
+                                <rect key="frame" x="0.0" y="230" width="10" height="10"/>
+                                <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMaxY="YES"/>
+                                <color key="backgroundColor" name="Small23"/>
+                            </view>
+                            <view contentMode="scaleToFill" fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO" id="T24-tb-024">
+                                <rect key="frame" x="0.0" y="240" width="10" height="10"/>
+                                <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMaxY="YES"/>
+                                <color key="backgroundColor" name="Small24"/>
+                            </view>
+                            <view contentMode="scaleToFill" fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO" id="T25-tb-025">
+                                <rect key="frame" x="0.0" y="250" width="10" height="10"/>
+                                <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMaxY="YES"/>
+                                <color key="backgroundColor" name="Small25"/>
+                            </view>
+                            <view contentMode="scaleToFill" fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO" id="T26-tb-026">
+                                <rect key="frame" x="0.0" y="260" width="10" height="10"/>
+                                <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMaxY="YES"/>
+                                <color key="backgroundColor" name="Small26"/>
+                            </view>
+                            <view contentMode="scaleToFill" fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO" id="T27-tb-027">
+                                <rect key="frame" x="0.0" y="270" width="10" height="10"/>
+                                <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMaxY="YES"/>
+                                <color key="backgroundColor" name="Small27"/>
+                            </view>
+                            <view contentMode="scaleToFill" fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO" id="T28-tb-028">
+                                <rect key="frame" x="0.0" y="280" width="10" height="10"/>
+                                <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMaxY="YES"/>
+                                <color key="backgroundColor" name="Small28"/>
+                            </view>
+                            <view contentMode="scaleToFill" fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO" id="T29-tb-029">
+                                <rect key="frame" x="0.0" y="290" width="10" height="10"/>
+                                <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMaxY="YES"/>
+                                <color key="backgroundColor" name="Small29"/>
+                            </view>
+                            <view contentMode="scaleToFill" fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO" id="T30-tb-030">
+                                <rect key="frame" x="0.0" y="300" width="10" height="10"/>
+                                <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMaxY="YES"/>
+                                <color key="backgroundColor" name="Small30"/>
+                            </view>
+                            <view contentMode="scaleToFill" fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO" id="T31-tb-031">
+                                <rect key="frame" x="0.0" y="310" width="10" height="10"/>
+                                <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMaxY="YES"/>
+                                <color key="backgroundColor" name="Small31"/>
+                            </view>
+                            <view contentMode="scaleToFill" fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO" id="T32-tb-032">
+                                <rect key="frame" x="0.0" y="320" width="10" height="10"/>
+                                <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMaxY="YES"/>
+                                <color key="backgroundColor" name="Small32"/>
+                            </view>
+                            <view contentMode="scaleToFill" fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO" id="T33-tb-033">
+                                <rect key="frame" x="0.0" y="330" width="10" height="10"/>
+                                <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMaxY="YES"/>
+                                <color key="backgroundColor" name="Small33"/>
+                            </view>
+                            <view contentMode="scaleToFill" fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO" id="T34-tb-034">
+                                <rect key="frame" x="0.0" y="340" width="10" height="10"/>
+                                <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMaxY="YES"/>
+                                <color key="backgroundColor" name="Small34"/>
+                            </view>
+                            <view contentMode="scaleToFill" fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO" id="T35-tb-035">
+                                <rect key="frame" x="0.0" y="350" width="10" height="10"/>
+                                <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMaxY="YES"/>
+                                <color key="backgroundColor" name="Small35"/>
+                            </view>
+                            <view contentMode="scaleToFill" fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO" id="T36-tb-036">
+                                <rect key="frame" x="0.0" y="360" width="10" height="10"/>
+                                <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMaxY="YES"/>
+                                <color key="backgroundColor" name="Small36"/>
+                            </view>
+                            <view contentMode="scaleToFill" fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO" id="T37-tb-037">
+                                <rect key="frame" x="0.0" y="370" width="10" height="10"/>
+                                <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMaxY="YES"/>
+                                <color key="backgroundColor" name="Small37"/>
+                            </view>
+                            <view contentMode="scaleToFill" fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO" id="T38-tb-038">
+                                <rect key="frame" x="0.0" y="380" width="10" height="10"/>
+                                <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMaxY="YES"/>
+                                <color key="backgroundColor" name="Small38"/>
+                            </view>
+                            <view contentMode="scaleToFill" fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO" id="T39-tb-039">
+                                <rect key="frame" x="0.0" y="390" width="10" height="10"/>
+                                <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMaxY="YES"/>
+                                <color key="backgroundColor" name="Small39"/>
+                            </view>
+                            <view contentMode="scaleToFill" fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO" id="T40-tb-040">
+                                <rect key="frame" x="0.0" y="400" width="10" height="10"/>
+                                <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMaxY="YES"/>
+                                <color key="backgroundColor" name="Small40"/>
+                            </view>
+                            <view contentMode="scaleToFill" fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO" id="T41-tb-041">
+                                <rect key="frame" x="0.0" y="410" width="10" height="10"/>
+                                <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMaxY="YES"/>
+                                <color key="backgroundColor" name="Small41"/>
+                            </view>
+                            <view contentMode="scaleToFill" fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO" id="T42-tb-042">
+                                <rect key="frame" x="0.0" y="420" width="10" height="10"/>
+                                <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMaxY="YES"/>
+                                <color key="backgroundColor" name="Small42"/>
+                            </view>
+                            <view contentMode="scaleToFill" fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO" id="T43-tb-043">
+                                <rect key="frame" x="0.0" y="430" width="10" height="10"/>
+                                <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMaxY="YES"/>
+                                <color key="backgroundColor" name="Small43"/>
+                            </view>
+                            <view contentMode="scaleToFill" fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO" id="T44-tb-044">
+                                <rect key="frame" x="0.0" y="440" width="10" height="10"/>
+                                <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMaxY="YES"/>
+                                <color key="backgroundColor" name="Small44"/>
+                            </view>
+                            <view contentMode="scaleToFill" fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO" id="T45-tb-045">
+                                <rect key="frame" x="0.0" y="450" width="10" height="10"/>
+                                <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMaxY="YES"/>
+                                <color key="backgroundColor" name="Small45"/>
+                            </view>
+                            <view contentMode="scaleToFill" fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO" id="T46-tb-046">
+                                <rect key="frame" x="0.0" y="460" width="10" height="10"/>
+                                <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMaxY="YES"/>
+                                <color key="backgroundColor" name="Small46"/>
+                            </view>
+                            <view contentMode="scaleToFill" fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO" id="T47-tb-047">
+                                <rect key="frame" x="0.0" y="470" width="10" height="10"/>
+                                <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMaxY="YES"/>
+                                <color key="backgroundColor" name="Small47"/>
+                            </view>
+                            <view contentMode="scaleToFill" fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO" id="T48-tb-048">
+                                <rect key="frame" x="0.0" y="480" width="10" height="10"/>
+                                <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMaxY="YES"/>
+                                <color key="backgroundColor" name="Small48"/>
+                            </view>
+                            <view contentMode="scaleToFill" fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO" id="T49-tb-049">
+                                <rect key="frame" x="0.0" y="490" width="10" height="10"/>
+                                <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMaxY="YES"/>
+                                <color key="backgroundColor" name="Small49"/>
+                            </view>
+                            <view contentMode="scaleToFill" fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO" id="T50-tb-050">
+                                <rect key="frame" x="0.0" y="500" width="10" height="10"/>
+                                <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMaxY="YES"/>
+                                <color key="backgroundColor" name="Small50"/>
+                            </view>
+                            <view contentMode="scaleToFill" fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO" id="T51-tb-051">
+                                <rect key="frame" x="0.0" y="510" width="10" height="10"/>
+                                <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMaxY="YES"/>
+                                <color key="backgroundColor" name="Small51"/>
+                            </view>
+                            <view contentMode="scaleToFill" fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO" id="T52-tb-052">
+                                <rect key="frame" x="0.0" y="520" width="10" height="10"/>
+                                <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMaxY="YES"/>
+                                <color key="backgroundColor" name="Small52"/>
+                            </view>
+                            <view contentMode="scaleToFill" fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO" id="T53-tb-053">
+                                <rect key="frame" x="0.0" y="530" width="10" height="10"/>
+                                <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMaxY="YES"/>
+                                <color key="backgroundColor" name="Small53"/>
+                            </view>
+                            <view contentMode="scaleToFill" fixedFrame="YES" translatesAutoresizingMaskIntoConstraints="NO" id="T54-tb-054">
+                                <rect key="frame" x="0.0" y="540" width="10" height="10"/>
+                                <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMaxY="YES"/>
+                                <color key="backgroundColor" name="Small54"/>
+                            </view>
+                        </subviews>
+                    </view>
+                </viewController>
+                <placeholder placeholderIdentifier="IBFirstResponder" id="iYj-Kq-Ea1" userLabel="First Responder" sceneMemberID="firstResponder"/>
+            </objects>
+            <point key="canvasLocation" x="53" y="375"/>
+        </scene>
+    </scenes>
+    <resources>
+        <namedColor name="Small00">
+            <color red="0.0039215686274509803" green="0.031372549019607843" blue="0.054901960784313725" alpha="9.9999999999999995e-07" colorSpace="custom" customColorSpace="sRGB"/>
+        </namedColor>
+        <namedColor name="Small01">
+            <color red="0.0078431372549019607" green="0.035294117647058823" blue="0.058823529411764705" alpha="1.9999999999999999e-06" colorSpace="custom" customColorSpace="sRGB"/>
+        </namedColor>
+        <namedColor name="Small02">
+            <color red="0.011764705882352941" green="0.039215686274509803" blue="0.062745098039215685" alpha="9.9999999999999995e-08" colorSpace="custom" customColorSpace="sRGB"/>
+        </namedColor>
+        <namedColor name="Small03">
+            <color red="0.015686274509803921" green="0.043137254901960784" blue="0.066666666666666666" alpha="9.9999999999999994e-12" colorSpace="custom" customColorSpace="sRGB"/>
+        </namedColor>
+        <namedColor name="Small04">
+            <color red="0.019607843137254902" green="0.047058823529411764" blue="0.070588235294117646" alpha="1.2345678901234568e-05" colorSpace="custom" customColorSpace="sRGB"/>
+        </namedColor>
+        <namedColor name="Small05">
+            <color red="0.023529411764705882" green="0.050980392156862744" blue="0.074509803921568626" alpha="0.00012345678901234001" colorSpace="custom" customColorSpace="sRGB"/>
+        </namedColor>
+        <namedColor name="Small06">
+            <color red="0.027450980392156862" green="0.054901960784313725" blue="0.078431372549019607" alpha="0.012345678901233999" colorSpace="custom" customColorSpace="sRGB"/>
+        </namedColor>
+        <namedColor name="Small07">
+            <color red="0.031372549019607843" green="0.058823529411764705" blue="0.082352941176470587" alpha="0.0123456789049999" colorSpace="custom" customColorSpace="sRGB"/>
+        </namedColor>
+        <namedColor name="Small08">
+            <color red="0.035294117647058823" green="0.062745098039215685" blue="0.086274509803921567" alpha="0.0123456789050001" colorSpace="custom" customColorSpace="sRGB"/>
+        </namedColor>
+        <namedColor name="Small09">
+            <color red="0.039215686274509803" green="0.066666666666666666" blue="0.090196078431372548" alpha="0.01234567891" colorSpace="custom" customColorSpace="sRGB"/>
+        </namedColor>
+        <namedColor name="Small10">
+            <color red="0.043137254901960784" green="0.070588235294117646" blue="0.094117647058823528" alpha="0.099999999994900002" colorSpace="custom" customColorSpace="sRGB"/>
+        </namedColor>
+        <namedColor name="Small11">
+            <color red="0.047058823529411764" green="0.074509803921568626" blue="0.098039215686274508" alpha="0.099999999995000005" colorSpace="custom" customColorSpace="sRGB"/>
+        </namedColor>
+        <namedColor name="Small12">
+            <color red="0.050980392156862744" green="0.078431372549019607" blue="0.001" alpha="0.098765432109875997" colorSpace="custom" customColorSpace="sRGB"/>
+        </namedColor>
+        <namedColor name="Small13">
+            <color red="0.054901960784313725" green="0.082352941176470587" blue="0.0001" alpha="0.12345678905" colorSpace="custom" customColorSpace="sRGB"/>
+        </namedColor>
+        <namedColor name="Small14">
+            <color red="0.058823529411764705" green="0.086274509803921567" blue="0.00050000000000000001" alpha="0.12345678904999" colorSpace="custom" customColorSpace="sRGB"/>
+        </namedColor>
+        <namedColor name="Small15">
+            <color red="0.062745098039215685" green="0.090196078431372548" blue="1.0000000000000001e-05" alpha="0.12350000000001" colorSpace="custom" customColorSpace="sRGB"/>
+        </namedColor>
+        <namedColor name="Small16">
+            <color red="0.066666666666666666" green="0.094117647058823528" blue="9.9999999999999995e-07" alpha="0.50000000000010003" colorSpace="custom" customColorSpace="sRGB"/>
+        </namedColor>
+        <namedColor name="Small17">
+            <color red="0.070588235294117646" green="0.098039215686274508" blue="1.9999999999999999e-06" alpha="0.50000000001" colorSpace="custom" customColorSpace="sRGB"/>
+        </namedColor>
+        <namedColor name="Small18">
+            <color red="0.074509803921568626" green="0.001" blue="9.9999999999999995e-08" alpha="0.50000000000489997" colorSpace="custom" customColorSpace="sRGB"/>
+        </namedColor>
+        <namedColor name="Small19">
+            <color red="0.078431372549019607" green="0.0001" blue="9.9999999999999994e-12" alpha="0.99999999995" colorSpace="custom" customColorSpace="sRGB"/>
+        </namedColor>
+        <namedColor name="Small20">
+            <color red="0.082352941176470587" green="0.00050000000000000001" blue="1.2345678901234568e-05" alpha="0.99999999994900002" colorSpace="custom" customColorSpace="sRGB"/>
+        </namedColor>
+        <namedColor name="Small21">
+            <color red="0.086274509803921567" green="1.0000000000000001e-05" blue="0.00012345678901234001" alpha="0.99999899999999997" colorSpace="custom" customColorSpace="sRGB"/>
+        </namedColor>
+        <namedColor name="Small22">
+            <color red="0.090196078431372548" green="9.9999999999999995e-07" blue="0.012345678901233999" alpha="1.1920928955078125e-07" colorSpace="custom" customColorSpace="sRGB"/>
+        </namedColor>
+        <namedColor name="Small23">
+            <color red="0.094117647058823528" green="1.9999999999999999e-06" blue="0.0123456789049999" alpha="0.012300000060349713" colorSpace="custom" customColorSpace="sRGB"/>
+        </namedColor>
+        <namedColor name="Small24">
+            <color red="0.098039215686274508" green="9.9999999999999995e-08" blue="0.0123456789050001" alpha="0.3000000268220902" colorSpace="custom" customColorSpace="sRGB"/>
+        </namedColor>
+        <namedColor name="Small25">
+            <color red="0.001" green="9.9999999999999994e-12" blue="0.01234567891" alpha="0.070000004023313536" colorSpace="custom" customColorSpace="sRGB"/>
+        </namedColor>
+        <namedColor name="Small26">
+            <color red="0.0001" green="1.2345678901234568e-05" blue="0.099999999994900002" alpha="0.0039215686274509803" colorSpace="custom" customColorSpace="sRGB"/>
+        </namedColor>
+        <namedColor name="Small27">
+            <color red="0.00050000000000000001" green="0.00012345678901234001" blue="0.099999999995000005" alpha="0.0078431372549019607" colorSpace="custom" customColorSpace="sRGB"/>
+        </namedColor>
+        <namedColor name="Small28">
+            <color red="1.0000000000000001e-05" green="0.012345678901233999" blue="0.098765432109875997" alpha="0.011764705882352941" colorSpace="custom" customColorSpace="sRGB"/>
+        </namedColor>
+        <namedColor name="Small29">
+            <color red="9.9999999999999995e-07" green="0.0123456789049999" blue="0.12345678905" alpha="0.015686274509803921" colorSpace="custom" customColorSpace="sRGB"/>
+        </namedColor>
+        <namedColor name="Small30">
+            <color red="1.9999999999999999e-06" green="0.0123456789050001" blue="0.12345678904999" alpha="0.019607843137254902" colorSpace="custom" customColorSpace="sRGB"/>
+        </namedColor>
+        <namedColor name="Small31">
+            <color red="9.9999999999999995e-08" green="0.01234567891" blue="0.12350000000001" alpha="0.023529411764705882" colorSpace="custom" customColorSpace="sRGB"/>
+        </namedColor>
+        <namedColor name="Small32">
+            <color red="9.9999999999999994e-12" green="0.099999999994900002" blue="0.50000000000010003" alpha="0.027450980392156862" colorSpace="custom" customColorSpace="sRGB"/>
+        </namedColor>
+        <namedColor name="Small33">
+            <color red="1.2345678901234568e-05" green="0.099999999995000005" blue="0.50000000001" alpha="0.031372549019607843" colorSpace="custom" customColorSpace="sRGB"/>
+        </namedColor>
+        <namedColor name="Small34">
+            <color red="0.00012345678901234001" green="0.098765432109875997" blue="0.50000000000489997" alpha="0.035294117647058823" colorSpace="custom" customColorSpace="sRGB"/>
+        </namedColor>
+        <namedColor name="Small35">
+            <color red="0.012345678901233999" green="0.12345678905" blue="0.99999999995" alpha="0.039215686274509803" colorSpace="custom" customColorSpace="sRGB"/>
+        </namedColor>
+        <namedColor name="Small36">
+            <color red="0.0123456789049999" green="0.12345678904999" blue="0.99999999994900002" alpha="0.043137254901960784" colorSpace="custom" customColorSpace="sRGB"/>
+        </namedColor>
+        <namedColor name="Small37">
+            <color red="0.0123456789050001" green="0.12350000000001" blue="0.99999899999999997" alpha="0.047058823529411764" colorSpace="custom" customColorSpace="sRGB"/>
+        </namedColor>
+        <namedColor name="Small38">
+            <color red="0.01234567891" green="0.50000000000010003" blue="1.1920928955078125e-07" alpha="0.050980392156862744" colorSpace="custom" customColorSpace="sRGB"/>
+        </namedColor>
+        <namedColor name="Small39">
+            <color red="0.099999999994900002" green="0.50000000001" blue="0.012300000060349713" alpha="0.054901960784313725" colorSpace="custom" customColorSpace="sRGB"/>
+        </namedColor>
+        <namedColor name="Small40">
+            <color red="0.099999999995000005" green="0.50000000000489997" blue="0.3000000268220902" alpha="0.058823529411764705" colorSpace="custom" customColorSpace="sRGB"/>
+        </namedColor>
+        <namedColor name="Small41">
+            <color red="0.098765432109875997" green="0.99999999995" blue="0.070000004023313536" alpha="0.062745098039215685" colorSpace="custom" customColorSpace="sRGB"/>
+        </namedColor>
+        <namedColor name="Small42">
+            <color red="0.12345678905" green="0.99999999994900002" blue="0.0039215686274509803" alpha="0.066666666666666666" colorSpace="custom" customColorSpace="sRGB"/>
+        </namedColor>
+        <namedColor name="Small43">
+            <color red="0.12345678904999" green="0.99999899999999997" blue="0.0078431372549019607" alpha="0.070588235294117646" colorSpace="custom" customColorSpace="sRGB"/>
+        </namedColor>
+        <namedColor name="Small44">
+            <color red="0.12350000000001" green="1.1920928955078125e-07" blue="0.011764705882352941" alpha="0.074509803921568626" colorSpace="custom" customColorSpace="sRGB"/>
+        </namedColor>
+        <namedColor name="Small45">
+            <color red="0.50000000000010003" green="0.012300000060349713" blue="0.015686274509803921" alpha="0.078431372549019607" colorSpace="custom" customColorSpace="sRGB"/>
+        </namedColor>
+        <namedColor name="Small46">
+            <color red="0.50000000001" green="0.3000000268220902" blue="0.019607843137254902" alpha="0.082352941176470587" colorSpace="custom" customColorSpace="sRGB"/>
+        </namedColor>
+        <namedColor name="Small47">
+            <color red="0.50000000000489997" green="0.070000004023313536" blue="0.023529411764705882" alpha="0.086274509803921567" colorSpace="custom" customColorSpace="sRGB"/>
+        </namedColor>
+        <namedColor name="Small48">
+            <color red="0.99999999995" green="0.0039215686274509803" blue="0.027450980392156862" alpha="0.090196078431372548" colorSpace="custom" customColorSpace="sRGB"/>
+        </namedColor>
+        <namedColor name="Small49">
+            <color red="0.99999999994900002" green="0.0078431372549019607" blue="0.031372549019607843" alpha="0.094117647058823528" colorSpace="custom" customColorSpace="sRGB"/>
+        </namedColor>
+        <namedColor name="Small50">
+            <color red="0.99999899999999997" green="0.011764705882352941" blue="0.035294117647058823" alpha="0.098039215686274508" colorSpace="custom" customColorSpace="sRGB"/>
+        </namedColor>
+        <namedColor name="Small51">
+            <color red="1.1920928955078125e-07" green="0.015686274509803921" blue="0.039215686274509803" alpha="0.001" colorSpace="custom" customColorSpace="sRGB"/>
+        </namedColor>
+        <namedColor name="Small52">
+            <color red="0.012300000060349713" green="0.019607843137254902" blue="0.043137254901960784" alpha="0.0001" colorSpace="custom" customColorSpace="sRGB"/>
+        </namedColor>
+        <namedColor name="Small53">
+            <color red="0.3000000268220902" green="0.023529411764705882" blue="0.047058823529411764" alpha="0.00050000000000000001" colorSpace="custom" customColorSpace="sRGB"/>
+        </namedColor>
+        <namedColor name="Small54">
+            <color red="0.070000004023313536" green="0.027450980392156862" blue="0.050980392156862744" alpha="1.0000000000000001e-05" colorSpace="custom" customColorSpace="sRGB"/>
+        </namedColor>
+    </resources>
+</document>

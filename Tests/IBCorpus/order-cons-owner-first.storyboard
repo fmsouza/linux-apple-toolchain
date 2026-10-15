@@ -1,0 +1,86 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<document type="com.apple.InterfaceBuilder3.CocoaTouch.Storyboard.XIB" version="3.0" toolsVersion="23727" targetRuntime="iOS.CocoaTouch" propertyAccessControl="none" useAutolayout="YES" launchScreen="YES" useTraitCollections="YES" useSafeAreas="YES" colorMatched="YES" initialViewController="01J-lp-oVM">
+    <device id="retina6_12" orientation="portrait" appearance="light"/>
+    <dependencies>
+        <deployment identifier="iOS"/>
+        <plugIn identifier="com.apple.InterfaceBuilder.IBCocoaTouchPlugin" version="23721"/>
+        <capability name="Safe area layout guides" minToolsVersion="9.0"/>
+        <capability name="System colors in document resources" minToolsVersion="11.0"/>
+        <capability name="documents saved in the Xcode 8 format" minToolsVersion="8.0"/>
+    </dependencies>
+    <scenes>
+        <!--View Controller-->
+        <scene sceneID="EHf-IW-A2E">
+            <objects>
+                <viewController id="01J-lp-oVM" sceneMemberID="viewController">
+                    <view key="view" contentMode="scaleToFill" id="Ze5-6b-2t3">
+                        <rect key="frame" x="0.0" y="0.0" width="393" height="852"/>
+                        <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
+                        <subviews>
+                            <view contentMode="scaleToFill" translatesAutoresizingMaskIntoConstraints="NO" id="000-aa-aaa">
+                                <rect key="frame" x="20" y="100" width="100" height="100"/>
+                                <subviews>
+                                    <imageView clipsSubviews="YES" userInteractionEnabled="NO" contentMode="scaleAspectFit" horizontalHuggingPriority="251" verticalHuggingPriority="251" image="Logo" translatesAutoresizingMaskIntoConstraints="NO" id="Kk0-aa-aaa">
+                                        <rect key="frame" x="0.0" y="0.0" width="20" height="20"/>
+                                    </imageView>
+                                </subviews>
+                                <constraints>
+                                    <constraint firstItem="Kk0-aa-aaa" firstAttribute="top" secondItem="000-aa-aaa" secondAttribute="top" id="K01-tb-001"/>
+                                    <constraint firstAttribute="height" constant="100" id="K02-tb-002"/>
+                                    <constraint firstItem="Kk0-aa-aaa" firstAttribute="leading" secondItem="000-aa-aaa" secondAttribute="leading" id="K03-tb-003"/>
+                                    <constraint firstAttribute="width" constant="100" id="K04-tb-004"/>
+                                    <constraint firstItem="000-aa-aaa" firstAttribute="width" secondItem="000-aa-aaa" secondAttribute="height" id="K05-tb-005"/>
+                                </constraints>
+                            </view>
+                            <view contentMode="scaleToFill" translatesAutoresizingMaskIntoConstraints="NO" id="Mmm-aa-aaa">
+                                <rect key="frame" x="20" y="250" width="100" height="100"/>
+                                <subviews>
+                                    <imageView clipsSubviews="YES" userInteractionEnabled="NO" contentMode="scaleAspectFit" horizontalHuggingPriority="251" verticalHuggingPriority="251" image="Logo" translatesAutoresizingMaskIntoConstraints="NO" id="Kk1-aa-aaa">
+                                        <rect key="frame" x="0.0" y="0.0" width="20" height="20"/>
+                                    </imageView>
+                                </subviews>
+                                <constraints>
+                                    <constraint firstItem="Kk1-aa-aaa" firstAttribute="top" secondItem="Mmm-aa-aaa" secondAttribute="top" id="K11-tb-011"/>
+                                    <constraint firstAttribute="height" constant="100" id="K12-tb-012"/>
+                                    <constraint firstItem="Kk1-aa-aaa" firstAttribute="leading" secondItem="Mmm-aa-aaa" secondAttribute="leading" id="K13-tb-013"/>
+                                    <constraint firstAttribute="width" constant="100" id="K14-tb-014"/>
+                                    <constraint firstItem="Mmm-aa-aaa" firstAttribute="width" secondItem="Mmm-aa-aaa" secondAttribute="height" id="K15-tb-015"/>
+                                </constraints>
+                            </view>
+                            <view contentMode="scaleToFill" translatesAutoresizingMaskIntoConstraints="NO" id="zzz-aa-aaa">
+                                <rect key="frame" x="20" y="400" width="100" height="100"/>
+                                <subviews>
+                                    <imageView clipsSubviews="YES" userInteractionEnabled="NO" contentMode="scaleAspectFit" horizontalHuggingPriority="251" verticalHuggingPriority="251" image="Logo" translatesAutoresizingMaskIntoConstraints="NO" id="Kk2-aa-aaa">
+                                        <rect key="frame" x="0.0" y="0.0" width="20" height="20"/>
+                                    </imageView>
+                                </subviews>
+                                <constraints>
+                                    <constraint firstItem="Kk2-aa-aaa" firstAttribute="top" secondItem="zzz-aa-aaa" secondAttribute="top" id="K21-tb-021"/>
+                                    <constraint firstAttribute="height" constant="100" id="K22-tb-022"/>
+                                    <constraint firstItem="Kk2-aa-aaa" firstAttribute="leading" secondItem="zzz-aa-aaa" secondAttribute="leading" id="K23-tb-023"/>
+                                    <constraint firstAttribute="width" constant="100" id="K24-tb-024"/>
+                                    <constraint firstItem="zzz-aa-aaa" firstAttribute="width" secondItem="zzz-aa-aaa" secondAttribute="height" id="K25-tb-025"/>
+                                </constraints>
+                            </view>
+                        </subviews>
+                        <viewLayoutGuide key="safeArea" id="6Tk-OE-BBY"/>
+                        <color key="backgroundColor" systemColor="systemBackgroundColor"/>
+                        <constraints>
+                            <constraint firstItem="000-aa-aaa" firstAttribute="top" secondItem="Ze5-6b-2t3" secondAttribute="top" id="K50-tb-050"/>
+                            <constraint firstItem="Mmm-aa-aaa" firstAttribute="top" secondItem="Ze5-6b-2t3" secondAttribute="top" id="K51-tb-051"/>
+                            <constraint firstItem="zzz-aa-aaa" firstAttribute="top" secondItem="Ze5-6b-2t3" secondAttribute="top" id="K52-tb-052"/>
+                        </constraints>
+                    </view>
+                </viewController>
+                <placeholder placeholderIdentifier="IBFirstResponder" id="iYj-Kq-Ea1" userLabel="First Responder" sceneMemberID="firstResponder"/>
+            </objects>
+            <point key="canvasLocation" x="53" y="375"/>
+        </scene>
+    </scenes>
+    <resources>
+        <image name="Logo" width="1" height="1"/>
+        <systemColor name="systemBackgroundColor">
+            <color white="1" alpha="1" colorSpace="custom" customColorSpace="genericGamma22GrayColorSpace"/>
+        </systemColor>
+    </resources>
+</document>

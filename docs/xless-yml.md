@@ -27,6 +27,9 @@ infoPlist: Resources/Info.plist
 | `assets` | path | required for iOS (app-store) | Asset catalog (`.xcassets`), relative to the project. Compiled to `Assets.car` on iOS and to an `.icns` icon on macOS (macOS has no `Assets.car`). App Store builds fail at `assets` unless it contains an `.appiconset`. |
 | `privacyManifest` | path | required for iOS (app-store) | `PrivacyInfo.xcprivacy`, copied into the bundle; `finalize` fails for App Store builds if it is missing. |
 | `infoPlist` | path | no | Extra Info.plist keys merged into the generated one (usage descriptions, orientations, export-compliance keys). |
+| `usesNonExemptEncryption` | boolean | no | Stamps `ITSAppUsesNonExemptEncryption` (export compliance) into the Info.plist. `finalize` refuses iOS App Store builds whose Info.plist has no such key (they would stall at "Missing Compliance" in TestFlight). Set it here, or put the key in the `infoPlist` file. If both define it with different values, `finalize` refuses. `false` means the app uses no encryption beyond what Apple's OS provides or only exempt encryption. `true` is valid, but App Store Connect then needs an export compliance answer for each build before testers can install it. A non-boolean value in the Info.plist is refused. |
+| `testflight` | map | no | Deliver uploaded builds to TestFlight groups. See [`testflight`](#testflight). |
+| `launchStoryboard` | path | no | iOS only (ignored for macOS). A launch-screen `.storyboard` (must end in `.storyboard`), relative to the project. See [Launch storyboard](#launch-storyboard). |
 
 ## `platforms.<ios|macos>` keys
 
@@ -38,10 +41,56 @@ infoPlist: Resources/Info.plist
 | `distribution` | `app-store` or `developer-id` | no | Defaults: iOS `app-store`, macOS `developer-id`. |
 | `bundleID` | string | no | Overrides the top-level `bundleID` for this platform. Same format rule. |
 
+## `testflight`
+
+```yaml
+testflight:
+  groups: ["Internal"]
+  whatToTest: "Launch screen built on Linux"
+```
+
+| Key | Type | Required | Notes |
+|---|---|---|---|
+| `groups` | list of strings | yes | Internal TestFlight groups to deliver to. At least one, no blanks or duplicates. |
+| `whatToTest` | string | no | The build's "What to Test" text (at most 4000 characters). |
+| `locale` | string | no | Locale of `whatToTest`, BCP-47 style with a hyphen (`en-US`, not `en_US`). Default `en-US`. |
+
+After `upload` reaches `VALID`, xless (iOS only; ignored for macOS):
+
+- reuses each group by exact (case-sensitive) name, matched client-side so names containing commas work, or creates it as an **internal** group with automatic distribution (`hasAccessToAllBuilds`). An existing external group with that name is an error. Nothing is ever deleted and existing groups are not modified;
+- adds the new build to each group explicitly;
+- sets or updates "What to Test" for `locale` when `whatToTest` is given;
+- prints the build number, the groups and `available to N testers`, and warns about groups with 0 testers. Internal testers must be App Store Connect users, added once in the web UI (Users and Access, then TestFlight).
+
+A failure here exits 17 as `[upload] …`; the build is already uploaded and processed, so the message says so (ship again with a higher build number, or finish in App Store Connect). One-command usage: [README](README.md#one-command-testflight).
+
+## Launch storyboard
+
+With `launchStoryboard` set, the iOS `assets` stage compiles the storyboard without ibtool, byte-identical to Xcode 27.0's
+ibtool (`xless storyboard compile` is the same compiler as a standalone command):
+
+- The `--target-device` set comes from `UIDeviceFamily` in the app's Info.plist: `[1]` → iPhone, `[1, 2]` → iPhone + iPad
+  (absent → iPhone + iPad). Other families are an error.
+- The deployment target is `platforms.ios.minimumOS` (15.0 to 27.x).
+- The result is written to `<App>.app/<name>.storyboardc` at the bundle root, where Xcode's link step puts it
+  ([research/ib-invocation.md](research/ib-invocation.md)); Info.plist gets `UILaunchStoryboardName = <name>` and loses
+  `UILaunchScreen`.
+- Images and named colors the storyboard uses must be in the `assets` catalog (e.g. a `Logo.imageset`).
+- Only a subset is supported: one view controller with a root view, image views, labels, Auto Layout constraints,
+  colors and safe area, views nested at most 32 levels deep, files up to 4 MiB. Anything else, or a storyboard saved by
+  an Xcode newer than 27.0, fails with
+  `[assets] launch storyboard <path>: unsupported … at line <n> — …` (exit code 13).
+
+Example: [samples/HelloShipLaunch](../samples/HelloShipLaunch) (`launchStoryboard: Resources/LaunchScreen.storyboard`).
+On the Mac, `make ib-parity` checks the compiler against ibtool (golden drift, and a simulator screenshot of the sample's
+launch screen compiled both ways).
+
 ## Validation rules
 
 - `distribution` is fixed in milestone 1. iOS must be `app-store`; macOS must be `developer-id` (Mac App Store is not supported, see [research/mas-pkg.md](research/mas-pkg.md)). Anything else is a config error.
 - `platforms.<p>.minimumOS` must parse as a dotted version.
+- `launchStoryboard` must end in `.storyboard`.
+- `testflight.groups` must be non-empty without blank or duplicate names; `whatToTest` must be non-blank and at most 4000 characters.
 - Invalid configs fail in the config stage (exit code 10) with `[config] cause — fix`.
 
 ## Environment

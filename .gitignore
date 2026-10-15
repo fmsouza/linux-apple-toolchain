@@ -13,3 +13,6 @@ samples/**/*.xcodeproj
 samples/**/.bsp/
 samples/**/xtool.yml
 ThirdParty/AssetKit/Package.resolved
+.build-linux/
+__pycache__/
+testflight.env

@@ -20,10 +20,11 @@ let package = Package(
         .target(name: "XlessMachO"),
         .target(name: "XlessBuild", dependencies: ["XlessCore", "XlessMachO"]),
         .target(name: "XlessAssets", dependencies: [
-            "XlessCore", "XlessMachO",
+            "XlessCore", "XlessMachO", "XlessIB",
             .product(name: "AssetKit", package: "AssetKit"),
             .product(name: "PNG", package: "swift-png"),
         ]),
+        .target(name: "XlessIB", dependencies: ["XlessCore"]),
         .target(name: "XlessFinalize", dependencies: ["XlessCore", "XlessMachO"]),
         .target(name: "XlessASC", dependencies: [
             "XlessCore",
@@ -37,9 +38,12 @@ let package = Package(
         ]),
         .target(name: "XlessPackage", dependencies: ["XlessCore", "XlessSign"]),
         .executableTarget(name: "xless", dependencies: [
-            "XlessCore", "XlessSDK", "XlessBuild", "XlessAssets", "XlessFinalize", "XlessSign", "XlessASC", "XlessPackage",
+            "XlessCore", "XlessSDK", "XlessBuild", "XlessAssets", "XlessFinalize", "XlessSign", "XlessASC", "XlessPackage", "XlessIB",
             .product(name: "ArgumentParser", package: "swift-argument-parser"),
         ]),
+        // Research tool: compares the storyboard compiler with ibtool outputs (scripts/ib-corpus/differential.py).
+        // Not a product: `--product xless` (image builds) skips it; only `swift run IBDifferential` builds it.
+        .executableTarget(name: "IBDifferential", dependencies: ["XlessIB", "XlessCore"]),
         .testTarget(name: "XlessCoreTests", dependencies: ["XlessCore"]),
         .testTarget(name: "XlessSDKTests", dependencies: ["XlessSDK", "XlessCore"]),
         .testTarget(name: "XlessBuildTests", dependencies: ["XlessBuild", "XlessCore"]),
@@ -60,6 +64,7 @@ let package = Package(
             .product(name: "_CryptoExtras", package: "swift-crypto"),
         ]),
         .testTarget(name: "XlessPackageTests", dependencies: ["XlessPackage", "XlessCore"]),
+        .testTarget(name: "XlessIBTests", dependencies: ["XlessIB", "XlessCore"]),
         .testTarget(name: "XlessMachOTests", dependencies: ["XlessMachO"]),
     ]
 )

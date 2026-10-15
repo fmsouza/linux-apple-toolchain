@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<document type="com.apple.InterfaceBuilder3.CocoaTouch.Storyboard.XIB" version="3.0" toolsVersion="25098" targetRuntime="iOS.CocoaTouch" propertyAccessControl="none" useAutolayout="YES" launchScreen="YES" useTraitCollections="YES" useSafeAreas="YES" colorMatched="YES" initialViewController="Hs1-Ln-VC0">
+    <device id="retina6_12" orientation="portrait" appearance="light"/>
+    <dependencies>
+        <plugIn identifier="com.apple.InterfaceBuilder.IBCocoaTouchPlugin" version="25073"/>
+        <capability name="Safe area layout guides" minToolsVersion="9.0"/>
+        <capability name="System colors in document resources" minToolsVersion="11.0"/>
+        <capability name="documents saved in the Xcode 8 format" minToolsVersion="8.0"/>
+    </dependencies>
+    <scenes>
+        <!--View Controller-->
+        <scene sceneID="Hs1-Ln-Scn">
+            <objects>
+                <viewController id="Hs1-Ln-VC0" sceneMemberID="viewController">
+                    <view key="view" contentMode="scaleToFill" id="Hs1-Ln-RtV">
+                        <rect key="frame" x="0.0" y="0.0" width="393" height="852"/>
+                        <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
+                        <subviews>
+                            <imageView clipsSubviews="YES" userInteractionEnabled="NO" contentMode="scaleAspectFit" horizontalHuggingPriority="251" verticalHuggingPriority="251" image="Logo" translatesAutoresizingMaskIntoConstraints="NO" id="Hs1-Ln-Lgo">
+                                <rect key="frame" x="146.5" y="376" width="100" height="100"/>
+                                <constraints>
+                                    <constraint firstAttribute="width" constant="100" id="Hs1-Cn-001"/>
+                                    <constraint firstAttribute="height" constant="100" id="Hs1-Cn-002"/>
+                                </constraints>
+                            </imageView>
+                            <label opaque="NO" userInteractionEnabled="NO" contentMode="left" horizontalHuggingPriority="251" verticalHuggingPriority="251" text="Built on Linux" textAlignment="center" lineBreakMode="tailTruncation" baselineAdjustment="alignBaselines" adjustsFontSizeToFit="NO" translatesAutoresizingMaskIntoConstraints="NO" id="Hs1-Ln-Lbl">
+                                <rect key="frame" x="20" y="500" width="353" height="24"/>
+                                <fontDescription key="fontDescription" type="system" weight="semibold" pointSize="20"/>
+                                <color key="textColor" systemColor="secondaryLabelColor"/>
+                                <nil key="highlightedColor"/>
+                            </label>
+                        </subviews>
+                        <viewLayoutGuide key="safeArea" id="Hs1-Ln-SfA"/>
+                        <color key="backgroundColor" systemColor="systemBackgroundColor"/>
+                        <constraints>
+                            <constraint firstItem="Hs1-Ln-Lgo" firstAttribute="centerX" secondItem="Hs1-Ln-RtV" secondAttribute="centerX" id="Hs1-Cn-003"/>
+                            <constraint firstItem="Hs1-Ln-Lgo" firstAttribute="centerY" secondItem="Hs1-Ln-RtV" secondAttribute="centerY" id="Hs1-Cn-004"/>
+                            <constraint firstItem="Hs1-Ln-Lbl" firstAttribute="top" secondItem="Hs1-Ln-Lgo" secondAttribute="bottom" constant="24" id="Hs1-Cn-005"/>
+                            <constraint firstItem="Hs1-Ln-Lbl" firstAttribute="leading" secondItem="Hs1-Ln-SfA" secondAttribute="leading" constant="20" id="Hs1-Cn-006"/>
+                            <constraint firstItem="Hs1-Ln-SfA" firstAttribute="trailing" secondItem="Hs1-Ln-Lbl" secondAttribute="trailing" constant="20" id="Hs1-Cn-007"/>
+                        </constraints>
+                    </view>
+                </viewController>
+                <placeholder placeholderIdentifier="IBFirstResponder" id="Hs1-Ln-FRs" userLabel="First Responder" sceneMemberID="firstResponder"/>
+            </objects>
+            <point key="canvasLocation" x="53" y="375"/>
+        </scene>
+    </scenes>
+    <resources>
+        <image name="Logo" width="100" height="100"/>
+        <systemColor name="secondaryLabelColor">
+            <color red="0.23529411759999999" green="0.23529411759999999" blue="0.26274509800000001" alpha="0.59999999999999998" colorSpace="custom" customColorSpace="sRGB"/>
+        </systemColor>
+        <systemColor name="systemBackgroundColor">
+            <color white="1" alpha="1" colorSpace="custom" customColorSpace="genericGamma22GrayColorSpace"/>
+        </systemColor>
+    </resources>
+</document>

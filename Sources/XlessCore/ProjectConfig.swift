@@ -10,6 +10,26 @@ public struct PlatformConfig: Sendable, Equatable, Decodable {
     public var bundleID: String?
 }
 
+/// Optional `testflight:` block: deliver each uploaded build to internal TestFlight groups.
+public struct TestFlightConfig: Sendable, Equatable, Decodable {
+    public var groups: [String]
+    public var whatToTest: String?
+    /// Locale of the "What to Test" text.
+    public var locale: String
+
+    public init(groups: [String], whatToTest: String? = nil, locale: String = "en-US") {
+        self.groups = groups; self.whatToTest = whatToTest; self.locale = locale
+    }
+
+    enum CodingKeys: String, CodingKey { case groups, whatToTest, locale }
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        groups = try c.decode([String].self, forKey: .groups)
+        whatToTest = try c.decodeIfPresent(String.self, forKey: .whatToTest)
+        locale = try c.decodeIfPresent(String.self, forKey: .locale) ?? "en-US"
+    }
+}
+
 public struct ProjectConfig: Sendable, Equatable {
     public var bundleID: String
     public var teamID: String
@@ -19,6 +39,11 @@ public struct ProjectConfig: Sendable, Equatable {
     public var assets: String?
     public var privacyManifest: String?
     public var infoPlist: String?
+    /// iOS launch-screen storyboard (`.storyboard`), relative to the project; compiled in the `assets` stage.
+    public var launchStoryboard: String? = nil
+    public var testflight: TestFlightConfig? = nil
+    /// Value stamped as `ITSAppUsesNonExemptEncryption` (export compliance) when set.
+    public var usesNonExemptEncryption: Bool? = nil
 
     public func platform(_ p: Platform) throws -> PlatformConfig {
         guard let c = platforms[p] else {
@@ -53,6 +78,9 @@ private struct RawConfig: Decodable {
     var assets: String?
     var privacyManifest: String?
     var infoPlist: String?
+    var launchStoryboard: String?
+    var testflight: TestFlightConfig?
+    var usesNonExemptEncryption: Bool?
 }
 
 extension ProjectConfig {
@@ -73,7 +101,9 @@ extension ProjectConfig {
         let config = ProjectConfig(
             bundleID: raw.bundleID, teamID: raw.teamID, version: raw.version,
             build: buildOverride ?? raw.build.value, platforms: platforms,
-            assets: raw.assets, privacyManifest: raw.privacyManifest, infoPlist: raw.infoPlist)
+            assets: raw.assets, privacyManifest: raw.privacyManifest, infoPlist: raw.infoPlist,
+            launchStoryboard: raw.launchStoryboard, testflight: raw.testflight,
+            usesNonExemptEncryption: raw.usesNonExemptEncryption)
         try config.validate()
         return config
     }
@@ -106,11 +136,41 @@ extension ProjectConfig {
                 throw XlessError(.config, "platforms.\(p.rawValue).minimumOS '\(pc.minimumOS)' is invalid", fix: "use e.g. \"17.0\"")
             }
         }
+        if let sb = launchStoryboard, !sb.hasSuffix(".storyboard") || sb == ".storyboard" || sb.hasSuffix("/.storyboard") {
+            throw XlessError(.config, "launchStoryboard '\(sb)' is not a .storyboard file", fix: "point launchStoryboard at the launch screen's .storyboard, e.g. Resources/LaunchScreen.storyboard")
+        }
+        if let tf = testflight { try Self.validate(tf) }
         if distribution(for: .ios) != .appStore, platforms[.ios] != nil {
             throw XlessError(.config, "iOS distribution must be app-store in milestone 1", fix: "remove platforms.ios.distribution")
         }
         if distribution(for: .macos) != .developerID, platforms[.macos] != nil {
             throw XlessError(.config, "macOS distribution must be developer-id in milestone 1 (Mac App Store .pkg is not supported)", fix: "set platforms.macos.distribution: developer-id")
+        }
+    }
+
+    private static func validate(_ tf: TestFlightConfig) throws {
+        if tf.groups.isEmpty {
+            throw XlessError(.config, "testflight.groups is empty", fix: "list at least one internal TestFlight group, e.g. groups: [\"Internal\"], or remove the testflight block")
+        }
+        var seen = Set<String>()
+        for g in tf.groups {
+            if g.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                throw XlessError(.config, "testflight.groups contains an empty name", fix: "give every group a name")
+            }
+            if !seen.insert(g).inserted {
+                throw XlessError(.config, "testflight.groups lists '\(g)' twice", fix: "remove the duplicate")
+            }
+        }
+        if let w = tf.whatToTest {
+            if w.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                throw XlessError(.config, "testflight.whatToTest is empty", fix: "write the text testers should see, or remove the key")
+            }
+            if w.count > 4000 {
+                throw XlessError(.config, "testflight.whatToTest is \(w.count) characters; App Store Connect allows at most 4000", fix: "shorten the text")
+            }
+        }
+        if tf.locale.wholeMatch(of: /[A-Za-z]{2,3}(-[A-Za-z0-9]{2,8})*/) == nil {
+            throw XlessError(.config, "testflight.locale '\(tf.locale)' is not a locale code", fix: "use e.g. en-US")
         }
     }
 }

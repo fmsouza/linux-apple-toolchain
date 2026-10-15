@@ -1,0 +1,11 @@
+bundleID: com.example.helloshiplaunch
+teamID: ABCDE12345
+version: 1.0.0
+build: 1
+platforms:
+  ios:   { minimumOS: "17.0", product: HelloShipLaunch, entitlements: ios.entitlements }
+  macos: { minimumOS: "14.0", product: HelloShipLaunch, entitlements: macos.entitlements, distribution: developer-id }
+assets: Resources/Assets.xcassets
+privacyManifest: Resources/PrivacyInfo.xcprivacy
+infoPlist: Resources/Info.plist
+launchStoryboard: Resources/LaunchScreen.storyboard

@@ -53,7 +53,19 @@ enum StageRunner {
         }
     }
 
-    static func upload(_ ctx: Context) async throws -> UploadRecord {
+    struct UploadOutcome {
+        var record: UploadRecord
+        /// Present when xless.yml has a `testflight:` block.
+        var testflight: TestFlightResult?
+
+        /// Terminal output: the build line, then the TestFlight delivery summary when configured (warnings go to stderr).
+        func report() -> String {
+            "build \(record.buildID ?? "?") \(record.processingState ?? record.state)"
+                + (testflight.map { "\n" + $0.summary.joined(separator: "\n") } ?? "")
+        }
+    }
+
+    static func upload(_ ctx: Context) async throws -> UploadOutcome {
         try await withStage(.upload) {
             guard ctx.platform == .ios else {
                 throw XlessError(.upload, "upload is App Store only; macOS Developer ID builds are distributed directly", fix: "use the notarized zip from `xless package --platform macos`")
@@ -72,12 +84,17 @@ enum StageRunner {
             let client = ASCClient(credentials: try ASCCredentials.fromSecrets(ctx.secrets, stage: .upload))
             let recordURL = ctx.paths.uploadRecord
             try? FileManager.default.removeItem(at: recordURL)
-            return try await BuildUploader(client: client).upload(ipa: ipa, bundleID: ctx.config.bundleID(for: .ios),
+            let record = try await BuildUploader(client: client).upload(ipa: ipa, bundleID: ctx.config.bundleID(for: .ios),
                                                                   version: versions.version, build: versions.build, platform: .ios) { record in
                 // Written on every state change, so the build ID survives a processing failure or timeout.
                 let enc = JSONEncoder(); enc.outputFormatting = [.prettyPrinted, .sortedKeys]
                 try enc.encode(record).write(to: recordURL, options: .atomic)
             }
+            guard let tf = ctx.config.testflight, let buildID = record.buildID else { return UploadOutcome(record: record, testflight: nil) }
+            let result = try await TestFlightPublisher(client: client).publish(
+                bundleID: ctx.config.bundleID(for: .ios), buildID: buildID, buildNumber: versions.build, config: tf)
+            for w in result.warnings { FileHandle.standardError.write(Data((w + "\n").utf8)) }
+            return UploadOutcome(record: record, testflight: result)
         }
     }
 }

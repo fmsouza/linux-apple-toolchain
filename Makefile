@@ -6,8 +6,9 @@ test:
 	swift test
 
 test-linux:
-	docker run --rm -v "$(CURDIR)":/src -w /src swift:$(SWIFT_VERSION)-jammy \
-	  bash -c 'apt-get update -qq && apt-get install -y -qq zip unzip >/dev/null && swift test --scratch-path /tmp/.build'
+	mkdir -p .build-linux
+	docker run --rm -v "$(CURDIR)":/src -v "$(CURDIR)/.build-linux":/scratch -w /src swift:$(SWIFT_VERSION)-jammy \
+	  bash -c 'apt-get update -qq && apt-get install -y -qq zip unzip >/dev/null && swift test --scratch-path /scratch'
 
 XLESS_TAG = xcode$(XCODE_VERSION)-$(XCODE_BUILD)-v$(XLESS_VERSION)
 BUILD_ARGS = --build-arg SWIFT_VERSION=$(SWIFT_VERSION) --build-arg XTOOL_VERSION=$(XTOOL_VERSION) --build-arg RCODESIGN_VERSION=$(RCODESIGN_VERSION) \
@@ -34,6 +35,15 @@ sdk-push:
 	R=$$(scripts/check-private-registry.sh) && docker buildx build --platform linux/arm64,linux/amd64 --push \
 	  -t $$R/xless:$(XLESS_TAG) -f docker/Dockerfile.sdk --build-arg BASE=$$R/xless-base:v$(XLESS_VERSION) .
 
-.PHONY: parity
+.PHONY: testflight
+# make testflight PROJECT=<dir>: build, sign, upload and deliver an iOS project to TestFlight (see scripts/testflight.sh).
+testflight:
+	@test -n "$(PROJECT)" || { echo "usage: make testflight PROJECT=<dir>" >&2; exit 2; }
+	@scripts/testflight.sh "$(PROJECT)"
+
+.PHONY: parity ib-parity
 parity:
 	scripts/parity.sh
+
+ib-parity:
+	scripts/ib-parity.sh

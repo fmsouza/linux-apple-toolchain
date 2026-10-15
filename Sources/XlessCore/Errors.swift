@@ -1,5 +1,5 @@
 public enum Stage: String, Sendable, CaseIterable, Comparable {
-    case config, sdk, build, assets, finalize, sign, package, upload
+    case config, sdk, build, assets, finalize, sign, package, upload, ib
 
     public var exitCode: Int32 {
         switch self {
@@ -11,6 +11,7 @@ public enum Stage: String, Sendable, CaseIterable, Comparable {
         case .sign: 15
         case .package: 16
         case .upload: 17
+        case .ib: 18
         }
     }
 

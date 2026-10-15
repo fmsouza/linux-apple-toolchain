@@ -32,7 +32,6 @@ struct UploadCommand: AsyncParsableCommand {
     static let configuration = CommandConfiguration(commandName: "upload", abstract: "Upload the .ipa to App Store Connect and wait for TestFlight processing.")
     @OptionGroup var options: ProjectOptions
     func run() async throws {
-        let r = try await StageRunner.upload(Context.load(options))
-        print("build \(r.buildID ?? "?") \(r.processingState ?? r.state)")
+        print(try await StageRunner.upload(Context.load(options)).report())
     }
 }

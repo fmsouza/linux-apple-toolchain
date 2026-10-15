@@ -1,6 +1,7 @@
 import AssetKit
 import Foundation
 import XlessCore
+import XlessIB
 import XlessMachO
 
 public enum AssetsStage {
@@ -18,7 +19,14 @@ public enum AssetsStage {
             throw XlessError(.assets, "App Store builds need an app icon, but \(missing)",
                              fix: "add an AppIcon.appiconset with an opaque 1024×1024 PNG to an asset catalog and set `assets:` in xless.yml to it")
         }
-        guard let assets = config.assets else { return app }
+        if let assets = config.assets { try await compileCatalog(assets, into: app, platform: platform, config: config, project: project) }
+        if platform == .ios, let storyboard = config.launchStoryboard {
+            try LaunchStoryboard.compile(project.appendingPathComponent(storyboard), into: app, minimumOS: try config.platform(.ios).minimumOS)
+        }
+        return app
+    }
+
+    static func compileCatalog(_ assets: String, into app: URL, platform: Platform, config: ProjectConfig, project: URL) async throws {
         let catalog = project.appendingPathComponent(assets)
         let layout = BundleLayout(platform: platform)
         let plistURL = app.appendingPathComponent(layout.infoPlist)
@@ -52,7 +60,7 @@ public enum AssetsStage {
                 info.removeValue(forKey: "CFBundleIconFile")
             }
         case .macos:
-            guard !icons.isEmpty else { return app }
+            guard !icons.isEmpty else { return }
             let icns: Data
             do { icns = try ICNS.make(pngs: icons) } catch {
                 throw XlessError(.assets, "cannot build AppIcon.icns: \(error)", fix: "provide square PNG app icons sized 16–1024")
@@ -61,7 +69,6 @@ public enum AssetsStage {
             info["CFBundleIconFile"] = "AppIcon"
         }
         try Plist.write(info, to: plistURL, stage: .assets)
-        return app
     }
 
     /// Copies the catalog into `dir`, adding the missing "scale" to app icon entries (AssetKit requires it).

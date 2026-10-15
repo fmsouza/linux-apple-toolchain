@@ -39,7 +39,7 @@ Each stage reads only the previous stage's directory under `.xless/build/<platfo
 | finalize | `xless finalize` | `final/` Xcode metadata stamped, binaries patched | 14 |
 | sign | `xless sign` | `signed/` | 15 |
 | package | `xless package` | `out/` `.ipa` or notarized `.zip` | 16 |
-| upload | `xless upload` | `upload.json` (iOS only; rewritten at every state change, so it keeps the build ID if processing fails or times out) | 17 |
+| upload | `xless upload` | `upload.json` (iOS only; rewritten at every state change, so it keeps the build ID if processing fails or times out). With a [`testflight:` block](xless-yml.md#testflight) it then delivers the processed build to your TestFlight groups. | 17 |
 
 Config errors exit 10 and SDK errors exit 11. Errors are printed as `[stage] cause — fix`. Other commands: `xless inspect <bundle> --platform <p>` prints Info.plist and Mach-O build versions as JSON (useful when comparing with an Xcode build); `xless sdk meta|export|install` manage the SDK.
 
@@ -78,6 +78,25 @@ Pass the variables by name (`-e NAME`) so values stay out of your shell history 
 The container runs as root, so the directories it creates in your project (`.xless/`, and for iOS builds `xtool/` and `.build/`) end up owned by root on a Linux host. Remove them with `sudo rm -rf .xless xtool .build`, or hand them back with `docker run --rm -v "$PWD":/work -w /work alpine chown -R "$(id -u):$(id -g)" .xless xtool .build`.
 
 For GitHub Actions see [.github/workflows/example-ios.yml](../.github/workflows/example-ios.yml). It runs the private image as the job container; set the repo variable `XLESS_IMAGE` and secrets `XLESS_REGISTRY_TOKEN`, `ASC_KEY_ID`, `ASC_ISSUER_ID`, `ASC_KEY_P8`, `XLESS_DIST_KEY`. The runner is x86_64 and the image is multi-arch; this workflow has not been run yet (needs real secrets).
+
+### One command: TestFlight
+
+`make testflight PROJECT=<dir>` builds, signs, uploads and delivers an iOS project to TestFlight with `xless ship --platform ios`. It wraps [scripts/testflight.sh](../scripts/testflight.sh), which you can also call directly (extra arguments go to `xless ship`, for example `--from upload`).
+
+- **Where it runs.** On macOS, inside the xless Linux image through docker (the image is `xless:local-<arch>` unless `XLESS_IMAGE` says otherwise; the docker context is `DOCKER_CONTEXT`, else `colima-xless` when that context exists, else the current one). On Linux it runs natively when `xless` is on PATH, otherwise through docker. `XLESS_USE_DOCKER=1|0` forces either.
+- **Build number.** `XLESS_BUILD_NUMBER` if set, else `$(( $(date +%s) / 60 ))`, which is monotonic across machines ([Secrets](#secrets)).
+- **Secrets.** The script reads the paths of your secret files from the environment, or from a local file that it sources first: `~/.config/xless/testflight.env` (override with `XLESS_TESTFLIGHT_ENV`; it never belongs in git). The files are mounted read-only into the container and values are never printed or put on a command line.
+
+  ```sh
+  # ~/.config/xless/testflight.env
+  ASC_KEY_ID=ABC123DEFG                          # the API key's ID
+  ASC_ISSUER_ID_FILE=$HOME/keys/asc-issuer-id    # file holding the issuer ID (or set ASC_ISSUER_ID)
+  ASC_KEY_P8_FILE=$HOME/keys/AuthKey_ABC123DEFG.p8
+  XLESS_DIST_KEY_FILE=$HOME/keys/dist-key.pem    # Apple Distribution private key
+  ```
+- **Paths.** Relative secret paths are resolved against the current directory. With docker, the secret files and the project must be under a directory the docker VM can see (on macOS usually somewhere under `$HOME`).
+- **Result.** xless prints the build number, each group and `available to N testers`; a group with no testers prints a warning on stderr. The exit code is xless's (17 for a failed upload or delivery).
+- **Testers.** Internal testers must be App Store Connect users. Add them to the group once in the web UI (Users and Access, then TestFlight); xless creates missing groups but cannot add users. API details: [research/asc-testflight.md](research/asc-testflight.md).
 
 ### Building the images (on the Mac)
 

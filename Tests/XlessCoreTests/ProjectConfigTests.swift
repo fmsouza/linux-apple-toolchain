@@ -54,3 +54,47 @@ func rejectsInvalid(from: String, to: String, expectedFragment: String) {
     let c = try ProjectConfig.parse(yaml: yaml)
     #expect(throws: XlessError.self) { try c.platform(.macos) }
 }
+
+// MARK: testflight / export compliance
+
+@Test func testflightAbsentByDefault() throws {
+    let c = try ProjectConfig.parse(yaml: validYAML)
+    #expect(c.testflight == nil)
+    #expect(c.usesNonExemptEncryption == nil)
+}
+
+@Test func parsesTestflightBlockAndEncryption() throws {
+    let c = try ProjectConfig.parse(yaml: validYAML + """
+
+    testflight:
+      groups: ["Internal", "QA"]
+      whatToTest: "Launch screen built on Linux"
+    usesNonExemptEncryption: false
+    """)
+    #expect(c.testflight == TestFlightConfig(groups: ["Internal", "QA"], whatToTest: "Launch screen built on Linux", locale: "en-US"))
+    #expect(c.usesNonExemptEncryption == false)
+}
+
+@Test func testflightLocaleIsConfigurable() throws {
+    let c = try ProjectConfig.parse(yaml: validYAML + "\ntestflight: { groups: [Internal], whatToTest: Hola, locale: es-ES }\n")
+    #expect(c.testflight?.locale == "es-ES")
+}
+
+@Test(arguments: [
+    "testflight: { groups: [] }",
+    "testflight: { groups: [\"\"] }",
+    "testflight: { groups: [A, A] }",
+    "testflight: { groups: [A], whatToTest: \"  \" }",
+    "testflight: { groups: [A], locale: \"not a locale\" }",
+    "testflight: { groups: [A], locale: en_US }",
+    "testflight: { whatToTest: x }",
+    "usesNonExemptEncryption: maybe",
+])
+func rejectsInvalidTestflight(extra: String) {
+    #expect(throws: XlessError.self) { try ProjectConfig.parse(yaml: validYAML + "\n" + extra + "\n") }
+}
+
+@Test func rejectsOverlongWhatToTest() {
+    let long = String(repeating: "x", count: 4001)
+    #expect(throws: XlessError.self) { try ProjectConfig.parse(yaml: validYAML + "\ntestflight: { groups: [A], whatToTest: \(long) }\n") }
+}

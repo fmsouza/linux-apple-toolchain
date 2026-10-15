@@ -12,19 +12,20 @@ public enum Shell {
     public static let scrubbedEnvironment: [String] = ["ASC_KEY_ID", "ASC_ISSUER_ID", "ASC_KEY_P8", "XLESS_DIST_KEY", "XLESS_DEVID_KEY"]
         .flatMap { [$0, "\($0)_FILE"] }
     /// Runs `executable` (resolved via PATH) with `arguments`. Throws XlessError(stage) on non-zero exit.
-    /// The child inherits this process's environment minus `scrubbedEnvironment`, plus `env` (explicit entries win;
+    /// The child inherits `baseEnvironment` (default: this process's environment; tests inject one instead of mutating the process) minus `scrubbedEnvironment`, plus `env` (explicit entries win;
     /// a nil value removes a variable). passthrough: stream output to the terminal instead of capturing it.
     @discardableResult
     public static func run(
         _ executable: String, _ arguments: [String],
         cwd: URL? = nil, env: [String: String?] = [:],
+        baseEnvironment: [String: String] = ProcessInfo.processInfo.environment,
         stage: Stage, passthrough: Bool = false
     ) throws -> ShellResult {
         let p = Process()
         p.executableURL = URL(fileURLWithPath: "/usr/bin/env")
         p.arguments = [executable] + arguments
         if let cwd { p.currentDirectoryURL = cwd }
-        var environment = ProcessInfo.processInfo.environment
+        var environment = baseEnvironment
         for name in scrubbedEnvironment { environment[name] = nil }
         for (k, v) in env { environment[k] = v }
         p.environment = environment

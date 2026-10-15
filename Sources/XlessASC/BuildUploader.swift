@@ -49,16 +49,8 @@ public struct BuildUploader: Sendable {
         self.client = client; self.sleep = sleep; self.pollInterval = pollInterval; self.timeout = timeout
     }
 
-    /// Runs one upload step, rethrowing every failure (ASC, transport, decoding, cancellation) as an `[upload]` error.
     private func step<T>(_ what: String, fix: String, _ op: () async throws -> T) async throws -> T {
-        do { return try await op() }
-        catch let e as ASCError {
-            let auth = e.status == 401 || e.status == 403 ? e.stageError(.upload).fix : nil
-            throw XlessError(.upload, "\(what): \(e.description)", fix: auth ?? KnownIssues.explain(e.description) ?? fix)
-        }
-        catch let e as URLError { throw XlessError(.upload, "\(what): \(e.localizedDescription) (\(e.code.rawValue))", fix: fix) }
-        catch let e as XlessError { throw e }
-        catch { throw XlessError(.upload, "\(what): \(error)", fix: fix) }
+        try await uploadStep(what, fix: fix, op)
     }
 
     public func upload(ipa: URL, bundleID: String, version: String, build: String, platform: Platform,

@@ -1,0 +1,3 @@
+<view${leading} contentMode="${mode}"${hugging}${fixed_frame} translatesAutoresizingMaskIntoConstraints="NO" id="${id}">
+    <rect key="frame" x="${x}" y="${y}" width="${width}" height="${height}"/>
+${autoresizing}${constraints}${background}</view>

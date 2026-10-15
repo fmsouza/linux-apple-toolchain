@@ -19,6 +19,14 @@ public enum Finalizer {
         let plistURL = app.appendingPathComponent(layout.infoPlist)
         var info = try Plist.read(plistURL, stage: .finalize)
         try InfoPlistStamper.stamp(&info, meta: meta, sdk: sdk, platform: platform, config: config)
+        if platform == .ios, config.distribution(for: .ios) == .appStore, info[InfoPlistStamper.encryptionKey] == nil {
+            throw XlessError(.finalize, "Info.plist has no ITSAppUsesNonExemptEncryption (export compliance); every upload would stall at \"Missing Compliance\" in TestFlight",
+                             fix: "add `usesNonExemptEncryption: false` to xless.yml (true if the app uses non-exempt encryption), or add ITSAppUsesNonExemptEncryption to the file named by `infoPlist`")
+        }
+        if platform == .ios, config.distribution(for: .ios) == .appStore, let v = info[InfoPlistStamper.encryptionKey], !(v is Bool) {
+            throw XlessError(.finalize, "ITSAppUsesNonExemptEncryption in the Info.plist is not a boolean (\(v))",
+                             fix: "make it <true/> or <false/> in the file named by `infoPlist`, or remove it and set `usesNonExemptEncryption` in xless.yml")
+        }
         try Plist.write(info, to: plistURL, stage: .finalize)
         let pkgInfo = app.appendingPathComponent(layout.pkgInfo)
         if !FileManager.default.fileExists(atPath: pkgInfo.path) {

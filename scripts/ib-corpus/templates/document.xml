@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<document type="com.apple.InterfaceBuilder3.CocoaTouch.Storyboard.XIB" version="3.0" toolsVersion="23727" targetRuntime="iOS.CocoaTouch" propertyAccessControl="none" useAutolayout="YES" launchScreen="YES"${use_traits}${use_safe_areas} colorMatched="YES" initialViewController="${vc_id}">
+${device}    <dependencies>
+        <deployment identifier="iOS"/>
+        <plugIn identifier="com.apple.InterfaceBuilder.IBCocoaTouchPlugin" version="23721"/>
+${capabilities}    </dependencies>
+    <scenes>
+        <!--View Controller-->
+        <scene sceneID="${scene_id}">
+            <objects>
+                <viewController id="${vc_id}" sceneMemberID="viewController">
+${layout_guides}${view}                </viewController>
+                <placeholder placeholderIdentifier="IBFirstResponder" id="${first_responder_id}" userLabel="First Responder" sceneMemberID="firstResponder"/>
+            </objects>
+            <point key="canvasLocation" x="53" y="375"/>
+        </scene>
+    </scenes>
+${resources}</document>

@@ -1,0 +1,5 @@
+<label opaque="NO" userInteractionEnabled="NO" contentMode="left" horizontalHuggingPriority="251" verticalHuggingPriority="251"${fixed_frame}${text}${text_alignment} lineBreakMode="${line_break}"${number_of_lines} baselineAdjustment="alignBaselines" adjustsFontSizeToFit="NO" translatesAutoresizingMaskIntoConstraints="NO" id="${id}">
+    <rect key="frame" x="${x}" y="${y}" width="${width}" height="${height}"/>
+${autoresizing}${constraints}${text_element}    <fontDescription key="fontDescription" ${font}/>
+${text_color}    <nil key="highlightedColor"/>
+</label>

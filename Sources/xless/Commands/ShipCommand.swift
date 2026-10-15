@@ -8,6 +8,12 @@ struct ShipCommand: AsyncParsableCommand {
     @OptionGroup var options: ProjectOptions
     @Option(help: "Resume from this stage.") var from: Stage = .build
 
+    func validate() throws {
+        if from == .ib {
+            throw ValidationError("`ib` is not a ship pipeline stage; use one of: build, assets, finalize, sign, package, upload")
+        }
+    }
+
     func run() async throws {
         let ctx = try Context.load(options)
         let steps: [(Stage, () async throws -> String)] = [
@@ -16,7 +22,7 @@ struct ShipCommand: AsyncParsableCommand {
             (.finalize, { try await StageRunner.finalize(ctx).path }),
             (.sign, { try await StageRunner.sign(ctx).path }),
             (.package, { try await StageRunner.package(ctx).path }),
-            (.upload, { let r = try await StageRunner.upload(ctx); return "build \(r.buildID ?? "?") \(r.processingState ?? r.state)" }),
+            (.upload, { try await StageRunner.upload(ctx).report() }),
         ]
         for (stage, step) in steps where stage >= from {
             if stage == .upload, ctx.platform == .macos { continue }
