@@ -1,0 +1,757 @@
+[
+  {
+    "contents": {
+      "guid": "G0",
+      "name": "ExtPkg",
+      "path": "$ROOT/ExtPkg.xcworkspace",
+      "projects": [
+        "G1",
+        "G43"
+      ]
+    },
+    "type": "workspace"
+  },
+  {
+    "contents": {
+      "appPreferencesBuildSettings": {},
+      "buildConfigurations": [
+        {
+          "buildSettings": {
+            "ALWAYS_SEARCH_USER_PATHS": "NO",
+            "CLANG_ANALYZER_NONNULL": "YES",
+            "CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION": "YES_AGGRESSIVE",
+            "CLANG_CXX_LANGUAGE_STANDARD": "gnu++14",
+            "CLANG_CXX_LIBRARY": "libc++",
+            "CLANG_ENABLE_MODULES": "YES",
+            "CLANG_ENABLE_OBJC_ARC": "YES",
+            "CLANG_ENABLE_OBJC_WEAK": "YES",
+            "CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING": "YES",
+            "CLANG_WARN_BOOL_CONVERSION": "YES",
+            "CLANG_WARN_COMMA": "YES",
+            "CLANG_WARN_CONSTANT_CONVERSION": "YES",
+            "CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS": "YES",
+            "CLANG_WARN_DIRECT_OBJC_ISA_USAGE": "YES_ERROR",
+            "CLANG_WARN_DOCUMENTATION_COMMENTS": "YES",
+            "CLANG_WARN_EMPTY_BODY": "YES",
+            "CLANG_WARN_ENUM_CONVERSION": "YES",
+            "CLANG_WARN_INFINITE_RECURSION": "YES",
+            "CLANG_WARN_INT_CONVERSION": "YES",
+            "CLANG_WARN_NON_LITERAL_NULL_CONVERSION": "YES",
+            "CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF": "YES",
+            "CLANG_WARN_OBJC_LITERAL_CONVERSION": "YES",
+            "CLANG_WARN_OBJC_ROOT_CLASS": "YES_ERROR",
+            "CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER": "YES",
+            "CLANG_WARN_RANGE_LOOP_ANALYSIS": "YES",
+            "CLANG_WARN_STRICT_PROTOTYPES": "YES",
+            "CLANG_WARN_SUSPICIOUS_MOVE": "YES",
+            "CLANG_WARN_UNGUARDED_AVAILABILITY": "YES_AGGRESSIVE",
+            "CLANG_WARN_UNREACHABLE_CODE": "YES",
+            "CLANG_WARN__DUPLICATE_METHOD_MATCH": "YES",
+            "CODE_SIGNING_ALLOWED": "NO",
+            "COPY_PHASE_STRIP": "NO",
+            "DEBUG_INFORMATION_FORMAT": "dwarf",
+            "ENABLE_STRICT_OBJC_MSGSEND": "YES",
+            "ENABLE_TESTABILITY": "YES",
+            "GCC_C_LANGUAGE_STANDARD": "gnu11",
+            "GCC_DYNAMIC_NO_PIC": "NO",
+            "GCC_NO_COMMON_BLOCKS": "YES",
+            "GCC_OPTIMIZATION_LEVEL": "0",
+            "GCC_PREPROCESSOR_DEFINITIONS": "$(inherited) DEBUG=1",
+            "GCC_WARN_64_TO_32_BIT_CONVERSION": "YES",
+            "GCC_WARN_ABOUT_RETURN_TYPE": "YES_ERROR",
+            "GCC_WARN_UNDECLARED_SELECTOR": "YES",
+            "GCC_WARN_UNINITIALIZED_AUTOS": "YES_AGGRESSIVE",
+            "GCC_WARN_UNUSED_FUNCTION": "YES",
+            "GCC_WARN_UNUSED_VARIABLE": "YES",
+            "IPHONEOS_DEPLOYMENT_TARGET": "16.4",
+            "MTL_ENABLE_DEBUG_INFO": "INCLUDE_SOURCE",
+            "MTL_FAST_MATH": "YES",
+            "ONLY_ACTIVE_ARCH": "YES",
+            "PRODUCT_NAME": "$(TARGET_NAME)",
+            "SDKROOT": "iphoneos",
+            "SWIFT_ACTIVE_COMPILATION_CONDITIONS": "DEBUG",
+            "SWIFT_OPTIMIZATION_LEVEL": "-Onone",
+            "SWIFT_VERSION": "5.0"
+          },
+          "guid": "G2",
+          "name": "Debug"
+        },
+        {
+          "buildSettings": {
+            "ALWAYS_SEARCH_USER_PATHS": "NO",
+            "CLANG_ANALYZER_NONNULL": "YES",
+            "CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION": "YES_AGGRESSIVE",
+            "CLANG_CXX_LANGUAGE_STANDARD": "gnu++14",
+            "CLANG_CXX_LIBRARY": "libc++",
+            "CLANG_ENABLE_MODULES": "YES",
+            "CLANG_ENABLE_OBJC_ARC": "YES",
+            "CLANG_ENABLE_OBJC_WEAK": "YES",
+            "CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING": "YES",
+            "CLANG_WARN_BOOL_CONVERSION": "YES",
+            "CLANG_WARN_COMMA": "YES",
+            "CLANG_WARN_CONSTANT_CONVERSION": "YES",
+            "CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS": "YES",
+            "CLANG_WARN_DIRECT_OBJC_ISA_USAGE": "YES_ERROR",
+            "CLANG_WARN_DOCUMENTATION_COMMENTS": "YES",
+            "CLANG_WARN_EMPTY_BODY": "YES",
+            "CLANG_WARN_ENUM_CONVERSION": "YES",
+            "CLANG_WARN_INFINITE_RECURSION": "YES",
+            "CLANG_WARN_INT_CONVERSION": "YES",
+            "CLANG_WARN_NON_LITERAL_NULL_CONVERSION": "YES",
+            "CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF": "YES",
+            "CLANG_WARN_OBJC_LITERAL_CONVERSION": "YES",
+            "CLANG_WARN_OBJC_ROOT_CLASS": "YES_ERROR",
+            "CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER": "YES",
+            "CLANG_WARN_RANGE_LOOP_ANALYSIS": "YES",
+            "CLANG_WARN_STRICT_PROTOTYPES": "YES",
+            "CLANG_WARN_SUSPICIOUS_MOVE": "YES",
+            "CLANG_WARN_UNGUARDED_AVAILABILITY": "YES_AGGRESSIVE",
+            "CLANG_WARN_UNREACHABLE_CODE": "YES",
+            "CLANG_WARN__DUPLICATE_METHOD_MATCH": "YES",
+            "CODE_SIGNING_ALLOWED": "NO",
+            "COPY_PHASE_STRIP": "NO",
+            "DEBUG_INFORMATION_FORMAT": "dwarf-with-dsym",
+            "ENABLE_NS_ASSERTIONS": "NO",
+            "ENABLE_STRICT_OBJC_MSGSEND": "YES",
+            "GCC_C_LANGUAGE_STANDARD": "gnu11",
+            "GCC_NO_COMMON_BLOCKS": "YES",
+            "GCC_WARN_64_TO_32_BIT_CONVERSION": "YES",
+            "GCC_WARN_ABOUT_RETURN_TYPE": "YES_ERROR",
+            "GCC_WARN_UNDECLARED_SELECTOR": "YES",
+            "GCC_WARN_UNINITIALIZED_AUTOS": "YES_AGGRESSIVE",
+            "GCC_WARN_UNUSED_FUNCTION": "YES",
+            "GCC_WARN_UNUSED_VARIABLE": "YES",
+            "IPHONEOS_DEPLOYMENT_TARGET": "16.4",
+            "MTL_ENABLE_DEBUG_INFO": "NO",
+            "MTL_FAST_MATH": "YES",
+            "PRODUCT_NAME": "$(TARGET_NAME)",
+            "SDKROOT": "iphoneos",
+            "SWIFT_COMPILATION_MODE": "wholemodule",
+            "SWIFT_OPTIMIZATION_LEVEL": "-O",
+            "SWIFT_VERSION": "5.0"
+          },
+          "guid": "G3",
+          "name": "Release"
+        }
+      ],
+      "classPrefix": "",
+      "defaultConfigurationName": "Debug",
+      "developmentRegion": "en",
+      "groupTree": {
+        "children": [
+          {
+            "children": [
+              {
+                "fileType": "sourcecode.swift",
+                "guid": "G6",
+                "path": "AppDelegate.swift",
+                "sourceTree": "<group>",
+                "type": "file"
+              },
+              {
+                "children": [
+                  {
+                    "fileType": "text.plist.strings",
+                    "guid": "G8",
+                    "path": "de.lproj/Localizable.strings",
+                    "regionVariantName": "de",
+                    "sourceTree": "<group>",
+                    "type": "file"
+                  },
+                  {
+                    "fileType": "text.plist.strings",
+                    "guid": "G9",
+                    "path": "en.lproj/Localizable.strings",
+                    "regionVariantName": "en",
+                    "sourceTree": "<group>",
+                    "type": "file"
+                  }
+                ],
+                "guid": "G7",
+                "name": "Localizable.strings",
+                "path": "",
+                "sourceTree": "<group>",
+                "type": "variantGroup"
+              }
+            ],
+            "guid": "G5",
+            "name": "App",
+            "path": "App",
+            "sourceTree": "<group>",
+            "type": "group"
+          },
+          {
+            "children": [
+              {
+                "fileType": "sourcecode.swift",
+                "guid": "G11",
+                "path": "ActionViewController.swift",
+                "sourceTree": "<group>",
+                "type": "file"
+              }
+            ],
+            "guid": "G10",
+            "name": "Share",
+            "path": "Share",
+            "sourceTree": "<group>",
+            "type": "group"
+          },
+          {
+            "children": [
+              {
+                "fileType": "wrapper.framework",
+                "guid": "G13",
+                "path": "System/Library/Frameworks/CoreML.framework",
+                "sourceTree": "SDKROOT",
+                "type": "file"
+              },
+              {
+                "fileType": "sourcecode.text-based-dylib-definition",
+                "guid": "G14",
+                "path": "usr/lib/libz.tbd",
+                "sourceTree": "SDKROOT",
+                "type": "file"
+              }
+            ],
+            "guid": "G12",
+            "name": "Frameworks",
+            "path": "",
+            "sourceTree": "<group>",
+            "type": "group"
+          },
+          {
+            "guid": "G15",
+            "name": "Products",
+            "path": "",
+            "sourceTree": "<group>",
+            "type": "group"
+          },
+          {
+            "children": [
+              {
+                "fileType": "wrapper.pb-project",
+                "guid": "G17",
+                "path": "Kit/Kit.xcodeproj",
+                "sourceTree": "<group>",
+                "type": "file"
+              }
+            ],
+            "guid": "G16",
+            "name": "Projects",
+            "path": "",
+            "sourceTree": "<group>",
+            "type": "group"
+          }
+        ],
+        "guid": "G4",
+        "name": "ExtPkg",
+        "path": "",
+        "sourceTree": "<group>",
+        "type": "group"
+      },
+      "guid": "G1",
+      "knownRegions": [
+        "Base",
+        "de",
+        "en"
+      ],
+      "path": "$ROOT/ExtPkg.xcodeproj",
+      "projectDirectory": "$ROOT",
+      "targets": [
+        "G18",
+        "G35"
+      ]
+    },
+    "type": "project"
+  },
+  {
+    "contents": {
+      "buildConfigurations": [
+        {
+          "buildSettings": {
+            "ASSETCATALOG_COMPILER_APPICON_NAME": "AppIcon",
+            "CODE_SIGN_IDENTITY": "iPhone Developer",
+            "INFOPLIST_FILE": "App/Info.plist",
+            "LD_RUNPATH_SEARCH_PATHS": "$(inherited) @executable_path/Frameworks",
+            "PRODUCT_BUNDLE_IDENTIFIER": "com.example.extpkg",
+            "SDKROOT": "iphoneos",
+            "TARGETED_DEVICE_FAMILY": "1,2"
+          },
+          "guid": "G19",
+          "name": "Debug"
+        },
+        {
+          "buildSettings": {
+            "ASSETCATALOG_COMPILER_APPICON_NAME": "AppIcon",
+            "CODE_SIGN_IDENTITY": "iPhone Developer",
+            "INFOPLIST_FILE": "App/Info.plist",
+            "LD_RUNPATH_SEARCH_PATHS": "$(inherited) @executable_path/Frameworks",
+            "PRODUCT_BUNDLE_IDENTIFIER": "com.example.extpkg",
+            "SDKROOT": "iphoneos",
+            "TARGETED_DEVICE_FAMILY": "1,2"
+          },
+          "guid": "G20",
+          "name": "Release"
+        }
+      ],
+      "buildPhases": [
+        {
+          "buildFiles": [
+            {
+              "fileReference": "G6",
+              "guid": "G22"
+            }
+          ],
+          "guid": "G21",
+          "type": "com.apple.buildphase.sources"
+        },
+        {
+          "buildFiles": [
+            {
+              "fileReference": "G7",
+              "guid": "G24"
+            }
+          ],
+          "guid": "G23",
+          "type": "com.apple.buildphase.resources"
+        },
+        {
+          "buildFiles": [
+            {
+              "guid": "G26",
+              "targetReference": "G50"
+            },
+            {
+              "fileReference": "G14",
+              "guid": "G27"
+            },
+            {
+              "fileReference": "G13",
+              "guid": "G28",
+              "shouldLinkWeakly": "true"
+            }
+          ],
+          "guid": "G25",
+          "type": "com.apple.buildphase.frameworks"
+        },
+        {
+          "buildFiles": [
+            {
+              "codeSignOnCopy": "true",
+              "guid": "G30",
+              "removeHeadersOnCopy": "true",
+              "targetReference": "G35"
+            }
+          ],
+          "destinationSubfolder": "$(PLUGINS_FOLDER_PATH)",
+          "destinationSubpath": "",
+          "guid": "G29",
+          "type": "com.apple.buildphase.copy-files"
+        },
+        {
+          "buildFiles": [
+            {
+              "codeSignOnCopy": "true",
+              "guid": "G32",
+              "removeHeadersOnCopy": "true",
+              "targetReference": "G50"
+            }
+          ],
+          "destinationSubfolder": "$(FRAMEWORKS_FOLDER_PATH)",
+          "destinationSubpath": "",
+          "guid": "G31",
+          "type": "com.apple.buildphase.copy-files"
+        },
+        {
+          "alwaysOutOfDate": "true",
+          "alwaysRunForInstallHdrs": "false",
+          "buildFiles": [],
+          "emitEnvironment": "true",
+          "guid": "G33",
+          "inputFileListPaths": [],
+          "inputFilePaths": [],
+          "name": "Install-only step",
+          "originalObjectID": "EEEC9DEE3209A37BA0A80CBC",
+          "outputFileListPaths": [],
+          "outputFilePaths": [],
+          "runOnlyForDeploymentPostprocessing": "true",
+          "sandboxingOverride": "basedOnBuildSetting",
+          "scriptContents": "echo install-only",
+          "shellPath": "/bin/sh",
+          "type": "com.apple.buildphase.shell-script"
+        }
+      ],
+      "buildRules": [],
+      "dependencies": [
+        {
+          "guid": "G35",
+          "name": "Share"
+        },
+        {
+          "guid": "G50",
+          "name": "Kit (from Kit.xcodeproj)"
+        }
+      ],
+      "guid": "G18",
+      "name": "ExtPkg",
+      "productReference": {
+        "guid": "G34",
+        "name": "ExtPkg.app",
+        "type": "product"
+      },
+      "productTypeIdentifier": "com.apple.product-type.application",
+      "provisioningSourceData": [
+        {
+          "bundleIdentifierFromInfoPlist": "$(PRODUCT_BUNDLE_IDENTIFIER)",
+          "configurationName": "Debug",
+          "provisioningStyle": 0
+        },
+        {
+          "bundleIdentifierFromInfoPlist": "$(PRODUCT_BUNDLE_IDENTIFIER)",
+          "configurationName": "Release",
+          "provisioningStyle": 0
+        }
+      ],
+      "type": "standard"
+    },
+    "type": "target"
+  },
+  {
+    "contents": {
+      "buildConfigurations": [
+        {
+          "buildSettings": {
+            "APPLICATION_EXTENSION_API_ONLY": "YES",
+            "INFOPLIST_FILE": "Share/Info.plist",
+            "IPHONEOS_DEPLOYMENT_TARGET": "17.0",
+            "LD_RUNPATH_SEARCH_PATHS": "$(inherited) @executable_path/Frameworks @executable_path/../../Frameworks",
+            "PRODUCT_BUNDLE_IDENTIFIER": "com.example.extpkg.Share",
+            "SDKROOT": "iphoneos",
+            "SWIFT_VERSION": "5.9",
+            "TARGETED_DEVICE_FAMILY": "1,2"
+          },
+          "guid": "G36",
+          "name": "Debug"
+        },
+        {
+          "buildSettings": {
+            "APPLICATION_EXTENSION_API_ONLY": "YES",
+            "INFOPLIST_FILE": "Share/Info.plist",
+            "IPHONEOS_DEPLOYMENT_TARGET": "17.0",
+            "LD_RUNPATH_SEARCH_PATHS": "$(inherited) @executable_path/Frameworks @executable_path/../../Frameworks",
+            "PRODUCT_BUNDLE_IDENTIFIER": "com.example.extpkg.Share",
+            "SDKROOT": "iphoneos",
+            "SWIFT_VERSION": "5.9",
+            "TARGETED_DEVICE_FAMILY": "1,2"
+          },
+          "guid": "G37",
+          "name": "Release"
+        }
+      ],
+      "buildPhases": [
+        {
+          "buildFiles": [
+            {
+              "fileReference": "G11",
+              "guid": "G39"
+            }
+          ],
+          "guid": "G38",
+          "type": "com.apple.buildphase.sources"
+        },
+        {
+          "buildFiles": [
+            {
+              "guid": "G41",
+              "targetReference": "PACKAGE-PRODUCT:greetingkit_GreetingKit.GreetingKit"
+            }
+          ],
+          "guid": "G40",
+          "type": "com.apple.buildphase.frameworks"
+        }
+      ],
+      "buildRules": [],
+      "dependencies": [
+        {
+          "guid": "PACKAGE-PRODUCT:greetingkit_GreetingKit.GreetingKit",
+          "name": "GreetingKit"
+        }
+      ],
+      "guid": "G35",
+      "name": "Share",
+      "productReference": {
+        "guid": "G42",
+        "name": "Share.appex",
+        "type": "product"
+      },
+      "productTypeIdentifier": "com.apple.product-type.app-extension",
+      "provisioningSourceData": [
+        {
+          "bundleIdentifierFromInfoPlist": "$(PRODUCT_BUNDLE_IDENTIFIER)",
+          "configurationName": "Debug",
+          "provisioningStyle": 0
+        },
+        {
+          "bundleIdentifierFromInfoPlist": "$(PRODUCT_BUNDLE_IDENTIFIER)",
+          "configurationName": "Release",
+          "provisioningStyle": 0
+        }
+      ],
+      "type": "standard"
+    },
+    "type": "target"
+  },
+  {
+    "contents": {
+      "appPreferencesBuildSettings": {},
+      "buildConfigurations": [
+        {
+          "buildSettings": {
+            "ALWAYS_SEARCH_USER_PATHS": "NO",
+            "CLANG_ANALYZER_NONNULL": "YES",
+            "CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION": "YES_AGGRESSIVE",
+            "CLANG_CXX_LANGUAGE_STANDARD": "gnu++14",
+            "CLANG_CXX_LIBRARY": "libc++",
+            "CLANG_ENABLE_MODULES": "YES",
+            "CLANG_ENABLE_OBJC_ARC": "YES",
+            "CLANG_ENABLE_OBJC_WEAK": "YES",
+            "CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING": "YES",
+            "CLANG_WARN_BOOL_CONVERSION": "YES",
+            "CLANG_WARN_COMMA": "YES",
+            "CLANG_WARN_CONSTANT_CONVERSION": "YES",
+            "CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS": "YES",
+            "CLANG_WARN_DIRECT_OBJC_ISA_USAGE": "YES_ERROR",
+            "CLANG_WARN_DOCUMENTATION_COMMENTS": "YES",
+            "CLANG_WARN_EMPTY_BODY": "YES",
+            "CLANG_WARN_ENUM_CONVERSION": "YES",
+            "CLANG_WARN_INFINITE_RECURSION": "YES",
+            "CLANG_WARN_INT_CONVERSION": "YES",
+            "CLANG_WARN_NON_LITERAL_NULL_CONVERSION": "YES",
+            "CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF": "YES",
+            "CLANG_WARN_OBJC_LITERAL_CONVERSION": "YES",
+            "CLANG_WARN_OBJC_ROOT_CLASS": "YES_ERROR",
+            "CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER": "YES",
+            "CLANG_WARN_RANGE_LOOP_ANALYSIS": "YES",
+            "CLANG_WARN_STRICT_PROTOTYPES": "YES",
+            "CLANG_WARN_SUSPICIOUS_MOVE": "YES",
+            "CLANG_WARN_UNGUARDED_AVAILABILITY": "YES_AGGRESSIVE",
+            "CLANG_WARN_UNREACHABLE_CODE": "YES",
+            "CLANG_WARN__DUPLICATE_METHOD_MATCH": "YES",
+            "CODE_SIGNING_ALLOWED": "NO",
+            "COPY_PHASE_STRIP": "NO",
+            "DEBUG_INFORMATION_FORMAT": "dwarf",
+            "ENABLE_STRICT_OBJC_MSGSEND": "YES",
+            "ENABLE_TESTABILITY": "YES",
+            "GCC_C_LANGUAGE_STANDARD": "gnu11",
+            "GCC_DYNAMIC_NO_PIC": "NO",
+            "GCC_NO_COMMON_BLOCKS": "YES",
+            "GCC_OPTIMIZATION_LEVEL": "0",
+            "GCC_PREPROCESSOR_DEFINITIONS": "$(inherited) DEBUG=1",
+            "GCC_WARN_64_TO_32_BIT_CONVERSION": "YES",
+            "GCC_WARN_ABOUT_RETURN_TYPE": "YES_ERROR",
+            "GCC_WARN_UNDECLARED_SELECTOR": "YES",
+            "GCC_WARN_UNINITIALIZED_AUTOS": "YES_AGGRESSIVE",
+            "GCC_WARN_UNUSED_FUNCTION": "YES",
+            "GCC_WARN_UNUSED_VARIABLE": "YES",
+            "IPHONEOS_DEPLOYMENT_TARGET": "16.4",
+            "MTL_ENABLE_DEBUG_INFO": "INCLUDE_SOURCE",
+            "MTL_FAST_MATH": "YES",
+            "ONLY_ACTIVE_ARCH": "YES",
+            "PRODUCT_NAME": "$(TARGET_NAME)",
+            "SDKROOT": "iphoneos",
+            "SWIFT_ACTIVE_COMPILATION_CONDITIONS": "DEBUG",
+            "SWIFT_OPTIMIZATION_LEVEL": "-Onone",
+            "SWIFT_VERSION": "5.0"
+          },
+          "guid": "G44",
+          "name": "Debug"
+        },
+        {
+          "buildSettings": {
+            "ALWAYS_SEARCH_USER_PATHS": "NO",
+            "CLANG_ANALYZER_NONNULL": "YES",
+            "CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION": "YES_AGGRESSIVE",
+            "CLANG_CXX_LANGUAGE_STANDARD": "gnu++14",
+            "CLANG_CXX_LIBRARY": "libc++",
+            "CLANG_ENABLE_MODULES": "YES",
+            "CLANG_ENABLE_OBJC_ARC": "YES",
+            "CLANG_ENABLE_OBJC_WEAK": "YES",
+            "CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING": "YES",
+            "CLANG_WARN_BOOL_CONVERSION": "YES",
+            "CLANG_WARN_COMMA": "YES",
+            "CLANG_WARN_CONSTANT_CONVERSION": "YES",
+            "CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS": "YES",
+            "CLANG_WARN_DIRECT_OBJC_ISA_USAGE": "YES_ERROR",
+            "CLANG_WARN_DOCUMENTATION_COMMENTS": "YES",
+            "CLANG_WARN_EMPTY_BODY": "YES",
+            "CLANG_WARN_ENUM_CONVERSION": "YES",
+            "CLANG_WARN_INFINITE_RECURSION": "YES",
+            "CLANG_WARN_INT_CONVERSION": "YES",
+            "CLANG_WARN_NON_LITERAL_NULL_CONVERSION": "YES",
+            "CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF": "YES",
+            "CLANG_WARN_OBJC_LITERAL_CONVERSION": "YES",
+            "CLANG_WARN_OBJC_ROOT_CLASS": "YES_ERROR",
+            "CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER": "YES",
+            "CLANG_WARN_RANGE_LOOP_ANALYSIS": "YES",
+            "CLANG_WARN_STRICT_PROTOTYPES": "YES",
+            "CLANG_WARN_SUSPICIOUS_MOVE": "YES",
+            "CLANG_WARN_UNGUARDED_AVAILABILITY": "YES_AGGRESSIVE",
+            "CLANG_WARN_UNREACHABLE_CODE": "YES",
+            "CLANG_WARN__DUPLICATE_METHOD_MATCH": "YES",
+            "CODE_SIGNING_ALLOWED": "NO",
+            "COPY_PHASE_STRIP": "NO",
+            "DEBUG_INFORMATION_FORMAT": "dwarf-with-dsym",
+            "ENABLE_NS_ASSERTIONS": "NO",
+            "ENABLE_STRICT_OBJC_MSGSEND": "YES",
+            "GCC_C_LANGUAGE_STANDARD": "gnu11",
+            "GCC_NO_COMMON_BLOCKS": "YES",
+            "GCC_WARN_64_TO_32_BIT_CONVERSION": "YES",
+            "GCC_WARN_ABOUT_RETURN_TYPE": "YES_ERROR",
+            "GCC_WARN_UNDECLARED_SELECTOR": "YES",
+            "GCC_WARN_UNINITIALIZED_AUTOS": "YES_AGGRESSIVE",
+            "GCC_WARN_UNUSED_FUNCTION": "YES",
+            "GCC_WARN_UNUSED_VARIABLE": "YES",
+            "IPHONEOS_DEPLOYMENT_TARGET": "16.4",
+            "MTL_ENABLE_DEBUG_INFO": "NO",
+            "MTL_FAST_MATH": "YES",
+            "PRODUCT_NAME": "$(TARGET_NAME)",
+            "SDKROOT": "iphoneos",
+            "SWIFT_COMPILATION_MODE": "wholemodule",
+            "SWIFT_OPTIMIZATION_LEVEL": "-O",
+            "SWIFT_VERSION": "5.0"
+          },
+          "guid": "G45",
+          "name": "Release"
+        }
+      ],
+      "classPrefix": "",
+      "defaultConfigurationName": "Debug",
+      "developmentRegion": "en",
+      "groupTree": {
+        "children": [
+          {
+            "children": [
+              {
+                "fileType": "sourcecode.swift",
+                "guid": "G48",
+                "path": "KitInfo.swift",
+                "sourceTree": "<group>",
+                "type": "file"
+              }
+            ],
+            "guid": "G47",
+            "name": "Sources",
+            "path": "Sources",
+            "sourceTree": "<group>",
+            "type": "group"
+          },
+          {
+            "guid": "G49",
+            "name": "Products",
+            "path": "",
+            "sourceTree": "<group>",
+            "type": "group"
+          }
+        ],
+        "guid": "G46",
+        "name": "Kit",
+        "path": "",
+        "sourceTree": "<group>",
+        "type": "group"
+      },
+      "guid": "G43",
+      "knownRegions": [
+        "Base",
+        "en"
+      ],
+      "path": "$ROOT/Kit/Kit.xcodeproj",
+      "projectDirectory": "$ROOT/Kit",
+      "targets": [
+        "G50"
+      ]
+    },
+    "type": "project"
+  },
+  {
+    "contents": {
+      "buildConfigurations": [
+        {
+          "buildSettings": {
+            "CODE_SIGN_IDENTITY": "",
+            "CURRENT_PROJECT_VERSION": "1",
+            "DEFINES_MODULE": "YES",
+            "DYLIB_COMPATIBILITY_VERSION": "1",
+            "DYLIB_CURRENT_VERSION": "1",
+            "DYLIB_INSTALL_NAME_BASE": "@rpath",
+            "GENERATE_INFOPLIST_FILE": "YES",
+            "INSTALL_PATH": "$(LOCAL_LIBRARY_DIR)/Frameworks",
+            "LD_RUNPATH_SEARCH_PATHS": "$(inherited) @executable_path/Frameworks",
+            "PRODUCT_BUNDLE_IDENTIFIER": "com.example.extpkg.kit",
+            "SDKROOT": "iphoneos",
+            "SKIP_INSTALL": "YES",
+            "TARGETED_DEVICE_FAMILY": "1,2",
+            "VERSIONING_SYSTEM": "apple-generic"
+          },
+          "guid": "G51",
+          "name": "Debug"
+        },
+        {
+          "buildSettings": {
+            "CODE_SIGN_IDENTITY": "",
+            "CURRENT_PROJECT_VERSION": "1",
+            "DEFINES_MODULE": "YES",
+            "DYLIB_COMPATIBILITY_VERSION": "1",
+            "DYLIB_CURRENT_VERSION": "1",
+            "DYLIB_INSTALL_NAME_BASE": "@rpath",
+            "GENERATE_INFOPLIST_FILE": "YES",
+            "INSTALL_PATH": "$(LOCAL_LIBRARY_DIR)/Frameworks",
+            "LD_RUNPATH_SEARCH_PATHS": "$(inherited) @executable_path/Frameworks",
+            "PRODUCT_BUNDLE_IDENTIFIER": "com.example.extpkg.kit",
+            "SDKROOT": "iphoneos",
+            "SKIP_INSTALL": "YES",
+            "TARGETED_DEVICE_FAMILY": "1,2",
+            "VERSIONING_SYSTEM": "apple-generic"
+          },
+          "guid": "G52",
+          "name": "Release"
+        }
+      ],
+      "buildPhases": [
+        {
+          "buildFiles": [
+            {
+              "fileReference": "G48",
+              "guid": "G54"
+            }
+          ],
+          "guid": "G53",
+          "type": "com.apple.buildphase.sources"
+        }
+      ],
+      "buildRules": [],
+      "dependencies": [],
+      "guid": "G50",
+      "name": "Kit",
+      "productReference": {
+        "guid": "G55",
+        "name": "Kit.framework",
+        "type": "product"
+      },
+      "productTypeIdentifier": "com.apple.product-type.framework",
+      "provisioningSourceData": [
+        {
+          "bundleIdentifierFromInfoPlist": "$(PRODUCT_BUNDLE_IDENTIFIER)",
+          "configurationName": "Debug",
+          "provisioningStyle": 1
+        },
+        {
+          "bundleIdentifierFromInfoPlist": "$(PRODUCT_BUNDLE_IDENTIFIER)",
+          "configurationName": "Release",
+          "provisioningStyle": 1
+        }
+      ],
+      "type": "standard"
+    },
+    "type": "target"
+  }
+]

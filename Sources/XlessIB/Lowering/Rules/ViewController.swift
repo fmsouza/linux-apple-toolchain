@@ -4,10 +4,36 @@ import XlessCore
 /// The view controller nib `UIViewController-<vcID>.nib` (docs/research/nib-encoding.md, section 6 "View controller nib").
 /// It depends only on the two IDs: every golden with VC `01J-lp-oVM` and view `Ze5-6b-2t3` has the same bytes;
 /// `id-different-ids` and `id-long-ids` prove the IDs are used verbatim.
+///
+/// A `storyboardIdentifier` (Expo's `SplashScreenViewController`) names the nib and its `Info.plist` entries instead of
+/// `UIViewController-<vcID>` and adds `UIStoryboardIdentifier` = @the identifier to the class swapper, after `UINibName`
+/// (`vc-storyboard-identifier`, `-short`, `-punct`; `-shared`: "UIViewController" is one string object with
+/// `UIClassName`).
 enum ViewControllerRule {
-    static let knownAttributes: Set<String> = ["id", "sceneMemberID"]
+    static let knownAttributes: Set<String> = ["id", "sceneMemberID", "storyboardIdentifier"]
 
-    static func nib(vcID: String, viewID: String) throws -> NIBArchive {
+    /// The view controller's `storyboardIdentifier`, nil without one. It becomes a file name and a string in two
+    /// archives, so only what was compiled with ibtool is accepted (`vc-storyboard-identifier`, `-short`, `-punct`:
+    /// letters, digits, space, ".", "_", "-" and "+"), at most `maxStoryboardIdentifierLength` characters. Refused too:
+    /// a leading ".", leading or trailing spaces, and a name equal to the view nib's, ignoring case (the nibs share a
+    /// directory, and macOS file systems ignore case).
+    static func storyboardIdentifier(_ vc: IBViewController, doc: IBDocument) throws -> String? {
+        guard let s = vc.attributes["storyboardIdentifier"] else { return nil }
+        let line = doc.element(at: vc.rawPath)?.line
+        guard !s.isEmpty, s.utf8.count <= maxStoryboardIdentifierLength, s.wholeMatch(of: /[A-Za-z0-9 ._+\-]+/) != nil, !s.hasPrefix("."),
+              !s.hasPrefix(" "), !s.hasSuffix(" "),
+              s.lowercased() != StoryboardcLayout.viewNibName(vcID: vc.id, viewID: vc.view.id).lowercased() else {
+            throw LoweringError.unsupported("storyboardIdentifier \"\(s)\" (verified: 1–\(maxStoryboardIdentifierLength) of A-Z a-z 0-9 space . _ - +, no leading \".\" or surrounding spaces, not the view nib's name)", line: line)
+        }
+        return s
+    }
+
+    /// The longest `storyboardIdentifier` accepted: its length then has the one-byte form in both the nib (a varint
+    /// below 128) and the binary Info.plist (an int marker with one byte), the forms the corpus measured (6 and 26
+    /// characters; `-short` is below the plist's inline limit of 15).
+    static let maxStoryboardIdentifierLength = 127
+
+    static func nib(vcID: String, viewID: String, storyboardIdentifier: String? = nil) throws -> NIBArchive {
         let b = ArchiveBuilder()
         let owner = b.proxy("IBFilesOwner"), responder = b.proxy("IBFirstResponder"), storyboard = b.proxy("UIStoryboardPlaceholder")
         let swapper = b.object("UIClassSwapper")
@@ -15,6 +41,7 @@ enum ViewControllerRule {
         b.set(table, "NSInlinedValue", .bool(true))
         b.set(swapper, "UIExternalObjectsTableForViewLoading", table)
         b.set(swapper, "UINibName", b.string(StoryboardcLayout.viewNibName(vcID: vcID, viewID: viewID)))
+        if let storyboardIdentifier { b.set(swapper, "UIStoryboardIdentifier", b.string(storyboardIdentifier)) }
         b.set(swapper, "UIClassName", b.string("UIViewController"))
         b.set(swapper, "UIOriginalClassName", b.string("UIViewController"))
         let objects = [owner, responder, storyboard, swapper]

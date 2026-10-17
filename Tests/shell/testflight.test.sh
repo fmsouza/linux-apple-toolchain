@@ -21,7 +21,7 @@ out=$("${base[@]}" "$S" "$t/proj" 2>/dev/null) || fail "dry run failed"
 [[ "$out" == *"--context colima-xless"* ]] || fail "colima-xless context not preferred: $out"
 [[ "$out" == *"xless ship --platform ios"* ]] || fail "missing ship command: $out"
 [[ "$out" == *"ISSUER-SECRET-VALUE"* ]] && fail "issuer value leaked"
-[[ "$out" == *"/secrets/asc.p8:ro"* && "$out" == *"ASC_KEY_P8_FILE=/secrets/asc.p8"* ]] || fail "p8 not mounted by path: $out"
+[[ "$out" == *"dst=/secrets/asc.p8,readonly"* && "$out" == *"ASC_KEY_P8_FILE=/secrets/asc.p8"* ]] || fail "p8 not mounted by path: $out"
 
 # explicit context wins, image override, build number override
 out=$("${base[@]}" DOCKER_CONTEXT=other XLESS_IMAGE=img:1 XLESS_BUILD_NUMBER=42 "$S" "$t/proj" 2>/dev/null)
@@ -48,7 +48,7 @@ for v in ASC_KEY_ID ASC_ISSUER_ID_FILE ASC_KEY_P8_FILE XLESS_DIST_KEY_FILE; do
 done
 # relative secret paths are made absolute before mounting
 out=$(cd "$t" && "${base[@]}" ASC_KEY_P8_FILE=key.p8 "$S" proj 2>/dev/null) || fail "relative path run failed"
-[[ "$out" == *"-v $t/key.p8:/secrets/asc.p8:ro"* || "$out" == *"-v "*"$t/key.p8:/secrets/asc.p8:ro"* ]] || fail "relative path not resolved: $out"
+[[ "$out" == *"--mount type=bind,src=$t/key.p8,dst=/secrets/asc.p8,readonly"* || "$out" == *"--mount "*"$t/key.p8,dst=/secrets/asc.p8,readonly"* ]] || fail "relative path not resolved: $out"
 
 # missing pieces are named without printing values
 "${base[@]}" ASC_KEY_P8_FILE="$t/missing.p8" "$S" "$t/proj" >/dev/null 2>"$t/err" && fail "missing p8 accepted"
@@ -80,21 +80,21 @@ s1=$(line "xless tauri next-build"); s2=$(line "--to finalize"); s3=$(line "--fr
 [[ "$s2" == *"xless ship --platform ios --config /config/my.overlay.yml --source /source --from build --to finalize "* ]] || fail "step 2 wrong: $s2"
 [[ "$s3" == *"xless ship --platform ios --config /config/my.overlay.yml --source /source --from sign --to upload "* ]] || fail "step 3 wrong: $s3"
 for l in "$s1" "$s2" "$s3"; do
-  [[ "$l" == *"-v $t/ov/app:/source:ro"* ]] || fail "source not mounted from the overlay: $l"
-  [[ "$l" == *"-v $t/ov:/config:ro"* ]] || fail "overlay directory not mounted: $l"
+  [[ "$l" == *"--mount type=bind,src=$t/ov/app,dst=/source,readonly"* ]] || fail "source not mounted from the overlay: $l"
+  [[ "$l" == *"--mount type=bind,src=$t/ov,dst=/config,readonly"* ]] || fail "overlay directory not mounted: $l"
   [[ "$l" == *"--context colima-xless"* && "$l" == *"xless-tauri:local-"* ]] || fail "context or tauri image: $l"
-  [[ "$l" != *":/work "* ]] || fail "project mount used with --config: $l"
+  [[ "$l" != *"dst=/work "* ]] || fail "project mount used with --config: $l"
 done
 # step 2 runs the app's build code: no secret mount, no secret variable
 [[ "$s2" != *"/secrets/"* && "$s2" != *"ASC_"* && "$s2" != *"XLESS_DIST_KEY"* ]] || fail "secrets reach the build step: $s2"
-[[ "$s2" == *"-v $t/home/.cache/xless/work:/cache/work"* && "$s2" == *"-v $t/home/.cache/xless/downloads:/cache/downloads"* ]] || fail "caches not mounted: $s2"
+[[ "$s2" == *"--mount type=bind,src=$t/home/.cache/xless/work,dst=/cache/work"* && "$s2" == *"--mount type=bind,src=$t/home/.cache/xless/downloads,dst=/cache/downloads"* ]] || fail "caches not mounted: $s2"
 [[ "$s2" == *"xless-rustup:/cache/rustup"* && "$s2" == *"xless-cargo:/cache/cargo"* ]] || fail "toolchain volumes missing: $s2"
 [[ "$s2" == *"XLESS_CACHE=/cache"* && "$s2" == *"XLESS_SOURCE_ORIGIN=$t/ov/app"* ]] || fail "XLESS_CACHE/XLESS_SOURCE_ORIGIN not set: $s2"
 [[ "$s2" == *"-e XLESS_BUILD_NUMBER "* && "$s3" == *"-e XLESS_BUILD_NUMBER "* ]] || fail "step 1's build number not passed by name: $out"
 # step 1 has the App Store Connect key only; step 3 has every secret and the work copy
-[[ "$s1" == *"/secrets/asc.p8:ro"* && "$s1" == *"-e ASC_KEY_ID"* && "$s1" != *"dist-key"* && "$s1" != *"/cache/"* ]] || fail "step 1 mounts: $s1"
-[[ "$s3" == *"/secrets/asc.p8:ro"* && "$s3" == *"/secrets/dist-key.pem:ro"* && "$s3" == *"ASC_ISSUER_ID_FILE=/secrets/asc-issuer-id"* ]] || fail "step 3 secrets: $s3"
-[[ "$s3" == *"-v $t/home/.cache/xless/work:/cache/work"* && "$s3" != *"xless-cargo"* && "$s3" != *"/cache/downloads"* ]] || fail "step 3 mounts: $s3"
+[[ "$s1" == *"dst=/secrets/asc.p8,readonly"* && "$s1" == *"-e ASC_KEY_ID"* && "$s1" != *"dist-key"* && "$s1" != *"/cache/"* ]] || fail "step 1 mounts: $s1"
+[[ "$s3" == *"dst=/secrets/asc.p8,readonly"* && "$s3" == *"dst=/secrets/dist-key.pem,readonly"* && "$s3" == *"ASC_ISSUER_ID_FILE=/secrets/asc-issuer-id"* ]] || fail "step 3 secrets: $s3"
+[[ "$s3" == *"--mount type=bind,src=$t/home/.cache/xless/work,dst=/cache/work"* && "$s3" != *"xless-cargo"* && "$s3" != *"/cache/downloads"* ]] || fail "step 3 mounts: $s3"
 [[ "$out" == *"ISSUER-SECRET-VALUE"* ]] && fail "issuer value leaked"
 # no default build number: dated decides in step 1
 msg=$("${base[@]}" "$S" --config "$t/ov/my.overlay.yml" 2>&1 >/dev/null) || true
@@ -107,7 +107,7 @@ out=$("${base[@]}" "$S" --config "$t/ov/my.overlay.yml" --build-number 1.0.0.202
 [[ "$out" != *"next-build"* && "$out" != *"-e XLESS_BUILD_NUMBER"* && "$(line "--to finalize")" == *"--to finalize --build-number 1.0.0.2026101507"* ]] || fail "--build-number: $out"
 # --from/--to choose the steps; XLESS_SOURCE wins over source:; other extra args go to both ship steps
 out=$("${base[@]}" XLESS_SOURCE="$t/proj" "$S" --config "$t/ov/my.overlay.yml" --from upload 2>/dev/null)
-[[ $(wc -l <<<"$out") -eq 1 && "$out" == *"-v $t/proj:/source:ro"* && "$out" == *"--source /source --from upload --to upload "* ]] || fail "XLESS_SOURCE/--from upload: $out"
+[[ $(wc -l <<<"$out") -eq 1 && "$out" == *"--mount type=bind,src=$t/proj,dst=/source,readonly"* && "$out" == *"--source /source --from upload --to upload "* ]] || fail "XLESS_SOURCE/--from upload: $out"
 out=$("${base[@]}" "$S" --config "$t/ov/my.overlay.yml" --to finalize 2>/dev/null)
 [[ $(wc -l <<<"$out") -eq 2 && "$out" == *"next-build"* && "$out" == *"--from build --to finalize "* ]] || fail "--to finalize: $out"
 out=$("${base[@]}" "$S" --config "$t/ov/my.overlay.yml" --from=assets --to=package --verbose 2>/dev/null)
@@ -121,10 +121,10 @@ code=0; "${base[@]}" "$S" --config "$t/ov/my.overlay.yml" --from ib >/dev/null 2
 mkdir -p "$t/home/src" "$t/home/ovh"
 printf 'type: tauri\nsource: "~/src"\n' > "$t/ov/tilde.yml"
 out=$("${base[@]}" "$S" --config "$t/ov/tilde.yml" 2>/dev/null) || fail "tilde overlay failed"
-[[ "$out" == *"-v $t/home/src:/source:ro"* ]] || fail "~ not expanded: $out"
+[[ "$out" == *"--mount type=bind,src=$t/home/src,dst=/source,readonly"* ]] || fail "~ not expanded: $out"
 printf 'type: tauri\nsource: %s\n' "$t/home/src" > "$t/home/ovh/h.yml"
 out=$("${base[@]}" "$S" --config '~/ovh/h.yml' 2>/dev/null) || fail "~/ overlay path not expanded"
-[[ "$out" == *"-v $t/home/ovh:/config:ro"* ]] || fail "~/ overlay path mounted wrongly: $out"
+[[ "$out" == *"--mount type=bind,src=$t/home/ovh,dst=/config,readonly"* ]] || fail "~/ overlay path mounted wrongly: $out"
 # the overlay's directory must not hold the env file or a secret file (it is mounted into the build container)
 mkdir -p "$t/sec/sub" "$t/elsewhere"
 printf 'type: tauri\nsource: %s\n' "$t/home/src" > "$t/sec/o.yml"
@@ -165,6 +165,175 @@ grep -q -- "--to finalize | ASC_KEY_ID=unset ASC_KEY_P8_FILE=unset BN=1.0.0.2026
 grep -q -- "--from sign --to upload | ASC_KEY_ID=KEYID .* BN=1.0.0.2026101503$" "$t/xlog" || fail "step 3 env wrong: $(cat "$t/xlog")"
 : > "$t/xlog"; code=0; "${real[@]}" STEP2_EXIT=12 "$S" --config "$t/ov/my.overlay.yml" >/dev/null 2>&1 || code=$?
 [[ $code -eq 12 && $(wc -l < "$t/xlog") -eq 2 ]] || fail "step 2 failure: exit $code, $(cat "$t/xlog")"
+# --platform macos: a Tauri DMG. No step 1; step 2 without secrets; step 3 with the Developer ID key and the App Store Connect key
+printf 'x' > "$t/devid.pem"
+mac=("${base[@]}" XLESS_DEVID_KEY_FILE="$t/devid.pem")
+out=$("${mac[@]}" "$S" --config "$t/ov/my.overlay.yml" --platform macos 2>/dev/null) || fail "macos dry run failed"
+[[ $(wc -l <<<"$out") -eq 2 && "$out" != *"next-build"* ]] || fail "macos wants two steps, no next-build: $out"
+s2=$(line "--to finalize"); s3=$(line "--from sign")
+[[ "$s2" == *"xless ship --platform macos --config /config/my.overlay.yml --source /source --from build --to finalize "* ]] || fail "macos step 2 wrong: $s2"
+[[ "$s3" == *"xless ship --platform macos --config /config/my.overlay.yml --source /source --from sign --to package "* ]] || fail "macos step 3 wrong: $s3"
+[[ "$s2" != *"/secrets/"* && "$s2" != *"ASC_"* && "$s2" != *"DEVID"* && "$s2" != *"DIST"* ]] || fail "secrets reach the macos build step: $s2"
+[[ "$s2" != *"XLESS_BUILD_NUMBER"* ]] || fail "macos passes a build number it does not have: $s2"
+[[ "$s3" == *"--mount type=bind,src=$t/devid.pem,dst=/secrets/devid-key.pem,readonly"* && "$s3" == *"-e XLESS_DEVID_KEY_FILE=/secrets/devid-key.pem"* ]] || fail "devid key not mounted: $s3"
+[[ "$s3" == *"dst=/secrets/asc.p8,readonly"* && "$s3" == *"ASC_KEY_P8_FILE=/secrets/asc.p8"* && "$s3" == *"-e ASC_KEY_ID"* ]] || fail "asc key not mounted in macos step 3: $s3"
+[[ "$s3" != *"dist-key"* && "$s3" == *"--mount type=bind,src=$t/home/.cache/xless/work,dst=/cache/work"* && "$s3" != *"xless-cargo"* ]] || fail "macos step 3 mounts: $s3"
+[[ "$out" == *"ISSUER-SECRET-VALUE"* ]] && fail "issuer value leaked"
+# --from package: only step 3, from package (the signed app is reused)
+out=$("${mac[@]}" "$S" --config "$t/ov/my.overlay.yml" --platform=macos --from package 2>/dev/null)
+[[ $(wc -l <<<"$out") -eq 1 && "$out" == *"--from package --to package "* && "$out" == *"devid-key.pem"* ]] || fail "macos --from package: $out"
+# an explicit build number is passed by name to both steps
+out=$("${mac[@]}" XLESS_BUILD_NUMBER=1.0.0.202610160000 "$S" --platform macos --config "$t/ov/my.overlay.yml" 2>/dev/null)
+[[ "$(line "--to finalize")" == *"-e XLESS_BUILD_NUMBER "* && "$(line "--from sign")" == *"-e XLESS_BUILD_NUMBER "* ]] || fail "macos build number: $out"
+# the default platform stays ios; the dist key is not needed on macos, the Developer ID key is
+out=$("${base[@]}" "$S" --config "$t/ov/my.overlay.yml" --platform ios 2>/dev/null)
+[[ $(wc -l <<<"$out") -eq 3 && "$out" == *"xless ship --platform ios"* && "$out" != *"devid"* ]] || fail "--platform ios: $out"
+"${mac[@]}" XLESS_DIST_KEY_FILE= "$S" --config "$t/ov/my.overlay.yml" --platform macos >/dev/null 2>&1 || fail "macos needs the dist key"
+code=0; "${mac[@]}" XLESS_DEVID_KEY_FILE= "$S" --config "$t/ov/my.overlay.yml" --platform macos >/dev/null 2>"$t/err" || code=$?
+[[ $code -eq 2 ]] && grep -q XLESS_DEVID_KEY_FILE "$t/err" || fail "missing devid key exits $code: $(cat "$t/err")"
+code=0; "${mac[@]}" "$S" "$t/proj" --platform macos >/dev/null 2>&1 || code=$?
+[[ $code -eq 2 ]] || fail "macos with a project directory exits $code, want 2"
+code=0; "${mac[@]}" "$S" --config "$t/ov/my.overlay.yml" --platform tvos >/dev/null 2>&1 || code=$?
+[[ $code -eq 2 ]] || fail "unknown platform exits $code, want 2"
+# the devid key inside the overlay's directory is refused too
+cp "$t/devid.pem" "$t/sec/devid.pem"
+code=0; "${mac[@]}" XLESS_DEVID_KEY_FILE="$t/sec/devid.pem" "$S" --config "$t/sec/o.yml" --platform macos >/dev/null 2>"$t/err" || code=$?
+[[ $code -eq 2 ]] && grep -q "keep the overlay in its own directory" "$t/err" || fail "devid key inside the overlay directory: exit $code"
+# native, for real (fake xless): the DMG path is reported, the build step sees no secret
+cat > "$t/bin/xless" <<'X'
+#!/bin/sh
+echo "$* | DEVID=${XLESS_DEVID_KEY_FILE-unset} ASC_KEY_ID=${ASC_KEY_ID-unset}" >> "$XLOG"
+case "$*" in *"--to package"*) echo "==> package"; echo "/work/out/App_1.0.0_universal.dmg" ;; esac
+exit 0
+X
+: > "$t/xlog"; msg=$("${real[@]}" XLESS_DEVID_KEY_FILE="$t/devid.pem" "$S" --config "$t/ov/my.overlay.yml" --platform macos 2>&1 >/dev/null) || fail "native macos run failed: $msg"
+[[ $(wc -l < "$t/xlog") -eq 2 ]] || fail "native macos: want 2 invocations: $(cat "$t/xlog")"
+grep -q -- "--platform macos .*--to finalize | DEVID=unset ASC_KEY_ID=unset$" "$t/xlog" || fail "macos step 2 env: $(cat "$t/xlog")"
+grep -q -- "--from sign --to package | DEVID=$t/devid.pem ASC_KEY_ID=KEYID$" "$t/xlog" || fail "macos step 3 env: $(cat "$t/xlog")"
+[[ "$msg" == *"==> DMG: /work/out/App_1.0.0_universal.dmg"* ]] || fail "DMG path not reported: $msg"
+# --config with a React Native overlay: step 1 (`xless next-build`) and step 3 in the base image, step 2 in xless-rn with
+# its caches on docker volumes (a case-sensitive work copy); no Rust volumes, no host work folder
+mkdir -p "$t/rn/app"
+cat > "$t/rn/app.yml" <<'Y'
+type: "react-native"    # quoted, with a comment
+source: app
+Y
+out=$("${base[@]}" "$S" --config "$t/rn/app.yml" 2>/dev/null) || fail "react-native dry run failed"
+# the work volume is per overlay file: its name and a hash of its path
+vol="xless-rn-work-app-$(printf '%s' "$t/rn/app.yml" | shasum -a 256 | cut -c1-8)"
+[[ $(wc -l <<<"$out") -eq 3 ]] || fail "react-native: want three steps: $out"
+s1=$(line "next-build"); s2=$(line "--to finalize"); s3=$(line "--from sign")
+[[ "$s1" == *" xless-base:local-"*" xless next-build --config /config/app.yml --source /source " ]] || fail "rn step 1: $s1"
+[[ "$s1" == *"dst=/secrets/asc.p8,readonly"* && "$s1" != *"dist-key"* && "$s1" != *"/cache/"* ]] || fail "rn step 1 mounts: $s1"
+[[ "$s2" == *" xless-rn:local-"*" xless ship --platform ios --config /config/app.yml --source /source --from build --to finalize "* ]] || fail "rn step 2: $s2"
+[[ "$s2" != *"/secrets/"* && "$s2" != *"ASC_"* && "$s2" != *"XLESS_DIST_KEY"* ]] || fail "secrets reach the rn build step: $s2"
+for v in $vol:/cache/work xless-corepack:/cache/corepack xless-bundle:/cache/bundle xless-cocoapods-home:/root/.cocoapods \
+         xless-cocoapods-cache:/root/Library/Caches/CocoaPods; do
+  [[ "$s2" == *"-v $v "* ]] || fail "rn step 2 lacks $v: $s2"
+done
+[[ "$s2" != *".cache/xless"* && "$s2" != *"xless-cargo"* && "$s2" != *"/cache/downloads"* ]] || fail "rn step 2 mounts Tauri caches: $s2"
+[[ "$s2" == *"XLESS_SOURCE_ORIGIN=$t/rn/app "* && "$s2" == *"-e XLESS_BUILD_NUMBER "* && "$s2" != *"XLESS_RN_CLEAN"* ]] || fail "rn step 2 env: $s2"
+[[ "$s3" == *" xless-base:local-"*" xless ship --platform ios --config /config/app.yml --source /source --from sign --to upload "* ]] || fail "rn step 3: $s3"
+[[ "$s3" == *"-v $vol:/cache/work -e XLESS_WORK_ROOT=/cache/work -e XLESS_WORK_VOLUME=$vol "* && "$s3" == *"dst=/secrets/dist-key.pem,readonly"* ]] || fail "rn step 3 mounts: $s3"
+[[ "$s3" != *"cocoapods"* && "$s3" != *"corepack"* && "$s3" != *".cache/xless"* ]] || fail "rn step 3 mounts build caches: $s3"
+# image and volume overrides; XLESS_RN_CLEAN reaches the build
+out=$("${base[@]}" XLESS_IMAGE=rn:1 XLESS_SIGN_IMAGE=keys:1 XLESS_RN_WORK_VOLUME=w1 XLESS_RN_CLEAN=1 "$S" --config "$t/rn/app.yml" 2>/dev/null)
+[[ "$(line "next-build")" == *" keys:1 xless next-build "* ]] || fail "rn step 1 image override: $out"
+[[ "$(line "--to finalize")" == *"-v w1:/cache/work "*"-e XLESS_RN_CLEAN "*" rn:1 xless ship "* ]] || fail "rn step 2 overrides: $out"
+[[ "$(line "--from sign")" == *"-v w1:/cache/work "*" keys:1 xless ship "* ]] || fail "rn step 3 overrides: $out"
+# offline: --build-number with --to finalize needs no secret at all (--dry-run is XLESS_TESTFLIGHT_DRY_RUN=1)
+bare=(env -i HOME="$t/home" PATH="$t/bin:/usr/bin:/bin" XLESS_TESTFLIGHT_ENV="$t/none.env" XLESS_USE_DOCKER=1)
+out=$("${bare[@]}" "$S" --config "$t/rn/app.yml" --dry-run --build-number 1.0.0.2026101601 --to finalize 2>/dev/null) || fail "offline rn run needs secrets"
+[[ $(wc -l <<<"$out") -eq 1 && "$out" == *"--from build --to finalize --build-number 1.0.0.2026101601 "* && "$out" != *"/secrets/"* ]] || fail "offline rn run: $out"
+# ... step 3 does, and step 1 needs the App Store Connect key only
+code=0; "${bare[@]}" "$S" --config "$t/rn/app.yml" --dry-run --build-number 1.0.0.2026101601 >/dev/null 2>"$t/err" || code=$?
+[[ $code -eq 2 ]] && grep -q ASC_KEY_ID "$t/err" || fail "step 3 without secrets: exit $code"
+code=0; "${bare[@]}" "$S" --config "$t/rn/app.yml" --dry-run --to finalize >/dev/null 2>"$t/err" || code=$?
+[[ $code -eq 2 ]] && grep -q ASC_KEY_ID "$t/err" || fail "step 1 without the App Store Connect key: exit $code"
+out=$("${base[@]}" XLESS_DIST_KEY_FILE= "$S" --config "$t/rn/app.yml" --to finalize 2>/dev/null) || fail "--to finalize needs the dist key"
+[[ $(wc -l <<<"$out") -eq 2 && "$out" != *"dist-key"* ]] || fail "--to finalize: $out"
+# React Native is iOS only
+code=0; "${base[@]}" XLESS_DEVID_KEY_FILE="$t/devid.pem" "$S" --config "$t/rn/app.yml" --platform macos >/dev/null 2>&1 || code=$?
+[[ $code -eq 2 ]] || fail "react-native --platform macos exits $code, want 2"
+# --destination simulator: step 2 only, no secret, no App Store Connect (bare environment), stopping at build
+out=$("${bare[@]}" "$S" --config "$t/rn/app.yml" --dry-run --destination simulator 2>/dev/null) || fail "simulator run needs secrets"
+[[ $(wc -l <<<"$out") -eq 1 && "$out" == *" xless-rn:local-"*" xless ship --platform ios --config /config/app.yml --source /source --destination simulator --from build --to build "* ]] || fail "simulator: $out"
+[[ "$out" != *"/secrets/"* && "$out" != *"ASC_"* && "$out" != *"next-build"* && "$out" == *"-v $vol:/cache/work "* ]] || fail "simulator mounts: $out"
+out=$("${bare[@]}" "$S" --config "$t/rn/app.yml" --dry-run --destination=simulator --to prepare 2>/dev/null) || fail "simulator --to prepare"
+[[ "$out" == *"--destination simulator --from prepare --to prepare "* ]] || fail "simulator --to prepare: $out"
+for bad in "--to finalize" "--from sign" "--to upload"; do
+  code=0; "${bare[@]}" "$S" --config "$t/rn/app.yml" --dry-run --destination simulator $bad >/dev/null 2>&1 || code=$?
+  [[ $code -eq 2 ]] || fail "simulator $bad exits $code, want 2"
+done
+code=0; "${bare[@]}" "$S" --config "$t/rn/app.yml" --dry-run --destination tv >/dev/null 2>&1 || code=$?
+[[ $code -eq 2 ]] || fail "--destination tv exits $code, want 2"
+code=0; "${base[@]}" "$S" "$t/proj" --destination simulator >/dev/null 2>&1 || code=$?
+[[ $code -eq 2 ]] || fail "simulator for a project directory exits $code, want 2"
+code=0; "${base[@]}" "$S" --config "$t/ov/my.overlay.yml" --destination simulator >/dev/null 2>&1 || code=$?
+[[ $code -eq 2 ]] || fail "simulator for a Tauri overlay exits $code, want 2"
+# natively: the app's path is reported as it is, for scripts/sim-launch.sh
+printf '#!/bin/sh\necho "==> build"\necho /w/.xless/build/ios-simulator/app/App.app\n' > "$t/bin/xless"
+msg=$("${bare[@]}" XLESS_USE_DOCKER=0 "$S" --config "$t/rn/app.yml" --destination simulator 2>&1 >/dev/null) || fail "native simulator run failed"
+[[ "$msg" == *"==> Simulator app: /w/.xless/build/ios-simulator/app/App.app"* && "$msg" == *"sim-launch.sh /w/.xless/build/ios-simulator/app/App.app"* ]] || fail "simulator app not reported: $msg"
+# a source inside a git checkout: the checkout's top is mounted, --source names the app below it
+git init -q "$t/repo"; mkdir -p "$t/repo/apps/one"
+printf 'type: react-native\nsource: %s\n' "$t/repo/apps/one" > "$t/rn/sub.yml"
+out=$("${base[@]}" "$S" --config "$t/rn/sub.yml" 2>/dev/null) || fail "subdirectory source failed"
+top=$(cd "$t/repo" && pwd -P)
+for l in "$(line "next-build")" "$(line "--to finalize")" "$(line "--from sign")"; do
+  [[ "$l" == *"--mount type=bind,src=$top,dst=/source,readonly "*"--source /source/apps/one "* ]] || fail "checkout top not mounted: $l"
+done
+[[ "$(line "--to finalize")" == *"XLESS_SOURCE_ORIGIN=$t/repo/apps/one "* ]] || fail "origin: $out"
+# ... so a secret inside the checkout is refused
+printf 'x' > "$t/repo/key.p8"
+code=0; "${base[@]}" ASC_KEY_P8_FILE="$t/repo/key.p8" "$S" --config "$t/rn/sub.yml" >/dev/null 2>"$t/err" || code=$?
+[[ $code -eq 2 ]] && grep -q "keep secrets out of the source" "$t/err" || fail "secret inside the mounted checkout: exit $code"
+# another overlay file gets another work volume
+cp "$t/rn/app.yml" "$t/rn/app2.yml"
+out2=$("${base[@]}" "$S" --config "$t/rn/app2.yml" 2>/dev/null)
+[[ "$out2" == *"-v xless-rn-work-app2-"* && "$out2" != *"-v $vol:"* ]] || fail "work volume not per overlay: $out2"
+# --from sign: step 3 only, in the base image, on the work volume; --from build: all three steps
+out=$("${base[@]}" "$S" --config "$t/rn/app.yml" --from sign 2>/dev/null)
+[[ $(wc -l <<<"$out") -eq 1 && "$out" == *"-v $vol:/cache/work "*" xless-base:local-"*"--from sign --to upload "* ]] || fail "rn --from sign: $out"
+out=$("${base[@]}" "$S" --config "$t/rn/app.yml" --from build 2>/dev/null)
+[[ $(wc -l <<<"$out") -eq 3 && "$out" == *"xless next-build"* && "$out" == *"--from build --to finalize"* ]] || fail "rn --from build: $out"
+# XLESS_BUILD_NUMBER skips step 1; so does a fixed build: (and then no App Store Connect key is needed to build)
+out=$("${base[@]}" XLESS_BUILD_NUMBER=1.0.0.2026101601 "$S" --config "$t/rn/app.yml" 2>/dev/null)
+[[ $(wc -l <<<"$out") -eq 2 && "$out" != *"next-build"* ]] || fail "rn XLESS_BUILD_NUMBER did not skip step 1: $out"
+printf 'type: react-native\nsource: app\nbuild: 42   # fixed\n' > "$t/rn/fixed.yml"
+out=$("${bare[@]}" "$S" --config "$t/rn/fixed.yml" --dry-run --to finalize 2>/dev/null) || fail "a fixed build needs App Store Connect for step 1"
+[[ $(wc -l <<<"$out") -eq 1 && "$out" != *"next-build"* && "$out" != *"/secrets/"* ]] || fail "fixed build: $out"
+# --to prepare alone starts at prepare
+out=$("${bare[@]}" "$S" --config "$t/rn/fixed.yml" --dry-run --to prepare 2>/dev/null) || fail "--to prepare refused"
+[[ "$out" == *"--from prepare --to prepare "* ]] || fail "--to prepare: $out"
+code=0; "${bare[@]}" "$S" --config "$t/rn/fixed.yml" --dry-run --from build --to prepare >/dev/null 2>&1 || code=$?
+[[ $code -eq 2 ]] || fail "an explicit --from build --to prepare exits $code, want 2"
+# a path with a comma is CSV-quoted in --mount
+mkdir -p "$t/a,b/app"; printf 'type: react-native\nsource: app\nbuild: 1\n' > "$t/a,b/o.yml"
+out=$("${bare[@]}" "$S" --config "$t/a,b/o.yml" --dry-run --to finalize 2>/dev/null) || fail "comma path refused"
+[[ "$out" == *"--mount 'type=bind,\"src=$t/a,b/app\",dst=/source,readonly'"* ]] || fail "comma path not quoted: $out"
+# a secret inside a mounted directory is found whatever the spelling (macOS file systems ignore case) and through symlinks
+mkdir -p "$t/cs/app"; printf 'type: react-native\nsource: app\n' > "$t/cs/o.yml"; printf 'x' > "$t/cs/key.p8"
+if [[ -e "$t/CS/o.yml" ]]; then   # a case-insensitive file system
+  code=0; "${base[@]}" ASC_KEY_P8_FILE="$t/cs/key.p8" "$S" --config "$t/CS/o.yml" >/dev/null 2>"$t/err" || code=$?
+  [[ $code -eq 2 ]] && grep -q "keep the overlay in its own directory" "$t/err" || fail "secret reached by another case: exit $code $(cat "$t/err")"
+fi
+# never mount /, the home directory or a directory above it
+printf 'type: react-native\nsource: %s\n' "$t/home" > "$t/rn/home.yml"
+code=0; "${base[@]}" "$S" --config "$t/rn/home.yml" >/dev/null 2>"$t/err" || code=$?
+[[ $code -eq 2 ]] && grep -q "holds your home directory" "$t/err" || fail "home directory as source: exit $code"
+printf 'type: react-native\nsource: %s\n' "$t" > "$t/rn/up.yml"
+code=0; "${base[@]}" "$S" --config "$t/rn/up.yml" >/dev/null 2>"$t/err" || code=$?
+[[ $code -eq 2 ]] && grep -q "holds your home directory" "$t/err" || fail "a parent of the home directory as source: exit $code"
+# natively nothing is mounted: neither the home directory as source nor a secret beside the overlay is refused
+out=$("${base[@]}" XLESS_USE_DOCKER=0 "$S" --config "$t/rn/home.yml" 2>"$t/err") || fail "native: home directory as source refused: $(cat "$t/err")"
+[[ "$(sed -n 1p <<<"$out")" == "xless next-build --config $t/rn/home.yml " ]] || fail "native home source: '$out'"
+out=$("${base[@]}" XLESS_USE_DOCKER=0 ASC_KEY_P8_FILE="$t/cs/key.p8" "$S" --config "$t/cs/o.yml" 2>"$t/err") || fail "native: secret beside the overlay refused: $(cat "$t/err")"
+code=0; "${base[@]}" ASC_KEY_P8_FILE="$t/cs/key.p8" "$S" --config "$t/cs/o.yml" >/dev/null 2>"$t/err" || code=$?
+[[ $code -eq 2 ]] && grep -q "is inside the overlay's directory" "$t/err" || fail "docker: secret beside the overlay: exit $code $(cat "$t/err")"
+# native: step 1 is `xless next-build`
+out=$("${base[@]}" XLESS_USE_DOCKER=0 "$S" --config "$t/rn/app.yml" 2>/dev/null)
+[[ "$(sed -n 1p <<<"$out")" == "xless next-build --config $t/rn/app.yml " ]] || fail "native rn step 1: '$out'"
 # usage errors
 code=0; "${base[@]}" "$S" --config "$t/ov/none.yml" >/dev/null 2>&1 || code=$?
 [[ $code -eq 2 ]] || fail "missing overlay exits $code, want 2"
@@ -175,4 +344,72 @@ code=0; "${base[@]}" "$S" "$t/proj" --config "$t/ov/my.overlay.yml" >/dev/null 2
 printf 'type: tauri\n' > "$t/ov/nosrc.yml"
 code=0; "${base[@]}" "$S" --config "$t/ov/nosrc.yml" >/dev/null 2>&1 || code=$?
 [[ $code -eq 2 ]] || fail "overlay without source exits $code, want 2"
+# xcode: pin (Ruling R8): every step in the images made from that Xcode (make images), *:local-<arch>-xcode<pin>
+case "$(uname -m)" in arm64|aarch64) A=arm64 ;; *) A=amd64 ;; esac
+mkdir -p "$t/fd"
+cat > "$t/fd/docker" <<'D'
+#!/usr/bin/env bash
+# A fake docker whose images are the lines of $FAKE_IMAGES.
+if [[ "$1 $2" == "context ls" ]]; then printf 'default\ncolima-xless\n'; exit 0; fi
+[[ "$1" != --context ]] || shift 2
+if [[ "$1 $2" == "image inspect" ]]; then grep -qxF -- "$3" "$FAKE_IMAGES"; exit $?; fi
+D
+chmod +x "$t/fd/docker"
+pinned=(env -i HOME="$t/home" PATH="$t/fd:/usr/bin:/bin" XLESS_TESTFLIGHT_ENV="$t/none.env" XLESS_TESTFLIGHT_DRY_RUN=1 XLESS_USE_DOCKER=1
+        ASC_KEY_ID=KEYID ASC_ISSUER_ID_FILE="$t/issuer" ASC_KEY_P8_FILE="$t/key.p8" XLESS_DIST_KEY_FILE="$t/dist.pem" FAKE_IMAGES="$t/images")
+mkdir -p "$t/pin/app"
+printf 'type: react-native\nsource: app\nxcode: "26.2"   # the release pipeline'"'"'s Xcode\n' > "$t/pin/rn.yml"
+printf '%s\n' "xless-rn:local-$A-xcode26.2" "xless-base:local-$A-xcode26.2" "xless-rn:local-$A" "xless-base:local-$A" > "$t/images"
+out=$("${pinned[@]}" "$S" --config "$t/pin/rn.yml" 2>"$t/err") || fail "pinned rn dry run: $(cat "$t/err")"
+[[ "$(line "next-build")" == *" xless-base:local-$A-xcode26.2 xless next-build "* ]] || fail "pinned rn step 1: $out"
+[[ "$(line "--to finalize")" == *" xless-rn:local-$A-xcode26.2 xless ship "* ]] || fail "pinned rn step 2: $out"
+[[ "$(line "--from sign")" == *" xless-base:local-$A-xcode26.2 xless ship "* ]] || fail "pinned rn step 3: $out"
+grep -q 'xcode: "26.2" (pinned)' "$t/err" || fail "pin not reported: $(cat "$t/err")"
+# a missing image is refused (exit 2) with the command that builds it; the default images never stand in for another Xcode
+printf '%s\n' "xless-rn:local-$A" "xless-base:local-$A" "xless-base:local-$A-xcode26.2" > "$t/images"
+code=0; "${pinned[@]}" "$S" --config "$t/pin/rn.yml" >/dev/null 2>"$t/err" || code=$?
+[[ $code -eq 2 ]] || fail "missing pinned image exits $code, want 2"
+grep -qF "pins xcode: \"26.2\", but these images are missing: xless-rn:local-$A-xcode26.2; build them from Xcode 26.2: make images XCODE=<path to Xcode 26.2's .app or .xip> ARCHS=$A" "$t/err" \
+  || fail "missing image message: $(cat "$t/err")"
+# The pin is looked up as image tags spell it (major.minor, the patch when not 0): "26.2.0" → -xcode26.2, "26" → -xcode26.0
+printf '%s\n' "xless-rn:local-$A-xcode26.2" "xless-base:local-$A-xcode26.2" "xless-rn:local-$A-xcode26.0" "xless-base:local-$A-xcode26.0" \
+  "xless-rn:local-$A-xcode26.0.1" "xless-base:local-$A-xcode26.0.1" > "$t/images"
+for pair in "26.2.0 26.2" "26 26.0" "26.0.0 26.0" "26.0.1 26.0.1"; do
+  set -- $pair
+  printf 'type: react-native\nsource: app\nxcode: "%s"\n' "$1" > "$t/pin/canon.yml"
+  out=$("${pinned[@]}" "$S" --config "$t/pin/canon.yml" 2>"$t/err") || fail "pin $1: $(cat "$t/err")"
+  [[ "$(line "--to finalize")" == *" xless-rn:local-$A-xcode$2 xless ship "* && "$(line "--from sign")" == *" xless-base:local-$A-xcode$2 xless ship "* ]] \
+    || fail "pin $1 does not select -xcode$2: $out"
+done
+# A simulator build with a pin needs only the build image (step 2): the App Store Connect image is not required.
+printf '%s\n' "xless-rn:local-$A-xcode26.2" > "$t/images"
+out=$("${pinned[@]}" "$S" --config "$t/pin/rn.yml" --destination simulator 2>"$t/err") || fail "pinned simulator without xless-base: $(cat "$t/err")"
+[[ $(wc -l <<<"$out") -eq 1 && "$out" == *" xless-rn:local-$A-xcode26.2 xless ship "*"--destination simulator"* ]] || fail "pinned simulator: $out"
+grep -q "xless-base" "$t/err" && fail "pinned simulator names the App Store Connect image: $(cat "$t/err")"
+printf '%s\n' "xless-rn:local-$A" "xless-base:local-$A" > "$t/images"
+# versions.env's Xcode: the plain default images serve it when no suffixed image exists
+dx="$(sed -n 's/^XCODE_VERSION=//p' "$(dirname "$S")/../versions.env")"
+printf 'type: react-native\nsource: app\nxcode: %s\n' "$dx" > "$t/pin/def.yml"
+out=$("${pinned[@]}" "$S" --config "$t/pin/def.yml" 2>"$t/err") || fail "default pin: $(cat "$t/err")"
+[[ "$(line "--to finalize")" == *" xless-rn:local-$A xless ship "* && "$(line "--from sign")" == *" xless-base:local-$A xless ship "* ]] || fail "default pin images: $out"
+# explicit images win over the pin; no pin: the plain images, never inspected
+out=$("${pinned[@]}" XLESS_IMAGE=rn:2 XLESS_SIGN_IMAGE=keys:2 "$S" --config "$t/pin/rn.yml" 2>/dev/null) || fail "pinned with explicit images"
+[[ "$(line "--to finalize")" == *" rn:2 xless ship "* && "$(line "--from sign")" == *" keys:2 xless ship "* ]] || fail "explicit images and a pin: $out"
+: > "$t/images"
+out=$("${pinned[@]}" "$S" --config "$t/rn/app.yml" 2>/dev/null) || fail "unpinned rn with no images listed"
+[[ "$(line "--to finalize")" == *" xless-rn:local-$A xless ship "* ]] || fail "unpinned rn image: $out"
+# Tauri overlays and xless.yml projects take the pin too
+printf 'type: tauri\nsource: app\nbundleID: com.example.x\nxcode: 26.2\n' > "$t/pin/tauri.yml"
+printf '%s\n' "xless-tauri:local-$A-xcode26.2" "xless:local-$A-xcode26.2" > "$t/images"
+out=$("${pinned[@]}" "$S" --config "$t/pin/tauri.yml" 2>/dev/null) || fail "pinned tauri"
+[[ $(grep -c " xless-tauri:local-$A-xcode26.2 xless " <<<"$out") -eq 3 ]] || fail "pinned tauri images: $out"
+mkdir -p "$t/pinproj"; printf 'xcode: "26.2"\n' > "$t/pinproj/xless.yml"
+out=$("${pinned[@]}" "$S" "$t/pinproj" 2>/dev/null) || fail "pinned project"
+[[ "$out" == *" xless:local-$A-xcode26.2 xless ship --platform ios"* ]] || fail "pinned project image: $out"
+# a pin that is no version is a usage error; natively the pin selects nothing (prepare and the build stage check the SDK)
+printf 'type: react-native\nsource: app\nxcode: latest\n' > "$t/pin/bad.yml"
+code=0; "${pinned[@]}" "$S" --config "$t/pin/bad.yml" >/dev/null 2>"$t/err" || code=$?
+[[ $code -eq 2 ]] && grep -q "is not an Xcode version" "$t/err" || fail "bad pin: exit $code $(cat "$t/err")"
+out=$("${base[@]}" XLESS_USE_DOCKER=0 "$S" --config "$t/pin/rn.yml" 2>/dev/null) || fail "native pinned"
+[[ "$(sed -n 1p <<<"$out")" == "xless next-build --config $t/pin/rn.yml " ]] || fail "native pinned: '$out'"
 echo PASS

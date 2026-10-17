@@ -49,4 +49,21 @@ struct CARWriterTests {
         #expect(Array(result.carData.prefix(8)) == Array("BOMStore".utf8))
         #expect(result.appIconBundle == nil)
     }
+
+    @Test("An unknown color-space name is refused, not compiled as sRGB")
+    func unknownColorSpace() async throws {
+        let tmp = FileManager.default.temporaryDirectory
+            .appendingPathComponent("cs-\(UUID().uuidString).xcassets", isDirectory: true)
+        let colorSet = tmp.appendingPathComponent("Accent.colorset", isDirectory: true)
+        try FileManager.default.createDirectory(at: colorSet, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: tmp) }
+        try Data(#"{ "info": { "version": 1, "author": "xcode" } }"#.utf8).write(to: tmp.appendingPathComponent("Contents.json"))
+        try Data("""
+        { "info": { "version": 1, "author": "xcode" },
+          "colors": [ { "idiom": "universal", "color": { "color-space": "adobe-rgb",
+            "components": { "red": "0.5", "green": "0.5", "blue": "0.5", "alpha": "1.0" } } } ] }
+        """.utf8).write(to: colorSet.appendingPathComponent("Contents.json"))
+        let compiler = XCAssetCompiler(deploymentTarget: "16.0", svgRasterizer: StubSVGRasterizer())
+        await #expect(throws: XCAssetCompilerError.unsupportedColorSpace("adobe-rgb")) { try await compiler.compile(catalog: tmp) }
+    }
 }

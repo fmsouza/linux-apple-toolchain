@@ -7,9 +7,8 @@ macos:NSHighResolutionCapable  # MacBuilder sets true (Retina-capable, the moder
 macos:CFBundleIconFile         # xless ships AppIcon.icns made from the 1024 icon (no macOS Assets.car by design); the sample's AppIcon set is platform "ios", so the Xcode macOS target has no catalog and no icon
 macos:file:Contents/Resources/AppIcon.icns  # same reason as macos:CFBundleIconFile
 
-# Assets.car renditions (iOS), exact Name|Idiom|Scale|PixelWidth lines: ios:car:-<line> = only in Xcode's car,
-# ios:car:+<line> = only in xless's car. Accepted for milestone 1; see docs/research/parity-known-gaps.md.
-ios:car:-AppIcon|phone|1|None        # actool's MultiSized Image rendition for the phone icon; AssetKit cannot write MultiSized Image renditions (xless ships Xcode-named loose 60x60@2x PNGs as the fallback) — AssetKit gap; revisit if App Store Connect rejects (ITMS-90562/icon issues)
-ios:car:-AppIcon|pad|1|None          # actool's MultiSized Image rendition for the pad icon; AssetKit cannot write MultiSized Image renditions (xless ships Xcode-named loose 76x76@2x~ipad PNGs as the fallback) — AssetKit gap; revisit if App Store Connect rejects (ITMS-90562/icon issues)
-ios:car:-AccentBlue|universal|1|None    # actool stores the colorset at scale 1 (colorspace srgb); AssetKit's ColorRenderer writes no scale (and assetutil reads its colorspace as generic) — AssetKit gap; revisit if App Store Connect rejects (ITMS-90562/icon issues)
-ios:car:+AccentBlue|universal|None|None # the same AccentBlue rendition as AssetKit writes it: no scale, generic colorspace — AssetKit gap; revisit if App Store Connect rejects (ITMS-90562/icon issues)
+# Assets.car renditions (iOS): ios:car:<car>:<Name>/<Idiom>/<Scale>/<Appearance>/<AssetType>, the `car:` keys of
+# `xless tauri compare --assets-only` (a rendition whose rendering fields differ, or that is on one side only).
+# Accepted for milestone 1; see docs/research/parity-known-gaps.md.
+ios:car:Assets.car:AppIcon/phone/1/-/MultiSized Image   # actool's MultiSized Image rendition for the phone icon; AssetKit cannot write MultiSized Image renditions (xless ships Xcode-named loose 60x60@2x PNGs as the fallback) — AssetKit gap; revisit if App Store Connect rejects (ITMS-90562/icon issues)
+ios:car:Assets.car:AppIcon/pad/1/-/MultiSized Image     # actool's MultiSized Image rendition for the pad icon; AssetKit cannot write MultiSized Image renditions (xless ships Xcode-named loose 76x76@2x~ipad PNGs as the fallback) — AssetKit gap; revisit if App Store Connect rejects (ITMS-90562/icon issues)

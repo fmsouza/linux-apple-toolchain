@@ -73,7 +73,10 @@ private let rootView = #"<view key="view" contentMode="scaleToFill" id="Ze5-6b-2
 @Test func refusesRootViewAttributesWithoutGoldens() throws {
     for (attr, expected) in [(#"opaque="NO""#, #"unsupported attribute opaque="NO" on the root <view>"#),
                              (#"clipsSubviews="YES""#, #"unsupported attribute clipsSubviews="YES" on the root <view>"#),
-                             (#"userInteractionEnabled="NO""#, #"unsupported attribute userInteractionEnabled="NO" on the root <view>"#)] {
+                             (#"layoutMarginsFollowReadableWidth="YES""#, #"unsupported attribute layoutMarginsFollowReadableWidth="YES" on the root <view>"#),
+                             // the lowercase spellings are proven for subviews only (`bool-lowercase-grid`)
+                             (#"userInteractionEnabled="false""#, #"unsupported userInteractionEnabled="false" (expected YES or NO)"#),
+                             (#"insetsLayoutMarginsFromSafeArea="false""#, #"unsupported insetsLayoutMarginsFromSafeArea="false" (expected YES or NO)"#)] {
         let e = try refusal([(rootView, rootView.replacingOccurrences(of: " id=", with: " \(attr) id="))])
         #expect(e.cause.hasPrefix(expected), "\(e)")
     }
@@ -527,4 +530,68 @@ private let ownWidth = #"<constraint firstAttribute="width" constant="100" id="C
         #expect(e.stage == .ib)
         #expect(e.cause.hasPrefix("unsupported element <view> at line \(line)"), "\(e.cause)")
     }
+}
+
+// MARK: Expo splash screens (m3 Task 6b)
+
+/// `storyboardIdentifier` becomes a file name; only the forms of `vc-storyboard-identifier*` are accepted.
+@Test func refusesStoryboardIdentifiersOutsideTheVerifiedForms() throws {
+    let vc = #"<viewController storyboardIdentifier="SplashScreenViewController" id="01J-lp-oVM""#
+    for bad in ["", "a/b", ".hidden", " Lead", "Trail ", "Écran", "Tab&#9;bed", "01J-lp-oVM-view-Ze5-6b-2t3",
+                // characters ibtool never compiled here, though printable ASCII
+                "a:b", "a,b", "a@b", "a#b", "a(b)", "a~b", "a=b", "a%b", "a!b", "a\\b", "a&amp;b", "a'b", "a&quot;b",
+                // the view nib's name in another case (one directory, case-insensitive on macOS)
+                "01j-LP-ovm-VIEW-ze5-6B-2T3",
+                String(repeating: "x", count: ViewControllerRule.maxStoryboardIdentifierLength + 1)] {
+        let e = try refusal(of: "vc-storyboard-identifier", [(vc, #"<viewController storyboardIdentifier="\#(bad)" id="01J-lp-oVM""#)])
+        #expect(e.stage == .ib)
+        #expect(e.cause.hasPrefix("unsupported storyboardIdentifier"), "\(bad): \(e.cause)")
+    }
+    // the other forms compile; the identifier names the view-controller nib
+    let r = try compileVariant(of: "vc-storyboard-identifier", [(vc, #"<viewController storyboardIdentifier="A b.c" id="01J-lp-oVM""#)])
+    #expect(r.files.keys.sorted() == ["01J-lp-oVM-view-Ze5-6b-2t3.nib", "A b.c.nib", "Info.plist"])
+    for good in ["Launch Screen.v2_x-y+z", "-1", String(repeating: "x", count: ViewControllerRule.maxStoryboardIdentifierLength)] {
+        let g = try compileVariant(of: "vc-storyboard-identifier", [(vc, #"<viewController storyboardIdentifier="\#(good)" id="01J-lp-oVM""#)])
+        #expect(g.files["\(good).nib"] != nil, "\(good)")
+    }
+}
+
+/// `<accessibility>`: exactly the traits element, the 16 verified trait names, YES/NO values.
+@Test func refusesAccessibilityOutsideTheVerifiedForms() throws {
+    let element = #"<accessibility key="accessibilityConfiguration">"#
+    let traits = #"<accessibilityTraits key="traits" selected="YES"/>"#
+    let cases: [([(String, String)], String)] = [
+        ([(element, #"<accessibility key="accessibilityConfiguration" label="Logo">"#)], #"unsupported attribute label="Logo" on <accessibility>"#),
+        ([(traits, #"<accessibilityTraits key="traits" tabBar="YES"/>"#)], #"unsupported attribute tabBar="YES" on <accessibilityTraits>"#),
+        ([(traits, #"<accessibilityTraits key="traits" selected="true"/>"#)], #"unsupported selected="true" (expected YES or NO)"#),
+        ([(traits, "")], "unsupported <accessibility> without <accessibilityTraits key=\"traits\">"),
+        ([(traits, #"<accessibilityTraits key="other" selected="YES"/>"#)], "unsupported element <accessibilityTraits>"),
+        ([(element, #"<accessibility key="other">"#)], "unsupported element <accessibility>"),
+    ]
+    for (replace, expected) in cases {
+        let e = try #require(throws: XlessError.self) {
+            var xml = try String(contentsOf: CorpusCase(name: "acc-kinds-order").storyboard, encoding: .utf8)
+            for (a, b) in replace {
+                let r = try #require(xml.range(of: a))
+                xml.replaceSubrange(r, with: b)
+            }
+            try StoryboardCompiler.compile(StoryboardParser.parse(Data(xml.utf8)), options: .flagset(named: "universal-16", root: corpusRoot))
+        }
+        #expect(e.stage == .ib)
+        #expect(e.cause.hasPrefix(expected), "\(e.cause)")
+    }
+}
+
+/// `true`/`false` only where `bool-lowercase-grid` proves them; `insetsLayoutMarginsFromSafeArea` only on the root.
+@Test func refusesLowercaseBooleansAndSubviewInsetsOutsideTheGoldens() throws {
+    let iv = #"<imageView id="EXPO-SplashScreen""#
+    for (attr, expected) in [(#"opaque="false""#, #"unsupported opaque="false" (expected YES or NO)"#),
+                             (#"fixedFrame="false""#, #"unsupported fixedFrame="false" (expected YES or NO)"#),
+                             (#"hidden="true""#, #"unsupported attribute hidden="true" on <imageView>"#),
+                             (#"insetsLayoutMarginsFromSafeArea="NO""#, #"unsupported attribute insetsLayoutMarginsFromSafeArea="NO" on <imageView>"#)] {
+        let e = try refusal(of: "real-expo-splash-configured", [(iv, "<imageView \(attr) id=\"EXPO-SplashScreen\"")])
+        #expect(e.cause.hasPrefix(expected), "\(e.cause)")
+    }
+    let e = try refusal(of: "real-expo-splash-configured", [(#"clipsSubviews="true""#, #"clipsSubviews="True""#)])
+    #expect(e.cause.hasPrefix(#"unsupported clipsSubviews="True" (expected YES or NO)"#), "\(e.cause)")
 }

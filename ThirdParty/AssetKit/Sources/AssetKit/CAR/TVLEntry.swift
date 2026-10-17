@@ -23,8 +23,9 @@ enum TVLEntry {
     /// `(1, 0, 0, 0, 0, width, height)` -- `(flags, x, y, z, w, w, h)`.
     case destRect(width: UInt32, height: UInt32)
 
-    /// Type 1004 (8-byte value): slice/scale pair. Reference is `(0, 1.0f)`.
-    case sliceScale
+    /// Type 1004 (8-byte value): slice/scale pair, `(0, scale as Float)`.
+    /// actool writes 1.0 for bitmaps and preserved sources, 0 for colors.
+    case sliceScale(Float)
 
     /// Type 1006 (4-byte value): always 1 in the reference. Likely a
     /// bitmap-count / has-mipmap-stages flag.
@@ -55,11 +56,11 @@ enum TVLEntry {
             w.writeLE(UInt32(0))
             w.writeLE(width)
             w.writeLE(height)
-        case .sliceScale:
+        case .sliceScale(let scale):
             w.writeLE(UInt32(1004))
             w.writeLE(UInt32(8))
             w.writeLE(UInt32(0))
-            w.writeLE(UInt32(Float(1).bitPattern))
+            w.writeLE(scale.bitPattern)
         case .bitmapFlag:
             w.writeLE(UInt32(1006))
             w.writeLE(UInt32(4))

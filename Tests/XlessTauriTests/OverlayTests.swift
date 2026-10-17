@@ -109,3 +109,46 @@ private let minimal = "type: tauri\nbundleID: com.example.a\nteamID: ABCDE12345\
     #expect(throws: XlessError.self) { try OverlayLocation.load(from: writeOverlay(minimal), env: [:]) }
     #expect(throws: XlessError.self) { try OverlayLocation.load(from: URL(fileURLWithPath: "/nonexistent/x.yml"), env: [:]) }
 }
+
+/// `macos:` parses; its `entitlements` resolves against the overlay file like `privacyManifest`.
+@Test func macosBlockParsesAndResolvesEntitlements() throws {
+    let o = try TauriOverlay.parse(yaml: overlayYAML + "\nmacos: { product: My App, minimumOS: \"12.0\", entitlements: mac.entitlements }\n", name: "app")
+    #expect(o.macos == OverlayMac(product: "My App", minimumOS: "12.0", entitlements: "mac.entitlements"))
+    #expect(try TauriOverlay.parse(yaml: overlayYAML, name: "app").macos == nil)
+
+    let dir = FileManager.default.temporaryDirectory.appendingPathComponent("ov-\(UUID().uuidString)/overlays", isDirectory: true)
+    try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+    let url = dir.appendingPathComponent("app.yml")
+    try (overlayYAML + "\nmacos: { entitlements: ../shared/mac.entitlements }\n").write(to: url, atomically: true, encoding: .utf8)
+    let loc = try OverlayLocation.load(from: url, sourceOverride: "/src", env: ["HOME": "/home/u"])
+    #expect(loc.overlay.macos?.entitlements == dir.deletingLastPathComponent().appendingPathComponent("shared/mac.entitlements").standardizedFileURL.path)
+}
+
+/// `macos.infoPlist` resolves against the overlay file like `macos.entitlements`; the top-level (iOS) `infoPlist` is untouched.
+@Test func macosInfoPlistResolvesAgainstTheOverlay() throws {
+    let dir = FileManager.default.temporaryDirectory.appendingPathComponent("ov-\(UUID().uuidString)", isDirectory: true)
+    try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+    let url = dir.appendingPathComponent("app.yml")
+    try (overlayYAML + "\ninfoPlist: src-tauri/gen/apple/app_iOS/Info.plist\nmacos: { infoPlist: mac/Info.plist }\n").write(to: url, atomically: true, encoding: .utf8)
+    let o = try OverlayLocation.load(from: url, sourceOverride: "/src", env: ["HOME": "/home/u"]).overlay
+    #expect(o.macos?.infoPlist == dir.appendingPathComponent("mac/Info.plist").standardizedFileURL.path)
+    #expect(o.infoPlist == "src-tauri/gen/apple/app_iOS/Info.plist")
+}
+
+/// `macos.features` replaces `tauri.features` for the macOS build (an empty list too); absent, `tauri.features` applies.
+@Test func macosFeaturesReplaceTauriFeatures() throws {
+    let base = try TauriOverlay.parse(yaml: overlayYAML, name: "app")   // tauri.features: [ipad]
+    #expect(base.macos?.features == nil && base.macFeatures == ["ipad"])
+    let empty = try TauriOverlay.parse(yaml: overlayYAML + "\nmacos: { features: [] }\n", name: "app")
+    #expect(empty.macos?.features == [] && empty.macFeatures == [] && empty.features == ["ipad"])
+    let own = try TauriOverlay.parse(yaml: overlayYAML + "\nmacos: { features: [desktop-tray, updater] }\n", name: "app")
+    #expect(own.macFeatures == ["desktop-tray", "updater"])
+    #expect(TauriBuilder.macCargoArguments(target: "aarch64-apple-darwin", features: empty.macFeatures)[3] == "tauri/custom-protocol")
+}
+
+@Test func tauriOverlaysTakeAnXcodePin() throws {
+    #expect(try TauriOverlay.parse(yaml: minimal, name: "a").xcode == nil)
+    #expect(try TauriOverlay.parse(yaml: minimal + "xcode: \"26.2\"\n", name: "a").xcode == "26.2")
+    let e = #expect(throws: XlessError.self) { try TauriOverlay.parse(yaml: minimal + "xcode: newest\n", name: "a") }
+    #expect(e?.stage == .config && e?.cause == "xcode 'newest' in overlay a is not an Xcode version")
+}

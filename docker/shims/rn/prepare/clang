@@ -1,0 +1,5 @@
+#!/bin/sh
+# clang during a React Native prepare only (on PATH first while `xless prepare` runs Expo prebuild and CocoaPods):
+# a Darwin-only compile with no target (Expo's ExpoModulesJSI stub dylib) is retargeted to iOS; anything else runs
+# the host clang unchanged (xless PrepareClangShim; contract doc, "Env-only fixes" 5).
+exec xless shim prepare-clang "$@"

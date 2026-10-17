@@ -1,0 +1,44 @@
+{
+  "executable" : {
+    "linkedLibraries" : [
+      "\/usr\/lib\/libc++.1.dylib",
+      "\/System\/Library\/Frameworks\/Foundation.framework\/Foundation",
+      "\/usr\/lib\/libobjc.A.dylib",
+      "\/usr\/lib\/libSystem.B.dylib",
+      "\/System\/Library\/Frameworks\/CoreFoundation.framework\/CoreFoundation",
+      "\/System\/Library\/Frameworks\/UIKit.framework\/UIKit"
+    ],
+    "minos" : "16.4",
+    "platform" : 2,
+    "rpaths" : [
+      "@executable_path\/Frameworks"
+    ]
+  },
+  "files" : [
+    "App",
+    "CoreLibResources.bundle\/Info.plist",
+    "CoreLibResources.bundle\/corelib.txt",
+    "Info.plist",
+    "PkgInfo"
+  ],
+  "frameworks" : {
+
+  },
+  "infoPlist" : {
+    "CFBundleDevelopmentRegion" : "en",
+    "CFBundleExecutable" : "App",
+    "CFBundleIdentifier" : "com.example.podsstyle",
+    "CFBundleInfoDictionaryVersion" : "6.0",
+    "CFBundleName" : "App",
+    "CFBundlePackageType" : "APPL",
+    "CFBundleShortVersionString" : "1.0",
+    "CFBundleSupportedPlatforms" : "[\"iPhoneOS\"]",
+    "DTPlatformName" : "iphoneos",
+    "DTPlatformVersion" : "27.0",
+    "DTSDKName" : "iphoneos27.0",
+    "LSRequiresIPhoneOS" : "true",
+    "MinimumOSVersion" : "16.4",
+    "UIDeviceFamily" : "[1,2]",
+    "UIRequiredDeviceCapabilities" : "[\"arm64\"]"
+  }
+}

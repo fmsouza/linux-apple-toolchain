@@ -1,6 +1,6 @@
-# Tauri v2 iOS apps
+# Tauri v2 apps (iOS and macOS)
 
-xless builds a [Tauri v2](https://v2.tauri.app/) iOS app on Linux and ships it to TestFlight, with no Mac and no Xcode on the build machine. The app repository stays untouched: everything xless needs to know lives in an **overlay** file kept outside it.
+xless builds a [Tauri v2](https://v2.tauri.app/) iOS app on Linux and ships it to TestFlight, and a Tauri v2 macOS app as a notarized DMG ([macOS](#macos)), with no Mac and no Xcode on the build machine. The app repository stays untouched: everything xless needs to know lives in an **overlay** file kept outside it.
 
 ```sh
 make testflight CONFIG=$HOME/ci/my-app.overlay.yml
@@ -12,7 +12,7 @@ make testflight CONFIG=$HOME/ci/my-app.overlay.yml
 - **Project.** The app repository must already be initialised with `tauri ios init`: `src-tauri/gen/apple/project.yml` is committed. xless supports the subset of `project.yml` that `tauri ios init` generates; an unsupported key is refused with its name, and so is a build script it does not know ([`scripts:`](#overlay-reference)).
 - **Build.** Release, arm64, device only. xless runs the frontend build command, compiles the Rust library (`cargo`) and the Swift packages for `aarch64-apple-ios`, and links the app. Then the usual stages: assets, finalize, sign, package, upload and TestFlight delivery ([README](README.md#pipeline)).
 - **Dependencies.** CocoaPods is not run. A pod that is a prebuilt binary is declared as a [`binaryDependencies`](#overlay-reference) entry (url, sha256 pin). Git submodules in the app repository are refused.
-- **Not supported.** Simulator and debug builds, x86_64, Android, macOS, dSYMs, external TestFlight groups, App Store submission.
+- **Not supported.** Simulator and debug builds, x86_64 (iOS), Android, dSYMs, external TestFlight groups, App Store submission.
 
 ## Requirements
 
@@ -46,7 +46,7 @@ Relative paths in the overlay (`source`, `privacyManifest`) resolve against the 
 | `type` | Required. Must be `tauri`. |
 | `source` | The app repository, read-only. Required unless `--source <dir>` (or `$XLESS_SOURCE` with `make testflight`) gives it. It may be a subdirectory of a git checkout. |
 | `tauri.dir` | Directory holding `tauri.conf.json` and `Cargo.toml`. Default `src-tauri`. |
-| `tauri.features` | Cargo features, as `tauri ios build --features`. |
+| `tauri.features` | Cargo features, as `tauri ios build --features`. They apply to the macOS build too unless `macos.features` is set. |
 | `bundleID` | Required. The iOS bundle ID. It overrides the `identifier` in `tauri.conf.json`. |
 | `teamID` | Required. The 10-character Apple team ID. |
 | `version` | `tauri` (default): `CFBundleShortVersionString` comes from `tauri.conf.json`. Or an explicit version. |
@@ -54,17 +54,18 @@ Relative paths in the overlay (`source`, `privacyManifest`) resolve against the 
 | `ios.product`, `ios.minimumOS`, `ios.entitlements` | Overrides for the product name, minimum iOS version and entitlements file. |
 | `assets` | An asset catalog (`.xcassets`) to use instead of the one in `project.yml`. |
 | `launchStoryboard` | A launch storyboard to use instead of the one in `project.yml`. |
-| `infoPlist` | A plist file in the work copy used in place of the target's own Info.plist as the source of the keys merged into the generated one. |
+| `infoPlist` | iOS only. A plist file in the work copy used in place of the target's own Info.plist as the source of the keys merged into the generated one. The macOS build never reads it (it holds Xcode placeholders such as `$(EXECUTABLE_NAME)`); use `macos.infoPlist`. |
 | `privacyManifest` | A `PrivacyInfo.xcprivacy` copied into the app. `finalize` requires one for App Store builds. |
 | `usesNonExemptEncryption` | `ITSAppUsesNonExemptEncryption`, stamped at `finalize`. App Store Connect asks about export compliance when it is missing. |
+| `xcode` | The Xcode whose SDK must build the app, e.g. `"26.2"`; `make testflight`/`make dmg` run in the images `make images XCODE=…` made from it (`xless-tauri:local-<arch>-xcode<version>`) and `prepare` (exit 19) and `build` refuse another SDK; app code compiles with the Swift toolchain that Xcode ships (Ruling R10) ([react-native.md](react-native.md#pinning-the-xcode-sdk)). Default: the image's SDK. |
 | `linkFlags` | Extra linker flags for the app, for example `["-ObjC"]`. |
-| `binaryDependencies` | List of prebuilt dependencies that replace CocoaPods. Each has `url` (https), `sha256` (pinned, 64 hex), `extract` (path inside the archive), `to` (relative path in the work copy), optionally `fixes: { minimumOSVersion: "16.0" }` (rewrites the MinimumOSVersion of the framework's Info.plist) and `linkFlags` (flags this dependency needs). Downloads are cached by hash in `~/.cache/xless/downloads`. An `embed: true` dependency whose framework binary is a static archive is linked but not embedded (the build prints a note); rcodesign cannot sign such a framework, and the code is already in the executable. |
+| `binaryDependencies` | iOS only (`prepare --platform macos` does not install them). List of prebuilt dependencies that replace CocoaPods. Each has `url` (https), `sha256` (pinned, 64 hex), `extract` (path inside the archive), `to` (relative path in the work copy), optionally `fixes: { minimumOSVersion: "16.0" }` (rewrites the MinimumOSVersion of the framework's Info.plist) and `linkFlags` (flags this dependency needs). Downloads are cached by hash in `~/.cache/xless/downloads`. An `embed: true` dependency whose framework binary is a static archive is linked but not embedded (the build prints a note); rcodesign cannot sign such a framework, and the code is already in the executable. |
 | `scripts` | Maps the name of a `project.yml` build script that is not Tauri's own "Build Rust Code" to `ignore`. xless does not run `project.yml` scripts; one that is not listed stops `prepare`. Only ignore a script whose job xless already does or that does not matter for a release. |
 | `testflight` | `groups`, `whatToTest`, `locale`: as in [xless.yml](xless-yml.md#testflight). |
 
 ### Capabilities
 
-xless enables the bundle-ID capabilities that the App Store Connect API can enable. The increased memory limit (`com.apple.developer.kernel.increased-memory-limit`) is not one of them: enable it by hand for the bundle ID at developer.apple.com/account/resources/identifiers. Then run `sign` (or `ship`) again; xless refreshes the provisioning profile once to pick the capability up, and stops with the manual-enable message if the profile still lacks it.
+xless enables the bundle-ID capabilities that the App Store Connect API can enable: on iOS, Push Notifications (`aps-environment`), Associated Domains, AutoFill Credential Provider and App Groups. It cannot create or assign an app group; a group missing from the profile stops `sign` with the portal steps. The increased memory limit (`com.apple.developer.kernel.increased-memory-limit`) is not one of them: enable it by hand for the bundle ID at developer.apple.com/account/resources/identifiers. Then run `sign` (or `ship`) again; xless refreshes the provisioning profile once to pick the capability up, and stops with the manual-enable message if the profile still lacks it.
 
 ### Build numbers
 
@@ -95,7 +96,7 @@ The script works in the `xless-tauri` image (`xless-tauri:local-<arch>`, or `XLE
 
 `--from <stage>` and `--to <stage>` among the extra arguments choose which of the steps run (`--from upload` runs only step 3); other extra arguments go to both `ship` steps. Options and variables are the ones of [One command: TestFlight](README.md#one-command-testflight), plus:
 
-- **Mounts.** The source goes read-only to `/source`, the overlay's folder read-only to `/config`, so a relative `privacyManifest` resolves, and `--source /source` replaces the overlay's own `source:` inside the container. Keep the overlay in its own directory: the folder is visible to the build, so the script stops (exit 2) when it holds the secrets file or one of the secret files, symlinks resolved. Caches (step 2): `~/.cache/xless/work` and `~/.cache/xless/downloads`, and the docker volumes `xless-rustup` and `xless-cargo` for the Rust toolchains; step 3 mounts only the work copy. The first build downloads Rust and compiles the whole dependency graph, which takes several minutes and several GB; later builds are incremental.
+- **Mounts.** The source goes read-only to `/source`, the overlay's folder read-only to `/config`, so a relative `privacyManifest` resolves, and `--source /source` replaces the overlay's own `source:` inside the container. Keep the overlay in its own directory: the folder is visible to the build, so the script stops (exit 2) when it or the source holds the secrets file or one of the secret files. Files are compared by inode, so neither a symlink nor another spelling of the path (letter case on macOS) hides one. It also refuses (exit 2) to mount `/`, your home directory or a directory above it as the source or the overlay's folder. Natively nothing is mounted, and these checks are skipped. Caches (step 2): `~/.cache/xless/work` and `~/.cache/xless/downloads`, and the docker volumes `xless-rustup` and `xless-cargo` for the Rust toolchains; step 3 mounts only the work copy. The first build downloads Rust and compiles the whole dependency graph, which takes several minutes and several GB; later builds are incremental.
 - **`source:`.** The script reads the overlay's `source:` itself, from a plain top-level `source: <path>` line (quotes and a trailing comment are fine). Flow style, anchors or a multi-line value are not understood; set `XLESS_SOURCE` then.
 - **Source override.** `XLESS_SOURCE=<dir>` takes the place of the overlay's `source:`.
 - **Overlay path.** A leading `~/` is expanded, but prefer `$HOME/…` on the command line: `make testflight CONFIG=~/…` reaches make unexpanded under zsh.
@@ -103,17 +104,61 @@ The script works in the `xless-tauri` image (`xless-tauri:local-<arch>`, or `XLE
 
 Without the script, each step is a command: `xless prepare|build|assets|finalize|sign|package|upload --config <overlay> [--source <dir>] --platform ios`. `build` runs `prepare` first. `xless ship` takes `--from <stage>` and `--to <stage>` to run a range, and `xless tauri next-build --config <overlay> [--source <dir>]` prints the build number the next run would use (read-only). Exit codes are the ones in the [README](README.md#pipeline), with `prepare` = 19.
 
+## macOS
+
+`make dmg CONFIG=$HOME/ci/my-app.overlay.yml` builds the app for `aarch64-apple-darwin` and `x86_64-apple-darwin`, merges the two into one universal `.app`, signs it with a Developer ID Application certificate and the hardened runtime, wraps it in a DMG, notarizes the DMG with Apple, staples the ticket and checks that the stapled ticket is in the DMG's signature. It prints the path of `<Product>_<version>_universal.dmg` last. It uses the same overlay as iOS (`bundleID`, `teamID`, `version`, `build`, `tauri`, `usesNonExemptEncryption`), plus an optional `macos:` block; the overlay is read for `--platform macos`, so one overlay can serve both platforms.
+
+```yaml
+macos:
+  product: My App                  # default: productName from tauri.conf.json
+  minimumOS: "11.0"                # default: bundle.macOS.minimumSystemVersion, else 10.13
+  entitlements: macos.entitlements # default: bundle.macOS.entitlements; relative to this file
+  infoPlist: macos.Info.plist      # optional; merged last into Info.plist; relative to this file
+  features: [desktop-tray]         # optional; replaces tauri.features for macOS ([] for none)
+```
+
+The top-level `infoPlist` and `binaryDependencies` are iOS-only: the macOS build ignores them. `tauri.features` applies to the macOS build unless `macos.features` is set, so an iOS-only feature (such as `ipad`) needs `macos.features` without it. `CFBundleVersion` is always the overlay's `build:` (stamped at `finalize`); `bundle.macOS.bundleVersion` in `tauri.conf.json` is ignored.
+
+`tauri.conf.json` is read with `tauri.macos.conf.json` merged over it, as `tauri build` does. xless reproduces the app `tauri build --target universal-apple-darwin --bundles app,dmg` produces for Tauri 2.12.x: `Info.plist` (category, file associations, icon, `LSMinimumSystemVersion`), `bundle.resources` (a list or a source-to-target map, globs included), `bundle.macOS.frameworks` and the other documented bundle keys.
+
+**Prerequisites.**
+
+- The one-time setup from [bootstrap.md](bootstrap.md), step 3: `xless sign bootstrap --type developer-id --out devid-key.pem` creates the Developer ID Application key and certificate. Point `XLESS_DEVID_KEY_FILE` at the key.
+- The App Store Connect API key, as for iOS (`ASC_KEY_ID`, `ASC_ISSUER_ID_FILE`, `ASC_KEY_P8_FILE`). On macOS it is used for two things only: finding the Developer ID certificate (a read-only lookup) and notarization. No distribution key is needed (`XLESS_DIST_KEY_FILE` can stay unset).
+- The `xless-tauri` image, which also carries the tools that build the DMG (`mkfs.hfsplus`, `hfsplus` and `dmg`; there is no `hdiutil` on Linux).
+
+**Build numbers.** There is no App Store Connect build for a Developer ID app. With `build: dated` the build number is `<version>.<YYYYMMDDHHmm>` (UTC), taken from the clock when a run starts and recorded in the work copy; `XLESS_BUILD_NUMBER` or `--build-number` (same form) replaces it. `scripts/testflight.sh --platform macos` skips the `next-build` step and never contacts App Store Connect before signing.
+
+**Key separation.** As for iOS, the app's build runs third-party code and never runs next to a secret:
+
+1. `xless ship --platform macos --to finalize` with no secret file or variable: prepare, build (both architectures), assets, finalize.
+2. `xless ship --platform macos --from sign --to package` with `XLESS_DEVID_KEY_FILE` and the App Store Connect key: sign, then package (build the DMG, sign it, notarize, staple, check the stapled ticket). No build code runs here.
+
+`--from <stage>` and `--to <stage>` among the extra arguments choose the steps; `--from package` reuses the signed app (for example to retry a notarization that failed on the network). The overlay's folder must not hold the Developer ID key either. Exit codes are those of the pipeline: prepare 19, build 12, finalize 14, sign 15, package 16. A notarization the service rejects is a `package` error (16) that names the submission; so is a DMG whose signature has no stapled ticket after `notary-submit --staple` (`rcodesign staple <dmg>` retries the staple alone).
+
+**Known gaps** ([research/parity-known-gaps.md](research/parity-known-gaps.md#tauri-macos)):
+
+- The DMG has a default layout: the app and an `/Applications` link on a plain volume, with no background image, window size or icon positions (tauri-bundler's create-dmg drives Finder for those), and no custom volume icon.
+- Updater artefacts (`.app.tar.gz`, signatures) and the other bundle targets (`pkg`, `msi`, AppImage) are out of scope.
+- A `bundle.macOS.frameworks` entry whose binary is a static archive is linked, not embedded (as on iOS). The overlay's `binaryDependencies` are not installed for macOS.
+- Per-target `bundle.resources` that differ between the two architectures are merged into one universal file when each copy is a thin Mach-O; any other difference stops the build.
+- The binary is stripped by the linker (`-Wl,-x`: local symbols dropped), not by `strip`; cargo's own strip is off.
+
+`xless tauri inspect --config <overlay> --platform macos` prints what a macOS build would do: the identity, the resources, the file associations, the targets and the dated number form. See [below](#xless-tauri-inspect).
+
 ## `xless tauri inspect`
 
 ```sh
-xless tauri inspect --config my-app.overlay.yml [--source <dir>]
+xless tauri inspect --config my-app.overlay.yml [--source <dir>] [--platform ios|macos]
 ```
 
-Prints, read-only (nothing is written, `cargo` is not run), what a build would do: the resolved identity (bundle ID, version, minimum OS), whether the Tauri and CLI versions are in contract, the target's sources and system libraries, how every `project.yml` script is handled (`built-in`, `ignore` or `UNHANDLED`; a `built-in` script, the one that runs `tauri ios xcode-script`, is printed in full, because xless does that step itself and executes nothing else of it), the binary dependencies and the next dated build number (only when App Store Connect credentials are set). Run it first when a `prepare` error is unclear.
+Prints, read-only (nothing is written, `cargo` is not run), what a build would do: the resolved identity (bundle ID, version, minimum OS), whether the Tauri and CLI versions are in contract, the target's sources and system libraries, how every `project.yml` script is handled (`built-in`, `ignore` or `UNHANDLED`; a `built-in` script, the one that runs `tauri ios xcode-script`, is printed in full, because xless does that step itself and executes nothing else of it), the binary dependencies and the next dated build number (only when App Store Connect credentials are set). With `--platform macos` it prints the macOS resolution instead (product, minimum macOS, bundle ID, version, the cargo features (`(macos.features)` when that key set them), the `macos.infoPlist`, the dated build number form `<version>.<YYYYMMDDHHmm>` chosen when a build starts, the `bundle.resources` targets, the number of file associations, the linker wrapper names and the two targets) and never contacts App Store Connect. Run it first when a `prepare` error is unclear.
 
 ## Linux parity test
 
 `make test-tauri-linux` builds `samples/HelloTauri` through `finalize` in the `xless-tauri` image (no credentials, no signing) and compares the result with `samples/HelloTauri/reference/reference.json`, recorded from `tauri ios build` on a Mac: linked libraries, platform and minimum OS, rpaths, files and Info.plist. It exits non-zero on any difference not listed in `samples/HelloTauri/reference/allowed-gaps.txt`; the gaps are explained in [research/parity-known-gaps.md](research/parity-known-gaps.md#tauri-ios).
+
+`make test-tauri-linux` runs the iOS test; `scripts/test-tauri-linux.sh --platform macos` builds the universal app through `finalize` and compares it with `samples/HelloTauri/reference/macos/reference.json` (gaps in `reference/macos/allowed-gaps.txt`), then builds an unsigned DMG of it (no signing, no notarization, no secrets) and checks its file name and root listing against `reference/macos/dmg.json`.
 
 ## Troubleshooting
 

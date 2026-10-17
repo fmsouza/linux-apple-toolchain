@@ -68,3 +68,39 @@ private let inspectOverlayYAML = """
             """))
     }
 }
+
+@Suite struct InspectReportMacTests {
+    private func macSource() throws -> URL {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("inspect-mac-\(UUID().uuidString)")
+        let dir = root.appendingPathComponent("src-tauri")
+        try FileManager.default.createDirectory(at: dir.appendingPathComponent("res/sub"), withIntermediateDirectories: true)
+        try "a".write(to: dir.appendingPathComponent("res/a.txt"), atomically: true, encoding: .utf8)
+        try "b".write(to: dir.appendingPathComponent("res/sub/b.txt"), atomically: true, encoding: .utf8)
+        try #"{"productName":"Acme","version":"1.2.3","identifier":"com.example.acme","build":{"frontendDist":"../dist"},"bundle":{"resources":["res/"],"fileAssociations":[{"ext":["acme"]},{"ext":["txt"]}],"macOS":{"minimumSystemVersion":"12.0"}}}"#
+            .write(to: dir.appendingPathComponent("tauri.conf.json"), atomically: true, encoding: .utf8)
+        return root
+    }
+
+    @Test func goldenMacReport() throws {
+        let overlay = try TauriOverlay.parse(yaml: "type: tauri\nbundleID: com.example.acme\nteamID: ABCDE12345\n", name: "acme")
+        let src = try macSource()
+        let r = try TauriProject.resolveMac(overlay: overlay, source: src)
+        let text = InspectReport.makeMac(resolved: r, overlay: overlay, contract: .init(tauri: "2.13.0", cli: "2.12.1"), source: src)
+        #expect(text == (try fixture("inspect-acme-macos.golden.txt")))
+    }
+
+    /// The report shows the macOS features (`macos.features` replaces `tauri.features`) and the macOS Info.plist only.
+    @Test func macFeaturesAndInfoPlist() throws {
+        let src = try macSource()
+        let base = "type: tauri\nbundleID: com.example.acme\nteamID: ABCDE12345\ntauri: { features: [ipad] }\ninfoPlist: ios/Info.plist\n"
+        func lines(_ yaml: String) throws -> [Substring] {
+            let o = try TauriOverlay.parse(yaml: yaml, name: "acme")
+            return InspectReport.makeMac(resolved: try TauriProject.resolveMac(overlay: o, source: src), overlay: o, contract: .init(tauri: "2.12.0", cli: "2.12.1"), source: src)
+                .split(separator: "\n")
+        }
+        let inherited = try lines(base)
+        #expect(inherited.contains("features: ipad") && inherited.contains("infoPlist: (none)"))
+        let own = try lines(base + "macos: { features: [], infoPlist: /abs/mac.plist }\n")
+        #expect(own.contains("features: (none) (macos.features)") && own.contains("infoPlist: /abs/mac.plist"))
+    }
+}

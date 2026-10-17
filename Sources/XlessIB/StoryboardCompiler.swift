@@ -63,10 +63,11 @@ public enum StoryboardCompiler {
 
         let lowering = ViewNibLowering(doc: doc, options: options)
         let viewNib = try lowering.lower(vc.view)
-        let vcNib = try ViewControllerRule.nib(vcID: vcID, viewID: viewID)
+        let identifier = try ViewControllerRule.storyboardIdentifier(vc, doc: doc)
+        let vcNib = try ViewControllerRule.nib(vcID: vcID, viewID: viewID, storyboardIdentifier: identifier)
         return IBCompileResult(files: [
-            StoryboardcLayout.infoPlistName: StoryboardcLayout.infoPlist(vcID: vcID),
-            StoryboardcLayout.viewControllerNibName(vcID: vcID) + ".nib": NIBArchiveWriter.write(vcNib),
+            StoryboardcLayout.infoPlistName: StoryboardcLayout.infoPlist(vcID: vcID, storyboardIdentifier: identifier),
+            StoryboardcLayout.viewControllerNibName(vcID: vcID, storyboardIdentifier: identifier) + ".nib": NIBArchiveWriter.write(vcNib),
             StoryboardcLayout.viewNibName(vcID: vcID, viewID: viewID) + ".nib": NIBArchiveWriter.write(viewNib),
         ], warnings: lowering.warnings)
     }
@@ -102,11 +103,14 @@ enum LoweringError {
     }
 
     /// A `YES`/`NO` attribute; nil when absent. Any other spelling is refused.
-    static func bool(_ attributes: [String: String], _ key: String, line: Int?) throws -> Bool? {
+    /// With `lowercase`, also `true`/`false` (proven per attribute: `ViewRule.lowercaseBooleans`).
+    static func bool(_ attributes: [String: String], _ key: String, line: Int?, lowercase: Bool = false) throws -> Bool? {
         switch attributes[key] {
         case nil: return nil
         case "YES": return true
         case "NO": return false
+        case "true" where lowercase: return true
+        case "false" where lowercase: return false
         case let other?: throw unsupported("\(key)=\"\(other)\" (expected YES or NO)", line: line)
         }
     }

@@ -3,9 +3,9 @@ dist/
 src-tauri/target/
 src-tauri/gen/schemas/
 src-tauri/plugins/*/.tauri/
-# Logs written by scripts/tauri-ios-reference.sh next to the committed reference.json / calls.json.
-reference/*.jsonl
-reference/build.log
-reference/link.txt
-reference/linkfiles.txt
-reference/compile.json
+# Logs written by scripts/tauri-ios-reference.sh next to the committed reference.json / calls.json (/ dmg.json).
+reference/**/*.jsonl
+reference/**/build.log
+reference/**/link.txt
+reference/**/linkfiles.txt
+reference/**/compile.json

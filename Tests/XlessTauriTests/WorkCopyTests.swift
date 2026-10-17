@@ -247,6 +247,15 @@ private func realGit() throws -> String {
     } catch let e as XlessError {
         #expect(e.stage == .prepare)
         #expect(e.cause.contains("was synced from") && e.fix.contains("rename"), "\(e.cause)")
+        #expect(!e.fix.contains("docker"))
+    }
+    // in a docker volume (scripts/testflight.sh): the fix says how to delete the work copy there
+    var env = ProcessInfo.processInfo.environment; env["XLESS_WORK_VOLUME"] = "xless-rn-work-o-12345678"
+    do {
+        _ = try WorkCopy.sync(source: other, to: work, baseEnvironment: env)
+        Issue.record("expected throw")
+    } catch let e as XlessError {
+        #expect(e.fix.hasSuffix("(it is in the docker volume xless-rn-work-o-12345678: docker run --rm -v xless-rn-work-o-12345678:/w alpine rm -rf /w/\(work.lastPathComponent))"), "\(e.fix)")
     }
 }
 

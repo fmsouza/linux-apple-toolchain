@@ -5,10 +5,10 @@ public struct DarwinSDK: Sendable {
     public let bundle: URL
     public init(bundle: URL = DarwinSDKLocator.bundle()) { self.bundle = bundle }
 
-    static let platformDir = ["iphoneos": "iPhoneOS", "macosx": "MacOSX"]
+    static let platformDir = ["iphoneos": "iPhoneOS", "iphonesimulator": "iPhoneSimulator", "macosx": "MacOSX"]
 
     public func sdkPath(_ name: String) throws -> URL {
-        guard let p = Self.platformDir[name] else { throw XlessError(.sdk, "unknown SDK '\(name)'", fix: "use iphoneos or macosx") }
+        guard let p = Self.platformDir[name] else { throw XlessError(.sdk, "unknown SDK '\(name)'", fix: "use iphoneos, iphonesimulator or macosx") }
         let dir = bundle.appendingPathComponent("Developer/Platforms/\(p).platform/Developer/SDKs")
         let items = (try? FileManager.default.contentsOfDirectory(atPath: dir.path)) ?? []
         // Prefer the versioned directory (iPhoneOS27.0.sdk); the unversioned one may be a symlink.

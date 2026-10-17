@@ -49,14 +49,14 @@ public enum Entitlements {
         ungatedKeys.contains(key) || ungatedPrefixes.contains { key.hasPrefix($0) }
     }
 
+    /// The App Store profile's `aps-environment` wins over the entitlements file's, as when Xcode signs: a project
+    /// says `development`, the distribution profile `production`.
+    static let apsEnvironmentValues: Set<String> = ["development", "production"]
+
     public static func merge(user: [String: Any], profile: [String: Any], platform: Platform,
                              teamID: String, bundleID: String) throws -> [String: Any] {
-        for key in user.keys.sorted() where !managedKeys.contains(key) && profile[key] == nil
-            && !isUngated(key) {
-            let manual = Capabilities.map[key] == nil
-            throw XlessError(.sign, "entitlement '\(key)' is not granted by the provisioning profile for \(bundleID)"
-                             + (manual ? "; xless cannot enable this capability automatically" : ""),
-                             fix: "enable the matching capability for \(bundleID) at developer.apple.com/account/resources/identifiers, then re-run")
+        if let problem = problems(user: user, profile: profile, platform: platform).first {
+            throw refusal(problem, platform: platform, teamID: teamID, bundleID: bundleID)
         }
         var out = user.filter { !managedKeys.contains($0.key) }
         let appID = "\(teamID).\(bundleID)"
@@ -66,9 +66,147 @@ public enum Entitlements {
             out["application-identifier"] = appID
             out["get-task-allow"] = false
             if profile["beta-reports-active"] as? Bool == true { out["beta-reports-active"] = true }
+            if let mine = out["aps-environment"] as? String, apsEnvironmentValues.contains(mine),
+               let theirs = profile["aps-environment"] as? String { out["aps-environment"] = theirs }
         case .macos:
             out["com.apple.application-identifier"] = appID
         }
         return out
+    }
+
+    // MARK: Signing-time build settings
+
+    /// Build settings Xcode defines only while it signs, both `<team ID>.`. The build stage leaves them in the
+    /// entitlements it records (`entitlements.json`), as written in the project's entitlements file.
+    static let signingPrefixes = ["AppIdentifierPrefix", "TeamIdentifierPrefix"]
+
+    /// Every string value with `$(AppIdentifierPrefix)` / `$(TeamIdentifierPrefix)` (or the `${…}` form) set to `<teamID>.`.
+    public static func expandSigningPrefixes(_ ents: [String: Any], teamID: String) -> [String: Any] {
+        mapStrings(ents) { s in
+            guard s.contains("$") else { return s }
+            var s = s
+            for name in signingPrefixes { for ref in ["$(\(name))", "${\(name)}"] { s = s.replacingOccurrences(of: ref, with: teamID + ".") } }
+            return s
+        }
+    }
+
+    /// The overlay's `entitlements:` edits: `remove` drops top-level keys, `replace` rewrites every string value.
+    public static func rewrite(_ ents: [String: Any], with rewrites: EntitlementRewrites) -> [String: Any] {
+        if rewrites.isEmpty { return ents }
+        let kept = ents.filter { !rewrites.remove.contains($0.key) }
+        return mapStrings(kept) { rewrites.apply(to: $0) }
+    }
+
+    static func mapStrings(_ dict: [String: Any], _ f: (String) -> String) -> [String: Any] {
+        func map(_ v: Any) -> Any {
+            if let s = v as? String { return f(s) }
+            if let d = v as? [String: Any] { return d.mapValues(map) }
+            if let a = v as? [Any] { return a.map(map) }
+            return v
+        }
+        return dict.mapValues(map)
+    }
+
+    // MARK: What a profile grants
+
+    /// A gated entitlement the profile does not grant: the key is absent, or (iOS, `valueCheckedKeys`) some of its
+    /// values are not among those the profile lists.
+    enum Problem: Equatable {
+        case missing(key: String)
+        case notAllowed(key: String, values: [String], allowed: [String])
+        var key: String { switch self { case .missing(let k), .notAllowed(let k, _, _): k } }
+    }
+
+    static let keychainGroupsKey = "keychain-access-groups"
+    static let appGroupsKey = "com.apple.security.application-groups"
+    static let associatedDomainsKey = "com.apple.developer.associated-domains"
+    /// Keys whose values an iOS profile lists: keychain groups as team patterns (`TEAM.*`), app groups as the groups
+    /// assigned to the identifier, associated domains as `*`.
+    static let valueCheckedKeys: Set<String> = [keychainGroupsKey, appGroupsKey, associatedDomainsKey]
+
+    static func problems(user: [String: Any], profile: [String: Any], platform: Platform) -> [Problem] {
+        var out: [Problem] = []
+        for key in user.keys.sorted() where !managedKeys.contains(key) && !isUngated(key) {
+            guard let granted = profile[key] else { out.append(.missing(key: key)); continue }
+            guard platform == .ios, valueCheckedKeys.contains(key), let value = user[key] else { continue }
+            let allowed = strings(granted)
+            let refused = strings(value).filter { v in !allowed.contains { matches(v, pattern: $0) } }
+            if !refused.isEmpty { out.append(.notAllowed(key: key, values: refused, allowed: allowed)) }
+        }
+        return out
+    }
+
+    /// A string, or the strings of an array; anything else lists nothing.
+    static func strings(_ v: Any) -> [String] {
+        if let s = v as? String { return [s] }
+        return (v as? [Any])?.compactMap { $0 as? String } ?? []
+    }
+
+    /// Profile patterns: `*` allows anything, a trailing `*` a prefix (`ABCDE12345.*`), anything else itself.
+    static func matches(_ value: String, pattern: String) -> Bool {
+        if pattern.hasSuffix("*") { return value.hasPrefix(pattern.dropLast()) }
+        return value == pattern
+    }
+
+    static func refusal(_ problem: Problem, platform: Platform, teamID: String, bundleID: String) -> XlessError {
+        let portal = "developer.apple.com/account/resources/identifiers"
+        switch problem {
+        case .missing(let key):
+            let manual = Capabilities.map(for: platform)[key] == nil
+            let name = Capabilities.portalNames[key].map { " (\($0))" } ?? ""
+            return XlessError(.sign, "entitlement '\(key)' is not granted by the provisioning profile for \(bundleID)"
+                              + (manual ? "; xless cannot enable this capability automatically" : ""),
+                              fix: "enable the matching capability\(name) for \(bundleID) at \(portal), then re-run. \(finishFirst)")
+        // `SignStage` refuses missing app groups for all bundles at once (`checkAppGroups`) before merging; this is the
+        // backstop for a direct `merge` caller.
+        case .notAllowed(let key, let values, _) where key == appGroupsKey:
+            return appGroupRefusal(values.map { ($0, [bundleID]) })
+        case .notAllowed(let key, let values, let allowed):
+            let cause = "entitlement '\(key)' value\(values.count == 1 ? "" : "s") \(values.map { "'\($0)'" }.joined(separator: ", ")) "
+                + "\(values.count == 1 ? "is" : "are") not allowed by the provisioning profile for \(bundleID) (it allows: \(allowed.isEmpty ? "nothing" : allowed.joined(separator: ", ")))"
+            if key == keychainGroupsKey {
+                return XlessError(.sign, cause, fix: "a keychain group must start with the signing team's prefix \(teamID).: write it as $(AppIdentifierPrefix)<group> in the entitlements file, or map it with the overlay's identifiers.replace")
+            }
+            return XlessError(.sign, cause, fix: "configure the capability for \(bundleID) at \(portal) so its profile allows these values, or change them with the overlay's identifiers.replace, then re-run")
+        }
+    }
+
+    /// Every run that still finds something missing deletes and recreates the affected profiles.
+    static let finishFirst = "Finish every portal step before re-running: each run regenerates the profiles that still lack something"
+
+    // MARK: App groups
+
+    /// iOS: every app group a bundle's entitlements name must be assigned to its identifier, so that its profile lists
+    /// it. App Store Connect's API can neither create an app group nor assign one (Apple's OpenAPI spec 4.5.1 has no
+    /// app-group resource and no group setting), so a missing group is one refusal with the portal steps for all bundles.
+    static func checkAppGroups(_ bundles: [(bundleID: String, user: [String: Any], profile: [String: Any])]) throws {
+        var missing: [(group: String, bundleIDs: [String])] = []
+        for b in bundles {
+            guard let value = b.user[appGroupsKey] else { continue }
+            let allowed = b.profile[appGroupsKey].map(strings) ?? []
+            for group in strings(value) where !allowed.contains(where: { matches(group, pattern: $0) }) {
+                if let i = missing.firstIndex(where: { $0.group == group }) { missing[i].bundleIDs.append(b.bundleID) }
+                else { missing.append((group, [b.bundleID])) }
+            }
+        }
+        if !missing.isEmpty { throw appGroupRefusal(missing) }
+    }
+
+    static func appGroupRefusal(_ missing: [(group: String, bundleIDs: [String])]) -> XlessError {
+        let groups = missing.map(\.group)
+        let ids = missing.flatMap(\.bundleIDs).reduce(into: [String]()) { if !$0.contains($1) { $0.append($1) } }
+        let cause = (missing.count == 1
+            ? "app group \(groups[0]) is not in the provisioning profile\(ids.count == 1 ? "" : "s") of \(ids.joined(separator: ", "))"
+            : "app groups are missing from provisioning profiles: " + missing.map { "\($0.group) (\($0.bundleIDs.joined(separator: ", ")))" }.joined(separator: "; "))
+            + "; the App Store Connect API cannot create or assign app groups"
+        let assign = ids.map { id in
+            "\(id) → App Groups → Configure → select \(missing.filter { $0.bundleIDs.contains(id) }.map(\.group).joined(separator: ", ")) → Save"
+        }.joined(separator: "; ")
+        let fix = "at developer.apple.com/account/resources/identifiers: (1) create the group: Identifiers → + → App Groups → "
+            + "Continue → identifier \(groups.joined(separator: ", then another with ")) → Register (skip a group that exists); "
+            + "(2) on each App ID (App Groups is enabled already): \(assign); (3) re-run (xless regenerates the profiles). "
+            + "A test build under another team: map the group to one this team owns with the overlay's identifiers.replace. "
+            + finishFirst
+        return XlessError(.sign, cause, fix: fix)
     }
 }

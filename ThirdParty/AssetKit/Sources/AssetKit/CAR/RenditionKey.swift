@@ -31,6 +31,8 @@ struct RenditionKey: Hashable, Sendable {
         case appIcon = 220
         /// Used by UIImage(named:) for generic `.imageset` assets.
         case image = 181
+        /// Named colors (`.colorset`), as actool 27.0 keys them (element 85).
+        case color = 217
         /// Slot for preserved-source vector renditions (SVG). Reference
         /// `actool` output places the SVG source rendition under this part
         /// rather than `image`; bitmap variants rasterised from the SVG
@@ -61,8 +63,8 @@ struct RenditionKey: Hashable, Sendable {
                 self.dimension2 = 0
             }
         case .color:
-            self.element = 0
-            self.part = 0
+            self.element = Element.bitmap.rawValue
+            self.part = Part.color.rawValue
             self.dimension2 = 0
         case .preservedSource(let body):
             self.element = Element.bitmap.rawValue

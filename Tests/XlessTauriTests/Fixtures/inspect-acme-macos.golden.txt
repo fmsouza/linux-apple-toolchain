@@ -1,0 +1,34 @@
+[project]
+overlay: acme
+platform: macos
+bundleID: com.example.acme
+teamID: ABCDE12345
+version: 1.2.3
+product: Acme
+minimumOS: 12.0
+features: (none)
+entitlements: (none)
+infoPlist: (none)
+usesNonExemptEncryption: (unset)
+
+[contract]
+supported: 2.12.x
+tauri: 2.13.0
+cli: 2.12.1
+status: OFF CONTRACT
+
+[bundle]
+frontendDist: ../dist
+beforeBuildCommand: (none)
+resources: res/a.txt, res/sub/b.txt
+fileAssociations: 2
+
+[link]
+targets: aarch64-apple-darwin x86_64-apple-darwin
+linkerWrapper: xless-macos-cc-arm64, xless-macos-cc-x86_64
+stripFlag: -Wl,-x
+
+[build]
+scheme: dated
+number: 1.2.3.<YYYYMMDDHHmm> (chosen when a build starts)
+next: (no App Store Connect lookup for macOS)

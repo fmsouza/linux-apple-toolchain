@@ -8,17 +8,28 @@ import XlessCore
 /// [`UIUserInteractionDisabled`], `UIAutoresizeSubviews`, [`UIAutoresizingMask`], [`UIContentMode`], [`UIClipsToBounds`],
 /// [`UITintColor`], [`UIViewDoesNotTranslateAutoresizingMaskIntoConstraints`], [`UIViewAutolayoutConstraints`],
 /// [`UIViewContentHuggingPriority`], [`UIViewContentCompressionResistancePriority`], [`UIViewLayoutGuides`],
-/// `UIViewSemanticContentAttribute`, `UIViewLargeContentStoredProperties`, then the class-specific keys
-/// (`ImageViewRule`, `LabelRule`).
+/// [`UIViewInsetsLayoutMarginsFromSafeArea`, root view only], `UIViewSemanticContentAttribute`,
+/// `UIViewLargeContentStoredProperties`, then the class-specific keys (`ImageViewRule`, `LabelRule`).
 enum ViewRule {
     /// Attributes of plain `<view>` subviews, each proven by a golden: `view-opaque-no`, `view-userinteraction-no`,
     /// `view-clips`, `view-contentmode-*`, `view-hugging-*`, and the spellings Xcode does not write
     /// (`opaque="YES"`, `clipsSubviews="NO"`, `userInteractionEnabled="YES"`, `fixedFrame="NO"`,
-    /// `translatesAutoresizingMaskIntoConstraints` YES or absent) by `view-attrs-explicit`.
+    /// `translatesAutoresizingMaskIntoConstraints` YES or absent) by `view-attrs-explicit`. `userLabel` (Interface
+    /// Builder's outline name) changes nothing on any view kind (`view-userlabel-grid`).
     static let subviewAttributes: Set<String> = [
         "id", "contentMode", "fixedFrame", "translatesAutoresizingMaskIntoConstraints", "opaque",
-        "userInteractionEnabled", "clipsSubviews", "horizontalHuggingPriority", "verticalHuggingPriority",
+        "userInteractionEnabled", "clipsSubviews", "horizontalHuggingPriority", "verticalHuggingPriority", "userLabel",
     ]
+
+    /// Subview attributes that ibtool also reads in expo-splash-screen's lowercase spelling, `true`/`false`, exactly
+    /// as YES/NO (`bool-lowercase-grid`: each value on a plain view, an image view and a label, all constrained).
+    static let lowercaseBooleans: Set<String> = ["clipsSubviews", "userInteractionEnabled", "translatesAutoresizingMaskIntoConstraints"]
+
+    /// A boolean attribute of `v`: YES/NO, or for subviews also `true`/`false` where proven (`lowercaseBooleans`).
+    /// The root view (the one with a `key`) keeps the strict YES/NO.
+    static func flag(_ v: IBView, _ key: String) throws -> Bool? {
+        try LoweringError.bool(v.attributes, key, line: v.line, lowercase: v.key == nil && lowercaseBooleans.contains(key))
+    }
 
     /// What a view's keys refer to besides its own attributes.
     struct Parts {
@@ -34,21 +45,19 @@ enum ViewRule {
     /// Writes the common `UIView` keys of `v` into `ref`.
     static func encode(_ v: IBView, into ref: ObjectRef, parts: Parts, lowering l: ViewNibLowering) throws {
         let b = l.b
-        let a = v.attributes
         b.set(ref, "UIBounds", ArchiveBuilder.doubles([0, 0, parts.size.width, parts.size.height]))
         b.set(ref, "UICenter", ArchiveBuilder.doubles([parts.center.x, parts.center.y]))
         if !parts.subviews.isEmpty { b.set(ref, "UISubviews", b.array(parts.subviews, mutable: true)) }
         if let bg = v.colors["backgroundColor"] { b.set(ref, "UIBackgroundColor", try ColorRule.encode(bg, doc: l.doc, into: b)) }
         b.set(ref, "UIDeepDrawRect", .bool(true))
-        let line = v.line
-        if try LoweringError.bool(a, "opaque", line: line) != false { b.set(ref, "UIOpaque", .bool(true)) }
-        if try LoweringError.bool(a, "userInteractionEnabled", line: line) == false { b.set(ref, "UIUserInteractionDisabled", .bool(true)) }
+        if try flag(v, "opaque") != false { b.set(ref, "UIOpaque", .bool(true)) }
+        if try flag(v, "userInteractionEnabled") == false { b.set(ref, "UIUserInteractionDisabled", .bool(true)) }
         b.set(ref, "UIAutoresizeSubviews", .bool(true))
         let mask = try autoresizingMask(v, lowering: l)
         if mask != 0 { b.set(ref, "UIAutoresizingMask", try ArchiveBuilder.int(mask)) }
         let mode = try contentMode(v)
         if mode != 0 { b.set(ref, "UIContentMode", try ArchiveBuilder.int(mode)) }
-        if try LoweringError.bool(a, "clipsSubviews", line: line) == true { b.set(ref, "UIClipsToBounds", .bool(true)) }
+        if try flag(v, "clipsSubviews") == true { b.set(ref, "UIClipsToBounds", .bool(true)) }
         // The system `tintColor` as a tint is the default: ibtool writes no key for it (`image-tint-default`,
         // `color-default-forms`; as a background or text color it is encoded like any system color).
         if let tint = v.colors["tintColor"] {
@@ -58,20 +67,26 @@ enum ViewRule {
         // Only a view that takes part in a constraint gets the key; `fixedFrame="YES"` or no constraint means
         // autoresizing (`image-catalog-*`, `image-with-constraints`, `view-attrs-explicit`, `view-translates-unconstrained`).
         if parts.constrained,
-           try LoweringError.bool(a, "translatesAutoresizingMaskIntoConstraints", line: line) == false,
-           try LoweringError.bool(a, "fixedFrame", line: line) != true {
+           try flag(v, "translatesAutoresizingMaskIntoConstraints") == false,
+           try flag(v, "fixedFrame") != true {
             b.set(ref, "UIViewDoesNotTranslateAutoresizingMaskIntoConstraints", .bool(true))
         }
         if !parts.constraints.isEmpty { b.set(ref, "UIViewAutolayoutConstraints", b.array(parts.constraints, mutable: true)) }
         if let hugging = try hugging(v) { b.set(ref, "UIViewContentHuggingPriority", b.string(hugging)) }
         if let resistance = try compressionResistance(v) { b.set(ref, "UIViewContentCompressionResistancePriority", b.string(resistance)) }
         if !parts.layoutGuides.isEmpty { b.set(ref, "UIViewLayoutGuides", b.array(parts.layoutGuides, mutable: true)) }
+        // Root view only (`rootAttributes`): NO gives int8 0 after the layout guides, in safe-area and legacy mode;
+        // YES gives nothing (`root-insets-no`, `root-insets-no-safearea`, `root-insets-no-legacy`, `root-insets-yes`).
+        if try flag(v, "insetsLayoutMarginsFromSafeArea") == false { b.set(ref, "UIViewInsetsLayoutMarginsFromSafeArea", .int8(0)) }
         b.set(ref, "UIViewSemanticContentAttribute", .int8(0))
         b.set(ref, "UIViewLargeContentStoredProperties", .null)
     }
 
-    /// The root view: only what every corpus root has (`key`, `id`, `contentMode="scaleToFill"`).
-    static let rootAttributes: Set<String> = ["key", "id", "contentMode"]
+    /// The root view: what every corpus root has (`key`, `id`, `contentMode="scaleToFill"`), plus the three attributes
+    /// of Expo's template (YES/NO only): `userInteractionEnabled` (`root-userinteraction-no`, `-yes`: the subviews'
+    /// `UIUserInteractionDisabled`), `insetsLayoutMarginsFromSafeArea` (`root-insets-*`) and `userLabel` (no effect,
+    /// `view-userlabel-grid`).
+    static let rootAttributes: Set<String> = ["key", "id", "contentMode", "userInteractionEnabled", "insetsLayoutMarginsFromSafeArea", "userLabel"]
 
     /// Checks that a `<view>` (root or plain subview) uses only what these rules encode.
     static func checkSupported(_ v: IBView, isRoot: Bool, lowering l: ViewNibLowering) throws {
@@ -92,9 +107,11 @@ enum ViewRule {
                             nilKeys: Set<String> = [], allowsFont: Bool = false) throws {
         try LoweringError.checkAttributes(v.attributes, known: attributes, element: v.kind.rawValue, line: v.line)
         _ = try contentMode(v)
-        for key in ["opaque", "userInteractionEnabled", "clipsSubviews", "fixedFrame", "translatesAutoresizingMaskIntoConstraints"] {
-            _ = try LoweringError.bool(v.attributes, key, line: v.line)
+        for key in ["opaque", "userInteractionEnabled", "clipsSubviews", "fixedFrame", "translatesAutoresizingMaskIntoConstraints",
+                    "insetsLayoutMarginsFromSafeArea"] {
+            _ = try flag(v, key)
         }
+        _ = try AccessibilityRule.value(v)
         _ = try hugging(v)
         _ = try compressionResistance(v)
         if let raw = l.doc.element(at: v.rawPath), let rect = raw.children.first(where: { $0.name == "rect" && $0.attributes["key"] != "frame" }) {

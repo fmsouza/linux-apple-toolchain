@@ -3,7 +3,7 @@ import XlessCore
 import XlessMachO
 
 /// Puts the linked executable into `<Product>.app` the way Xcode's build of the Tauri target does: Info.plist, folder
-/// references and embedded frameworks. The asset catalog and launch storyboard are compiled later by the `assets`
+/// references (with bundle.resources staged into `assets/` first, as tauri-cli does) and embedded frameworks. The asset catalog and launch storyboard are compiled later by the `assets`
 /// stage; DT* keys and the SDK version by `finalize`.
 public enum AppAssembler {
     public static func assemble(resolved: ResolvedTauri, workRoot: URL, executable: URL, into appDir: URL,
@@ -27,6 +27,12 @@ public enum AppAssembler {
             }
             try fm.copyItem(at: src, to: app.appendingPathComponent("PrivacyInfo.xcprivacy"))
         }
+
+        // bundle.resources, staged into gen/apple/assets/ with Tauri's path mapping, as `tauri ios build` does (shipped
+        // through the `assets` folder reference; the Mac reference has assets/resources/hello.txt).
+        let tauriDir = workRoot.appendingPathComponent(resolved.tauriDir)
+        let resources = try TauriMacBundler.resourceMappings(resources: (resolved.tauri.raw["bundle"] as? [String: Any])?["resources"], tauriDir: tauriDir)
+        try stageResources(resources, resolved: resolved, workRoot: workRoot)
 
         // Folder references are copied as folders. tauri-build creates `assets/` (empty for an app without bundle
         // resources; the Mac reference ships it empty), so a missing one becomes an empty folder too.
@@ -70,6 +76,42 @@ public enum AppAssembler {
         return app
     }
 
+    /// The work-copy-relative record of the files xless copied into `gen/apple/assets/` (one path per line, relative to
+    /// `assets/`).
+    static let resourcesManifest = ".xless/ios-resources.txt"
+
+    /// Copies `resources` into `<appleDir>/assets/<target>`. The files a previous build copied (`resourcesManifest`) are
+    /// removed first, so a resource dropped from bundle.resources does not ship; a file the app's repository tracks
+    /// (`.xless/tracked.txt`) is never removed.
+    static func stageResources(_ resources: [TauriMacBundler.Resource], resolved: ResolvedTauri, workRoot: URL) throws {
+        let fm = FileManager.default
+        let assets = workRoot.appendingPathComponent("\(resolved.appleDir)/assets", isDirectory: true)
+        let manifest = workRoot.appendingPathComponent(resourcesManifest)
+        let tracked = Set((try? String(contentsOf: workRoot.appendingPathComponent(".xless/tracked.txt"), encoding: .utf8))?
+            .split(separator: "\0").map(String.init) ?? [])
+        let previous = (try? String(contentsOf: manifest, encoding: .utf8))?.split(separator: "\n").map(String.init) ?? []
+        for target in previous where !target.split(separator: "/").contains("..") && !tracked.contains("\(resolved.appleDir)/assets/\(target)") {
+            var url = assets.appendingPathComponent(target)
+            try? fm.removeItem(at: url)
+            // Directories left empty by the removal go too, up to (not including) assets/.
+            url = url.deletingLastPathComponent()
+            while url.standardizedFileURL.path.count > assets.standardizedFileURL.path.count,
+                  (try? fm.contentsOfDirectory(atPath: url.path))?.isEmpty == true {
+                try? fm.removeItem(at: url)
+                url = url.deletingLastPathComponent()
+            }
+        }
+        try fm.createDirectory(at: manifest.deletingLastPathComponent(), withIntermediateDirectories: true)
+        // Recorded before copying, so a copy that fails part-way is still cleaned up by the next build.
+        try resources.map { "\($0.target)\n" }.joined().write(to: manifest, atomically: true, encoding: .utf8)
+        for res in resources {
+            let dst = assets.appendingPathComponent(res.target)
+            try fm.createDirectory(at: dst.deletingLastPathComponent(), withIntermediateDirectories: true)
+            try? fm.removeItem(at: dst)
+            try fm.copyItem(at: res.source.resolvingSymlinksInPath(), to: dst)
+        }
+    }
+
     /// `info.path` (or the overlay's `infoPlist`), with `<tauriDir>/Info.ios.plist` dict-merged over it (as tauri-cli
     /// does), then `info.properties`; `$(VAR)` placeholders expanded; then the bundle identity and the keys Xcode's build
     /// adds from build settings (MinimumOSVersion, CFBundleSupportedPlatforms, UIDeviceFamily).
@@ -81,6 +123,9 @@ public enum AppAssembler {
         var info = try Plist.read(workRoot.appendingPathComponent(infoPath), stage: .build)
         let iosPlist = workRoot.appendingPathComponent("\(resolved.tauriDir)/Info.ios.plist")
         if FileManager.default.fileExists(atPath: iosPlist.path) { info = deepMerge(info, try Plist.read(iosPlist, stage: .build)) }
+        // bundle.fileAssociations → CFBundleDocumentTypes (and UTExportedTypeDeclarations), as tauri-cli writes them into
+        // the target's Info.plist.
+        for (k, v) in try TauriMacBundler.fileAssociationsPlist((resolved.tauri.raw["bundle"] as? [String: Any])?["fileAssociations"]) { info[k] = v }
         for (k, v) in resolved.target.infoProperties { info[k] = v }
 
         var vars = resolved.target.settings

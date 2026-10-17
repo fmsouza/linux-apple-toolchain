@@ -1,0 +1,58 @@
+{
+  "HelloExtension.appex": {
+    "executable": {
+      "linkedLibraries": [
+        "/System/Library/Frameworks/Foundation.framework/Foundation",
+        "/usr/lib/libobjc.A.dylib",
+        "/usr/lib/libSystem.B.dylib",
+        "/System/Library/Frameworks/UIKit.framework/UIKit",
+        "/usr/lib/swift/libswiftCore.dylib",
+        "/usr/lib/swift/libswiftCoreFoundation.dylib",
+        "/usr/lib/swift/libswiftCoreImage.dylib",
+        "/usr/lib/swift/libswiftCoreLocation.dylib",
+        "/usr/lib/swift/libswiftDarwin.dylib",
+        "/usr/lib/swift/libswiftDispatch.dylib",
+        "/usr/lib/swift/libswiftMetal.dylib",
+        "/usr/lib/swift/libswiftOSLog.dylib",
+        "/usr/lib/swift/libswiftObjectiveC.dylib",
+        "/usr/lib/swift/libswiftQuartzCore.dylib",
+        "/usr/lib/swift/libswiftSpatial.dylib",
+        "/usr/lib/swift/libswiftUniformTypeIdentifiers.dylib",
+        "/usr/lib/swift/libswiftXPC.dylib",
+        "/usr/lib/swift/libswiftos.dylib",
+        "/usr/lib/swift/libswiftsimd.dylib"
+      ],
+      "minos": "17.0",
+      "platform": 2,
+      "rpaths": [
+        "/usr/lib/swift",
+        "@executable_path/Frameworks",
+        "@executable_path/../../Frameworks"
+      ]
+    },
+    "files": [
+      "HelloExtension",
+      "Info.plist"
+    ],
+    "frameworks": {},
+    "infoPlist": {
+      "CFBundleDevelopmentRegion": "en",
+      "CFBundleDisplayName": "Hello",
+      "CFBundleExecutable": "HelloExtension",
+      "CFBundleIdentifier": "com.example.hellorn.HelloExtension",
+      "CFBundleInfoDictionaryVersion": "6.0",
+      "CFBundleName": "HelloExtension",
+      "CFBundlePackageType": "XPC!",
+      "CFBundleShortVersionString": "1.0.0",
+      "CFBundleSupportedPlatforms": "[\"iPhoneOS\"]",
+      "DTPlatformName": "iphoneos",
+      "DTPlatformVersion": "27.0",
+      "DTSDKName": "iphoneos27.0",
+      "MinimumOSVersion": "17.0",
+      "NSExtension": "{\"NSExtensionAttributes\":{\"NSExtensionActivationRule\":{\"NSExtensionActivationSupportsText\":true}},\"NSExtensionPointIdentifier\":\"com.apple.ui-services\",\"NSExtensionPrincipalClass\":\"HelloExtension.ActionViewController\"}",
+      "RCTNewArchEnabled": "true",
+      "UIDeviceFamily": "[1,2]",
+      "UIRequiredDeviceCapabilities": "[\"arm64\"]"
+    }
+  }
+}

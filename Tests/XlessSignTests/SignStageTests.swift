@@ -9,7 +9,10 @@ import Foundation
 struct SignFixture {
     let project: URL, input: URL, outputDir: URL, key: SigningKey, transport: MockTransport, config: ProjectConfig
 
-    init(profileEntitlements: [String: Any], userEntitlements: [String: Any] = [:], teamID: String = "ABCDE12345", tail: [(Int, String)]? = nil) throws {
+    /// `absoluteEntitlements`: the entitlements file lives outside the project and xless.yml names it by absolute path (as a
+    /// Tauri overlay's `macos.entitlements` does once `OverlayLocation.load` resolved it).
+    init(profileEntitlements: [String: Any], userEntitlements: [String: Any] = [:], teamID: String = "ABCDE12345", tail: [(Int, String)]? = nil,
+         absoluteEntitlements: Bool = false) throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent("sign-\(UUID())", isDirectory: true)
         project = root.appendingPathComponent("proj", isDirectory: true)
         input = root.appendingPathComponent("final/X.app", isDirectory: true)
@@ -18,14 +21,16 @@ struct SignFixture {
         try FileManager.default.createDirectory(at: input, withIntermediateDirectories: true)
         try Plist.write(["CFBundleExecutable": "X", "CFBundleIdentifier": "a.b"], to: input.appendingPathComponent("Info.plist"), stage: .sign)
         try Data("not a Mach-O".utf8).write(to: input.appendingPathComponent("X"))
-        try Plist.write(userEntitlements, to: project.appendingPathComponent("ios.entitlements"), format: .xml, stage: .sign)
+        let entitlements = absoluteEntitlements ? root.appendingPathComponent("elsewhere/ios.entitlements") : project.appendingPathComponent("ios.entitlements")
+        try FileManager.default.createDirectory(at: entitlements.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try Plist.write(userEntitlements, to: entitlements, format: .xml, stage: .sign)
         config = try ProjectConfig.parse(yaml: """
         bundleID: a.b
         teamID: \(teamID)
         version: "1.0"
         build: 1
         platforms:
-          ios: { minimumOS: "17.0", product: X, entitlements: ios.entitlements }
+          ios: { minimumOS: "17.0", product: X, entitlements: "\(absoluteEntitlements ? entitlements.path : "ios.entitlements")" }
         """)
         key = try SigningKey.generate()
         let profile = try fakeProfile(profileEntitlements).base64EncodedString()
@@ -51,6 +56,10 @@ struct SignFixture {
     }
 }
 
+/// Portal-only capabilities: the App Store Connect API has no capability type for them (ruling R13).
+let appAttest = "com.apple.developer.devicecheck.appattest-environment"
+let ageRange = "com.apple.developer.declared-age-range"
+
 func teamProfile() -> [String: Any] { ["application-identifier": "ABCDE12345.a.b", "com.apple.developer.team-identifier": "ABCDE12345",
                                   "beta-reports-active": true, "get-task-allow": false] }
 
@@ -66,14 +75,14 @@ func refreshSteps(oldProfile: String, fresh: [String: Any]) throws -> [(Int, Str
 
 @Test func entitlementGateFailureLeavesNoSignedBundle() async throws {
     let old = try fakeProfile(teamProfile()).base64EncodedString()
-    let f = try SignFixture(profileEntitlements: teamProfile(), userEntitlements: ["aps-environment": "production"], tail: [
+    let f = try SignFixture(profileEntitlements: teamProfile(), userEntitlements: [ageRange: true], tail: [
         (200, #"{"data":[{"type":"profiles","id":"P1","attributes":{"name":"xless a.b IOS_APP_STORE","profileState":"ACTIVE","profileType":"IOS_APP_STORE","profileContent":"\#(old)","expirationDate":"\#(future)"}}]}"#),
         (200, #"{"data":[{"type":"certificates","id":"C1"}]}"#),
         (200, #"{"data":{"type":"bundleIds","id":"B1"}}"#),
     ] + (try refreshSteps(oldProfile: old, fresh: teamProfile())))
     try FileManager.default.createDirectory(at: f.outputDir.appendingPathComponent("X.app"), withIntermediateDirectories: true)   // stale
     do { _ = try await f.run(); Issue.record("expected throw") }
-    catch let e as XlessError { #expect(e.stage == .sign); #expect(e.cause.contains("aps-environment")) }
+    catch let e as XlessError { #expect(e.stage == .sign); #expect(e.cause.contains(ageRange)) }
     #expect(f.leftApps.isEmpty)
     #expect(!FileManager.default.fileExists(atPath: f.outputDir.path + ".partial"))
 }
@@ -100,8 +109,8 @@ func refreshSteps(oldProfile: String, fresh: [String: Any]) throws -> [(Int, Str
 }
 
 @Test func unmappedGatedKeyGrantedByProfileProceeds() async throws {
-    var granted = teamProfile(); granted["com.apple.developer.associated-domains"] = ["applinks:example.com"]
-    let f = try SignFixture(profileEntitlements: granted, userEntitlements: ["com.apple.developer.associated-domains": ["applinks:example.com"]])
+    var granted = teamProfile(); granted[appAttest] = "production"
+    let f = try SignFixture(profileEntitlements: granted, userEntitlements: [appAttest: "production"])
     do { _ = try await f.run(); Issue.record("expected throw") }
     catch let e as XlessError { #expect(e.cause.contains("rcodesign")) }   // past every entitlement check; only the fake Mach-O fails
     #expect(f.transport.requests.allSatisfy { $0.httpMethod == "GET" })
@@ -109,24 +118,24 @@ func refreshSteps(oldProfile: String, fresh: [String: Any]) throws -> [(Int, Str
 
 @Test func unmappedGatedKeyNotGrantedRefreshesProfileThenRefuses() async throws {
     let old = try fakeProfile(teamProfile()).base64EncodedString()
-    let f = try SignFixture(profileEntitlements: teamProfile(), userEntitlements: ["com.apple.developer.associated-domains": ["applinks:example.com"]], tail: [
+    let f = try SignFixture(profileEntitlements: teamProfile(), userEntitlements: [appAttest: "production"], tail: [
         (200, #"{"data":[{"type":"profiles","id":"P1","attributes":{"name":"xless a.b IOS_APP_STORE","profileState":"ACTIVE","profileType":"IOS_APP_STORE","profileContent":"\#(old)","expirationDate":"\#(future)"}}]}"#),
         (200, #"{"data":[{"type":"certificates","id":"C1"}]}"#),
         (200, #"{"data":{"type":"bundleIds","id":"B1"}}"#),
     ] + (try refreshSteps(oldProfile: old, fresh: teamProfile())))
     do { _ = try await f.run(); Issue.record("expected throw") }
     catch let e as XlessError {
-        #expect(e.cause == "entitlement 'com.apple.developer.associated-domains' is not granted by the provisioning profile for a.b; xless cannot enable this capability automatically")
-        #expect(e.fix.contains("enable the matching capability for a.b at developer.apple.com/account/resources/identifiers"))
+        #expect(e.cause == "entitlement '\(appAttest)' is not granted by the provisioning profile for a.b; xless cannot enable this capability automatically")
+        #expect(e.fix == "enable the matching capability (App Attest) for a.b at developer.apple.com/account/resources/identifiers, then re-run. \(Entitlements.finishFirst)")
     }
     #expect(f.transport.requests.map { $0.httpMethod ?? "" }.suffix(3) == ["GET", "DELETE", "POST"])
     #expect(f.leftApps.isEmpty)
 }
 
 @Test func unmappedGatedKeyEnabledByHandIsPickedUpByRefresh() async throws {
-    var granted = teamProfile(); granted["com.apple.developer.associated-domains"] = ["applinks:example.com"]
+    var granted = teamProfile(); granted[appAttest] = "production"
     let old = try fakeProfile(teamProfile()).base64EncodedString()
-    let f = try SignFixture(profileEntitlements: teamProfile(), userEntitlements: ["com.apple.developer.associated-domains": ["applinks:example.com"]], tail: [
+    let f = try SignFixture(profileEntitlements: teamProfile(), userEntitlements: [appAttest: "production"], tail: [
         (200, #"{"data":[{"type":"profiles","id":"P1","attributes":{"name":"xless a.b IOS_APP_STORE","profileState":"ACTIVE","profileType":"IOS_APP_STORE","profileContent":"\#(old)","expirationDate":"\#(future)"}}]}"#),
         (200, #"{"data":[{"type":"certificates","id":"C1"}]}"#),
         (200, #"{"data":{"type":"bundleIds","id":"B1"}}"#),
@@ -151,4 +160,26 @@ func refreshSteps(oldProfile: String, fresh: [String: Any]) throws -> [(Int, Str
     let reqs = f.transport.requests.map { "\($0.httpMethod ?? "") \($0.url!.path)" }
     #expect(!reqs.contains("POST /v1/bundleIdCapabilities"))
     #expect(reqs.suffix(3).map { $0.split(separator: " ")[0] } == ["GET", "DELETE", "POST"])
+}
+
+/// An absolute entitlements path (a Tauri overlay's `macos.entitlements`) is read as is, not joined to the project directory;
+/// the entitlements' content reaches the capability gate.
+@Test func absoluteEntitlementsPathIsReadAsIs() async throws {
+    let old = try fakeProfile(teamProfile()).base64EncodedString()
+    let f = try SignFixture(profileEntitlements: teamProfile(), userEntitlements: [ageRange: true], tail: [
+        (200, #"{"data":[{"type":"profiles","id":"P1","attributes":{"name":"xless a.b IOS_APP_STORE","profileState":"ACTIVE","profileType":"IOS_APP_STORE","profileContent":"\#(old)","expirationDate":"\#(future)"}}]}"#),
+        (200, #"{"data":[{"type":"certificates","id":"C1"}]}"#),
+        (200, #"{"data":{"type":"bundleIds","id":"B1"}}"#),
+    ] + (try refreshSteps(oldProfile: old, fresh: teamProfile())), absoluteEntitlements: true)
+    #expect(try f.config.platform(.ios).entitlements?.hasPrefix("/") == true)
+    do { _ = try await f.run(); Issue.record("expected throw") }
+    catch let e as XlessError { #expect(e.stage == .sign); #expect(e.cause.contains(ageRange)) }
+}
+
+/// A relative path (xless.yml) stays relative to the project directory.
+@Test func relativeEntitlementsPathIsProjectRelative() async throws {
+    let f = try SignFixture(profileEntitlements: teamProfile())
+    #expect(try f.config.platform(.ios).entitlements == "ios.entitlements")
+    do { _ = try await f.run(); Issue.record("expected throw") }
+    catch let e as XlessError { #expect(e.cause.contains("rcodesign")) }   // read, past every check; only the fake Mach-O fails
 }

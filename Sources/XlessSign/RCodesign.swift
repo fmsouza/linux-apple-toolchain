@@ -1,16 +1,44 @@
 import Foundation
 import XlessCore
+import XlessMachO
 
 public enum RCodesign {
-    public static func signArguments(bundle: URL, keyPEM: URL, certPEM: URL, entitlements: URL, distribution: Distribution) -> [String] {
+    /// `runtimePaths` (Developer ID only): bundle-relative Mach-Os (`hardenedRuntimePaths`) that get the hardened runtime
+    /// too. rcodesign signs loose Mach-Os (e.g. a dylib in Contents/Resources) and nested bundles, but an unscoped
+    /// `--code-signature-flags` applies to the main executable only, so each one is named with a path-scoped flag.
+    ///
+    /// `nestedEntitlements`: bundle-relative nested bundles (`PlugIns/X.appex`) signed with their own entitlements. An
+    /// rcodesign setting scoped to a nested bundle's path (`<path>:<file>`) applies to that bundle only, and the unscoped
+    /// one to the main bundle only (rcodesign 0.29.0 `sign --help`, "Settings Scope"). rcodesign signs nested bundles
+    /// before the bundle that contains them, so one invocation signs each extension, then the app.
+    public static func signArguments(bundle: URL, keyPEM: URL, certPEM: URL, entitlements: URL, distribution: Distribution,
+                                     runtimePaths: [String] = [], nestedEntitlements: [(path: String, file: URL)] = []) -> [String] {
         var a = ["sign", "--pem-file", keyPEM.path, "--pem-file", certPEM.path, "--entitlements-xml-file", entitlements.path]
+        for nested in nestedEntitlements { a += ["--entitlements-xml-file", "\(nested.path):\(nested.file.path)"] }
         switch distribution {
         case .appStore:
             a += ["--timestamp-url", "none"]   // ITMS-90135: App Store builds must not carry a secure timestamp
         case .developerID:
             a += ["--code-signature-flags", "runtime", "--for-notarization"]
+            for path in runtimePaths { a += ["--code-signature-flags", "\(path):runtime"] }
         }
         return a + [bundle.path]
+    }
+
+    /// What gets a path-scoped `runtime` flag for Developer ID: every Mach-O image in the bundle (regular files, by their
+    /// real path) except the main executable. That covers loose Mach-Os and the binaries of nested bundles. A bundle scope
+    /// is not enough: rcodesign signs a versioned framework's `Versions/A` as its own nested bundle, so
+    /// `X.framework:runtime` does not reach `Versions/A/X`, while the binary's own path does. Sorted.
+    public static func hardenedRuntimePaths(in app: URL, mainExecutable: String) -> [String] {
+        let root = app.standardizedFileURL.path
+        return Files.regularFiles(under: app).filter(isImage)
+            .map { String($0.standardizedFileURL.path.dropFirst(root.count + 1)) }
+            .filter { $0 != mainExecutable }.sorted()
+    }
+
+    static func isImage(_ file: URL) -> Bool {
+        guard let data = try? Data(contentsOf: file, options: .alwaysMapped) else { return false }
+        return (try? MachO.containsLoadableImage(data)) == true
     }
 
     /// rcodesign 0.29.0 waits 600 s by default (`notary-submit --help`); notarization queues can take longer.

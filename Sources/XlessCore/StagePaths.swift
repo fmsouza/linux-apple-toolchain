@@ -7,6 +7,13 @@ public struct StagePaths: Sendable {
         root = project.appendingPathComponent(".xless/build/\(platform.rawValue)", isDirectory: true)
     }
 
+    /// React Native simulator builds: `.xless/build/ios-simulator`, next to (never inside) the device build's `ios`.
+    public static func iosSimulator(project: URL) -> StagePaths {
+        StagePaths(root: project.appendingPathComponent(".xless/build/ios-simulator", isDirectory: true))
+    }
+
+    private init(root: URL) { self.root = root }
+
     public var app: URL { root.appendingPathComponent("app", isDirectory: true) }
     public var assets: URL { root.appendingPathComponent("assets", isDirectory: true) }
     public var final: URL { root.appendingPathComponent("final", isDirectory: true) }

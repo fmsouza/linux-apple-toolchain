@@ -1,0 +1,7 @@
+#!/bin/sh
+# Expo's ExpoModulesJSI build phase runs xcodebuild under `env -i` (PATH and HOME kept): restore the image settings the
+# shim needs (the SDK bundle's location, the shims, the toolchain headers, the SDK metadata).
+: "${XDG_CONFIG_HOME:=/opt/xless/config}" "${XLESS_SHIM_DIR:=/opt/xless/shims}" \
+  "${XLESS_TOOLCHAIN_INCLUDE:=/opt/xless/toolchain/usr/include}" "${XLESS_TOOLCHAIN_META:=/opt/xless/toolchain-meta.json}"
+export XDG_CONFIG_HOME XLESS_SHIM_DIR XLESS_TOOLCHAIN_INCLUDE XLESS_TOOLCHAIN_META
+exec xless shim xcodebuild "$@"

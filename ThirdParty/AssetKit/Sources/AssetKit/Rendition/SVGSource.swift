@@ -89,6 +89,7 @@ enum SVGSource {
                     pixelsBGRA: rgba,
                     colorSpaceID: Gamut.sRGB.colorSpaceID,
                     kind: .image,
+                    isOpaque: PNGSource.isOpaque(rgba),
                     derivedFromVector: true,
                     // Reference uses the source SVG filename for every
                     // variant (vector + raster), not a synthetic per-scale

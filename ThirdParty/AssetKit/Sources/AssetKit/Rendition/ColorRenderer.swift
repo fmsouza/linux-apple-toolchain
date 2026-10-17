@@ -16,12 +16,13 @@ enum ColorRenderer {
             out.append(Rendition(
                 name: set.name,
                 idiom: entry.idiom,
-                scale: nil,
+                // actool keys colors at scale 1.
+                scale: .x1,
                 appearance: appearance,
                 gamut: gamut,
                 body: .color(ColorBody(
                     red: r, green: g, blue: b, alpha: a,
-                    colorSpaceID: gamut.colorSpaceID
+                    colorSpaceID: try entry.color.colorSpaceID()
                 ))
             ))
         }

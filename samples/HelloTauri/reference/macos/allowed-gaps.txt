@@ -1,0 +1,15 @@
+# Known differences between an xless build of samples/HelloTauri for macOS (after `finalize`) and the Mac reference
+# (reference.json, `tauri build --target universal-apple-darwin --no-sign`). One compare key per line; `#` starts a
+# comment. Used with `xless tauri compare --allow-file`. Explained in docs/research/parity-known-gaps.md, "Tauri macOS".
+
+# finalize stamps the SDK keys Xcode writes into every product; tauri-bundler (no Xcode) writes none
+plist:DTPlatformName
+plist:DTPlatformVersion
+plist:DTSDKName
+plist:CFBundleSupportedPlatforms
+
+# finalize writes PkgInfo, as Xcode does for every app; tauri-bundler does not
+file:Contents/PkgInfo
+
+# finalize stamps the overlay's usesNonExemptEncryption; tauri-bundler writes no such key
+plist:ITSAppUsesNonExemptEncryption

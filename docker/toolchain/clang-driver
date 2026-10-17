@@ -1,0 +1,54 @@
+#!/bin/sh
+# Installed by docker/Dockerfile.sdk (Ruling R10) as the `clang` and `clang++` of an open-source Swift toolchain whose
+# clang driver lacks defaults of the Apple clang its Xcode ships (measured: Xcode 26.2's clang 17 against Swift 6.2.3's;
+# LLVM 21's driver has both):
+# - it drops -fno-cxx-modules yet passes -fmodule-map-file on, so the compiler refuses a C++ #include of a header that a
+#   module map covers ("module 'X' is needed but has not been provided, and implicit use of module files is
+#   disabled"): the flag is passed on when the command line or a response file names it;
+# - it predefines no TARGET_OS_* macros for Darwin targets (code testing TARGET_OS_MACCATALYST without including
+#   TargetConditionals.h fails under -Werror=undef-prefix=TARGET_OS_), and with -fdefine-target-os-macros still lacks
+#   some Apple clang has: compiles get the image's clang flags (recorded in /opt/xless/swift-toolchain.json as
+#   clangFlags; docker/toolchain/target-os-macros).
+# Both are Apple clang's defaults for Apple targets only, so they are added only when the invocation targets Darwin: its
+# last -target/--target value (on the command line or in a response file) names an Apple triple. Any other invocation
+# (cargo build scripts, the cc crate's host builds, script phases compiling for Linux) runs the open-source driver
+# unchanged: -fdefine-target-os-macros would define TARGET_OS_LINUX 1, TARGET_OS_MAC 0, … for a Linux target, which
+# Apple's clang and stock clang never do, and C code testing `defined(TARGET_OS_MAC)` would take its Apple branch.
+# The flags go to compiles (-c, -S, -E, -fsyntax-only, -M, -MM, or a source file or stdin as input), not to links.
+# @DRIVER@ and @FLAGS@ are filled in at install: the real driver (absolute path) and the flags. Shell builtins only: build
+# systems run compilers with a reduced PATH.
+real=@DRIVER@
+flags='@FLAGS@'
+case "$1" in -cc1*) exec "$real" "$@" ;; esac
+mode=
+case "$0" in *clang-cpp) mode=--driver-mode=cpp ;; *clang-cl) mode=--driver-mode=cl ;; *++) mode=--driver-mode=g++ ;; esac
+set -f
+cxx=0 compile=0 darwin=0 value=
+triple() { case "$1" in *-apple-*) darwin=1 ;; *) darwin=0 ;; esac; }
+scan() {
+  if [ -n "$value" ]; then value=; triple "$1"; return; fi
+  case "$1" in
+    -target|--target) value=1 ;;
+    --target=*|-target=*) triple "${1#*=}" ;;
+    -fno-cxx-modules) cxx=1 ;;
+    -c|-S|-E|-fsyntax-only|-M|-MM|-) compile=1 ;;
+    -*) ;;
+    *.c|*.cc|*.cpp|*.cxx|*.c++|*.C|*.m|*.mm|*.M) compile=1 ;;
+  esac
+}
+for a; do
+  case "$a" in
+    @*) if [ -f "${a#@}" ]; then
+          while IFS= read -r line || [ -n "$line" ]; do
+            for w in $line; do w=${w#\"}; w=${w%\"}; w=${w#\'}; w=${w%\'}; scan "$w"; done
+          done < "${a#@}"
+        fi ;;
+    *) scan "$a" ;;
+  esac
+done
+if [ $darwin = 1 ]; then
+  # shellcheck disable=SC2086 # the flags are a list of words (no globbing: set -f)
+  [ $compile = 1 ] && set -- "$@" $flags
+  [ $cxx = 1 ] && set -- "$@" -Xclang -fno-cxx-modules
+fi
+exec "$real" $mode "$@"

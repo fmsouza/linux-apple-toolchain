@@ -54,6 +54,23 @@ public enum MacBuilder {
         }
     }
 
+    /// `swift build` of the wrapper package for one architecture. Another Swift than the image's own (Ruling R10: its
+    /// SwiftPM, on PATH; measured with 6.2.3):
+    /// - names the executable product, as `SwiftPackages.build` does: its Swift Build otherwise builds only targets and
+    ///   links no executable;
+    /// - selects the architecture with `--swift-sdk <arch>-apple-macosx --arch <arch>` rather than a triple: with
+    ///   `--triple` its Swift Build builds every standard macOS architecture (arm64 and x86_64) and joins them with
+    ///   `lipo`, which the image does not have; `--arch` is refused next to `--triple`. The deployment target is then the
+    ///   wrapper package's `platforms` (`minimumOS`), which the triple's version otherwise sets.
+    static func swiftBuildArguments(wrapper: URL, scratch: URL, arch: String, minimumOS: String, toolset: URL,
+                                    product: String, own: SwiftToolchain?) -> [String] {
+        let target = own == nil ? ["--triple", "\(arch)-apple-macosx\(minimumOS)"] : ["--swift-sdk", "\(arch)-apple-macosx", "--arch", arch]
+        var args = ["build", "--package-path", wrapper.path, "--scratch-path", scratch.path,
+                    "-c", "release", "--build-system", "swiftbuild"] + target + ["--toolset", toolset.path]
+        if own != nil { args += ["--product", "\(product)Mac"] }
+        return args
+    }
+
     public static func build(project: URL, config: ProjectConfig, paths: StagePaths,
                              env: [String: String] = ProcessInfo.processInfo.environment) throws -> URL {
         let mac = try config.platform(.macos)
@@ -77,13 +94,16 @@ public enum MacBuilder {
         ]
         var slices: [Data] = []
         var resourceBundles: [URL] = []
+        // Ruling R10: another Swift than the image's own (the build stage put it on PATH) builds in its own scratch
+        // directory, never reusing a previous toolchain's products; its SwiftPM may lay them out elsewhere than `out/`.
+        let own = (try? SwiftToolchain.load(env: env)).flatMap { $0.isEngine ? nil : $0 }
         for arch in archs {
-            let scratch = project.appendingPathComponent(".xless/macos-build-\(arch)", isDirectory: true)
-            try Shell.run("swift", ["build", "--package-path", wrapper.path, "--scratch-path", scratch.path,
-                                    "-c", "release", "--build-system", "swiftbuild",
-                                    "--triple", "\(arch)-apple-macosx\(mac.minimumOS)", "--toolset", toolset.path],
+            let scratch = project.appendingPathComponent(".xless/macos-build-\(arch)" + (own.map { "-swift-\($0.version)" } ?? ""), isDirectory: true)
+            try Shell.run("swift", swiftBuildArguments(wrapper: wrapper, scratch: scratch, arch: arch, minimumOS: mac.minimumOS,
+                                                       toolset: toolset, product: mac.product, own: own),
                           cwd: project, env: buildEnv, stage: .build, passthrough: true)
-            guard let exe = builtExecutable(named: "\(mac.product)Mac", under: scratch.appendingPathComponent("out/Products")) else {
+            guard let exe = builtExecutable(named: "\(mac.product)Mac", under: scratch.appendingPathComponent("out/Products"))
+                    ?? (own == nil ? nil : builtExecutable(named: "\(mac.product)Mac", under: scratch)) else {
                 throw XlessError(.build, "no \(mac.product)Mac executable under \(scratch.path)/out/Products", fix: "check the swift build output above")
             }
             slices.append(try Data(contentsOf: exe))

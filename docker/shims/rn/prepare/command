@@ -1,0 +1,4 @@
+#!/bin/sh
+# macOS ships /usr/bin/command, a wrapper around the shell builtin; Ruby backticks (React Native's post-install runs
+# `command -v ccache`) execute it directly, so it must exist as a program (contract doc, "Env-only fixes" 4).
+command "$@"

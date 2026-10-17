@@ -47,3 +47,11 @@ func thinWithLibs(dylibs: [String], rpaths: [String], weak: [String] = []) -> Da
     d.removeLast(8)
     #expect(throws: MachOError.self) { try MachO.linkedLibraries(in: d) }
 }
+
+@Test func loadCommandTypesListEverySliceInOrder() throws {
+    let a = thinWithLibs(dylibs: ["/usr/lib/libSystem.B.dylib"], rpaths: ["@executable_path/Frameworks"])
+    let b = thinWithLibs(dylibs: [], rpaths: [], weak: ["/usr/lib/libz.dylib"])
+    #expect(try MachO.loadCommandTypes(in: a) == [0xc, 0x8000001c])
+    #expect(try MachO.loadCommandTypes(in: try MachO.makeFat([a, b])) == [0xc, 0x8000001c, 0x80000018])
+    #expect(throws: MachOError.self) { try MachO.loadCommandTypes(in: a.prefix(40)) }
+}

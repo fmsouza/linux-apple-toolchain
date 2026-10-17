@@ -22,5 +22,25 @@ A copy of [xtool-org/AssetKit](https://github.com/xtool-org/AssetKit), the `Asse
    phone only for every app icon) and skipped colors, so `assetutil --validate-file` reported "invalid
    bitmapindex". The rule comes from actool 27.0 output and from `assetutil --update-bitmap`.
 
-Tests: `BOMWriterTests` (free list), `BitmapKeysTests` (descriptors), and `AssetutilParseTests` "assetutil
-validates and thins the compiled Assets.car" (macOS: `assetutil --validate-file` and thinning).
+3. **Bitmap opacity** (`Sources/AssetKit/CAR/MLECBody.swift`, `Rendition/PNGSource.swift`, `Rendition.swift`). The
+   first word after `MLEC` is a flags word, not a compression type: bit 1 (0x2) says every pixel is opaque, and CoreUI
+   then draws the rendition without its alpha. Upstream wrote 3 for every bitmap, so a transparent PNG drew on a black
+   square (`assetutil --info`: `Opaque: True`). The flags are now 3 when every alpha is 255 and 1 otherwise, the next
+   word (upstream's "bytes per pixel") is the compression, 4 (LZFSE). Measured with actool 27.0 on neutral PNGs:
+   opacity is decided from the pixels, not the PNG colour type (an RGBA PNG whose alpha is all 255 is opaque, one alpha
+   of 254 is not; RGB, gray and palette PNGs are opaque).
+4. **Named colors** (`CSIWriter.color`, `RenditionKey`, `FacetKeys`, `ColorRenderer`, `Schema/Contents.swift`). Written
+   as actool 27.0 writes them: key and facet element 85, part 217, scale 1; CSI header scale and colour space 0, TVL
+   `1004 = (0, 0)` and `1006 = 1`, bitmap count 1; body tag `COLR` as an LE constant (file bytes `RLOC`), version 1,
+   the colour space ID (srgb 1, display-p3 3, extended-srgb 4, extended-linear-srgb 5), then the components. A
+   component without a decimal point is an 8-bit value ("1" is 1/255), one with a decimal point goes through Float.
+   Upstream's colors read in `assetutil` as one component (2e-323) in a "generic" space, and `UIColor(named:)` found
+   none.
+
+Tests: `BOMWriterTests` (free list), `BitmapKeysTests` (descriptors), `AssetutilParseTests` "assetutil validates and
+thins the compiled Assets.car" (macOS: `assetutil --validate-file` and thinning), and `ActoolParityTests` (opacity
+and colors against `Fixtures/Parity.expected.json`: what `assetutil --info` reports for actool 27.0's car of the
+neutral `Fixtures/Parity.xcassets`, recorded by `scripts/assetkit-golden.sh`; macOS also compares AssetKit's car
+field by field). Known gaps against actool: no MultiSized Image rendition for app icons, grayscale PNGs stored as
+ARGB in sRGB (actool: 8-bit gray in "gray gamma 22"; same pixels), images stored LZFSE instead of deepmap2, no
+display-gamut key attribute for colors (docs/research/parity-known-gaps.md).

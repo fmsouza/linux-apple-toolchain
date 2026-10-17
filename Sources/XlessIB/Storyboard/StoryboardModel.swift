@@ -57,6 +57,14 @@ public struct IBImageReference: Equatable, Sendable {
     public init(name: String, catalog: String?) { self.name = name; self.catalog = catalog }
 }
 
+/// A view's `<accessibility key="accessibilityConfiguration">` element and its `<accessibilityTraits key="traits">`
+/// child (attributes verbatim; `traits` is nil without the child).
+public struct IBAccessibility: Equatable, Sendable {
+    public var attributes: [String: String]
+    public var traits: [String: String]?
+    public var line: Int
+}
+
 public struct IBView: Equatable, Sendable {
     public enum Kind: String, Equatable, Sendable { case view, imageView, label }
     public var kind: Kind
@@ -76,6 +84,8 @@ public struct IBView: Equatable, Sendable {
     public var constraints: [IBConstraint]
     /// Keys of `<nil key="…"/>` children (explicitly unset properties).
     public var nilKeys: Set<String>
+    /// The `<accessibility>` element, if any.
+    public var accessibility: IBAccessibility?
     public var line: Int
     public var rawPath: [Int]
 }

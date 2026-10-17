@@ -22,14 +22,21 @@ extension ArchiveBuilder {
     }
 
     /// The root `NSObject` (#0): the three lists, four keys sharing the empty `NSArray`, and `IBUINibLNEVersionKey` = 1.
-    func nibRoot(topLevel: [ObjectRef], objects list: [ObjectRef], connections: [ObjectRef]) -> ObjectRef {
+    /// With accessibility configurations, `UINibAccessibilityConfigurationsKey` is an `NSArray` of them instead
+    /// (`acc-kinds-order`; the other three keys still share the empty array, first referenced by the visible windows).
+    func nibRoot(topLevel: [ObjectRef], objects list: [ObjectRef], connections: [ObjectRef],
+                 accessibilityConfigurations: [ObjectRef] = []) -> ObjectRef {
         let root = object("NSObject")
         set(root, "UINibTopLevelObjectsKey", array(topLevel))
         set(root, "UINibObjectsKey", array(list))
         set(root, "UINibConnectionsKey", array(connections))
         let empty = array([])
         for key in ["UINibVisibleWindowsKey", "UINibAccessibilityConfigurationsKey", "UINibTraitStorageListsKey", "UINibKeyValuePairsKey"] {
-            set(root, key, empty)
+            if key == "UINibAccessibilityConfigurationsKey", !accessibilityConfigurations.isEmpty {
+                set(root, key, array(accessibilityConfigurations))
+            } else {
+                set(root, key, empty)
+            }
         }
         set(root, "IBUINibLNEVersionKey", .int8(1))
         return root

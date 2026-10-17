@@ -1,0 +1,118 @@
+import Testing
+import Foundation
+import XlessCore
+@testable import XlessIB
+
+// Command lines are Swift Build's CompileStoryboard / LinkStoryboards (IBStoryboardCompiler.xcspec,
+// IBStoryboardLinker.xcspec) with Xcode's flag order (docs/research/ib-invocation.md).
+
+private func scratch() throws -> URL {
+    let dir = FileManager.default.temporaryDirectory.appendingPathComponent("xless-ibshim-\(UUID().uuidString)", isDirectory: true)
+    try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+    return dir
+}
+
+private func files(_ dir: URL) throws -> [String: Data] {
+    var out: [String: Data] = [:]
+    for f in try FileManager.default.contentsOfDirectory(atPath: dir.path) { out[f] = try Data(contentsOf: dir.appendingPathComponent(f)) }
+    return out
+}
+
+private func compileArgs(_ input: URL, tmp: URL, devices: [String] = ["iphone", "ipad"], target: String = "16.4") -> [String] {
+    ["--errors", "--warnings", "--notices", "--module", "IBProbe",
+     "--output-partial-info-plist", tmp.appendingPathComponent("\(input.deletingPathExtension().lastPathComponent)-SBPartialInfo.plist").path,
+     "--auto-activate-custom-fonts"] + devices.flatMap { ["--target-device", $0] }
+        + ["--minimum-deployment-target", target, "--output-format", "human-readable-text", input.path, "--compilation-directory", tmp.path]
+}
+
+@Test func versionProbeAnswersAsIbtool27() throws {
+    let r = IbtoolShim.run(["--version", "--output-format", "xml1"])
+    #expect(r.exitCode == 0)
+    let v = try PropertyListSerialization.propertyList(from: Data(r.stdout.utf8), format: nil) as! [String: Any]
+    #expect(v["com.apple.ibtool.version"] as? [String: String] == ["bundle-version": "25098", "short-bundle-version": "27.0"])
+}
+
+@Test func compileThenLinkGivesTheGoldenStoryboardc() throws {
+    let dir = try scratch(); defer { try? FileManager.default.removeItem(at: dir) }
+    let c = CorpusCase(name: "real-logo-plus-label")
+    let input = dir.appendingPathComponent("LaunchScreen.storyboard")
+    try FileManager.default.copyItem(at: c.storyboard, to: input)
+    let tmp = dir.appendingPathComponent("tmp"), app = dir.appendingPathComponent("X.app")
+    var r = IbtoolShim.run(compileArgs(input, tmp: tmp))
+    #expect(r == .init(stdout: "", stderr: "", exitCode: 0))
+    let golden = try c.goldenFiles(flagset: "universal-16")
+    #expect(try files(tmp.appendingPathComponent("LaunchScreen.storyboardc")) == golden)
+    let partial = try PropertyListSerialization.propertyList(from: Data(contentsOf: tmp.appendingPathComponent("LaunchScreen-SBPartialInfo.plist")), format: nil)
+    #expect((partial as? [String: Any])?.isEmpty == true)
+
+    r = IbtoolShim.run(["--errors", "--warnings", "--notices", "--module", "IBProbe", "--target-device", "iphone", "--target-device", "ipad",
+                        "--minimum-deployment-target", "16.4", "--output-format", "human-readable-text",
+                        "--link", app.path, tmp.appendingPathComponent("LaunchScreen.storyboardc").path])
+    #expect(r.exitCode == 0)
+    #expect(try files(app.appendingPathComponent("LaunchScreen.storyboardc")) == golden)
+}
+
+/// Expo's template SplashScreen.storyboard (HelloRN's prebuild output, `real-expo-splash-template`) compiles and links to
+/// ibtool's bytes, with the deployment target Expo uses (16.4) and the empty partial Info.plist.
+@Test func expoSplashScreenCompilesLikeIbtool() throws {
+    let dir = try scratch(); defer { try? FileManager.default.removeItem(at: dir) }
+    let c = CorpusCase(name: "real-expo-splash-template")
+    let input = dir.appendingPathComponent("SplashScreen.storyboard")
+    try FileManager.default.copyItem(at: c.storyboard, to: input)
+    let tmp = dir.appendingPathComponent("tmp"), app = dir.appendingPathComponent("HelloRN.app")
+    var r = IbtoolShim.run(compileArgs(input, tmp: tmp))
+    #expect(r == .init(stdout: "", stderr: "", exitCode: 0))
+    let golden = try c.goldenFiles(flagset: "universal-16")
+    #expect(golden.keys.sorted() == ["EXPO-VIEWCONTROLLER-1-view-EXPO-ContainerView.nib", "Info.plist", "SplashScreenViewController.nib"])
+    #expect(try files(tmp.appendingPathComponent("SplashScreen.storyboardc")) == golden)
+    let partial = try PropertyListSerialization.propertyList(from: Data(contentsOf: tmp.appendingPathComponent("SplashScreen-SBPartialInfo.plist")), format: nil)
+    #expect((partial as? [String: Any])?.isEmpty == true)
+    r = IbtoolShim.run(["--errors", "--warnings", "--notices", "--module", "IBProbe", "--target-device", "iphone", "--target-device", "ipad",
+                        "--minimum-deployment-target", "16.4", "--output-format", "human-readable-text",
+                        "--link", app.path, tmp.appendingPathComponent("SplashScreen.storyboardc").path])
+    #expect(r.exitCode == 0)
+    #expect(try files(app.appendingPathComponent("SplashScreen.storyboardc")) == golden)
+}
+
+@Test func storyboardOutsideTheSubsetFailsWithTheCompilersRefusal() throws {
+    let dir = try scratch(); defer { try? FileManager.default.removeItem(at: dir) }
+    var xml = try String(contentsOf: CorpusCase(name: "real-logo-plus-label").storyboard, encoding: .utf8)
+    xml = xml.replacingOccurrences(of: "<viewController ", with: "<viewController restorationIdentifier=\"X\" ")
+    let input = dir.appendingPathComponent("SplashScreen.storyboard")
+    try Data(xml.utf8).write(to: input)
+    let r = IbtoolShim.run(compileArgs(input, tmp: dir.appendingPathComponent("tmp")))
+    #expect(r.exitCode == 1)
+    #expect(r.stdout.hasPrefix("/* com.apple.ibtool.errors */\n\(input.path): error: unsupported attribute restorationIdentifier=\"X\" on <viewController>"))
+    #expect(r.stderr.hasPrefix("xless ibtool shim: [ib] unsupported attribute restorationIdentifier=\"X\" on <viewController>"))
+    #expect(r.stderr.contains(" — "))   // the compiler's fix travels with the refusal
+    #expect(!FileManager.default.fileExists(atPath: dir.appendingPathComponent("tmp/SplashScreen.storyboardc").path))
+}
+
+@Test func unverifiedFlagSetsAreToolErrors() throws {
+    let dir = try scratch(); defer { try? FileManager.default.removeItem(at: dir) }
+    let r = IbtoolShim.run(compileArgs(CorpusCase(name: "real-logo-plus-label").storyboard, tmp: dir, target: "13.0"))
+    #expect(r.exitCode == 1)
+    #expect(r.stderr.contains("--minimum-deployment-target 13.0 is not supported"))
+}
+
+@Test(arguments: [
+    (["--flatten", "NO"], "unknown option --flatten"),
+    (["--companion-strings-file", "en:/x.strings"], "unknown option --companion-strings-file"),
+    (["--platform", "iphoneos"], "unknown option --platform"),
+    (["--compile", "/o/x.storyboardc"], "exactly one of --compile, --compilation-directory, --link"),
+])
+func refusesArgvOutsideTheSwiftBuildSubset(extra: [String], reason: String) {
+    let args = compileArgs(URL(fileURLWithPath: "/in/A.storyboard"), tmp: URL(fileURLWithPath: "/tmp/x")) + extra
+    let r = IbtoolShim.run(args)
+    #expect(r.exitCode == 70)
+    #expect(r.stderr.contains(reason))
+    #expect(r.stderr.contains("ibtool \(args.joined(separator: " "))"))
+}
+
+@Test func refusesLocalizedAndNonStoryboardInputs() {
+    var r = IbtoolShim.run(["--output-format", "human-readable-text", "--link", "/app", "/t/Base.lproj/Main.storyboardc"])
+    #expect(r.exitCode == 70)
+    #expect(r.stderr.contains("(.lproj) is not supported"))
+    r = IbtoolShim.run(["--output-format", "human-readable-text", "--minimum-deployment-target", "16.4", "--target-device", "iphone", "/in/View.xib", "--compile", "/o/View.nib"])
+    #expect(r.exitCode == 70)
+}

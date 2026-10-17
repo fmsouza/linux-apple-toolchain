@@ -23,10 +23,15 @@ public struct ToolchainMeta: Codable, Sendable, Equatable {
     public var compiler: String
     /// Keyed by Platform.sdkKey ("iphoneos", "macosx").
     public var platforms: [String: PlatformSDKInfo]
+    /// The Swift this Xcode ships, from its toolchain's `swift --version` (e.g. "6.2.3"; Ruling R10). nil in metadata
+    /// exported before that ruling.
+    public var swiftVersion: String?
 
-    public init(xcodeVersion: String, xcodeBuild: String, buildMachineOSBuild: String, compiler: String, platforms: [String: PlatformSDKInfo]) {
+    public init(xcodeVersion: String, xcodeBuild: String, buildMachineOSBuild: String, compiler: String, platforms: [String: PlatformSDKInfo],
+                swiftVersion: String? = nil) {
         self.xcodeVersion = xcodeVersion; self.xcodeBuild = xcodeBuild
         self.buildMachineOSBuild = buildMachineOSBuild; self.compiler = compiler; self.platforms = platforms
+        self.swiftVersion = swiftVersion
     }
 
     public func sdk(for p: Platform) throws -> PlatformSDKInfo {

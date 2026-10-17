@@ -3,6 +3,8 @@ import Foundation
 @testable import XlessIB
 
 /// Order-preserving `bplist00` reader for the shapes ibtool writes (dict, ASCII/UTF-16 string, integer); test-only.
+/// An object referenced more than once is read as `tagged` at its first reference (keys before values, as the writer
+/// numbers them) and `ref` at the others.
 private func readBinaryPlist(_ d: Data) throws -> BinaryPlistWriter.Value {
     let b = [UInt8](d)
     guard b.count >= 40, Array(b.prefix(8)) == Array("bplist00".utf8) else { throw CocoaError(.propertyListReadCorrupt) }
@@ -16,7 +18,21 @@ private func readBinaryPlist(_ d: Data) throws -> BinaryPlistWriter.Value {
         let n = 1 << Int(b[p] & 0x0F); defer { p += 1 + n }
         return be(p + 1, n)
     }
+    var refCount: [Int: Int] = [:], seen = Set<Int>()
+    func countRefs(_ i: Int) {
+        refCount[i, default: 0] += 1
+        guard refCount[i] == 1, i < count else { return }
+        var p = offset(i)
+        let m = b[p]; p += 1
+        if m >> 4 == 0xD { let n = length(m, &p); for k in 0..<(2 * n) { countRefs(be(p + k * refSize, refSize)) } }
+    }
+    countRefs(top)
     func obj(_ i: Int) throws -> BinaryPlistWriter.Value {
+        guard (refCount[i] ?? 0) > 1 else { return try plain(i) }
+        guard seen.insert(i).inserted else { return .ref("o\(i)") }
+        return .tagged("o\(i)", try plain(i))
+    }
+    func plain(_ i: Int) throws -> BinaryPlistWriter.Value {
         guard i < count else { throw CocoaError(.propertyListReadCorrupt) }
         var p = offset(i)
         let m = b[p]; p += 1
@@ -30,7 +46,8 @@ private func readBinaryPlist(_ d: Data) throws -> BinaryPlistWriter.Value {
             let n = length(m, &p)
             let keys = (0..<n).map { be(p + $0 * refSize, refSize) }
             let vals = (0..<n).map { be(p + (n + $0) * refSize, refSize) }
-            return .dict(try zip(keys, vals).map { .init(try obj($0), try obj($1)) })
+            let k = try keys.map(obj), v = try vals.map(obj)
+            return .dict(zip(k, v).map { .init($0, $1) })
         default: throw CocoaError(.propertyListReadCorrupt)
         }
     }
@@ -56,8 +73,13 @@ private func goldenInfoPlists() throws -> [URL] {
         let bytes = try Data(contentsOf: url)
         let plist = try #require(try PropertyListSerialization.propertyList(from: bytes, format: nil) as? [String: Any])
         let entry = try #require(plist["UIStoryboardDesignatedEntryPointIdentifier"] as? String)
-        let vcID = String(entry.dropFirst("UIViewController-".count))
-        #expect(StoryboardcLayout.infoPlist(vcID: vcID) == bytes, "\(url.path)")
+        // golden/<case>/<flagset>.storyboardc/Info.plist: the case's view controller says which form applies
+        let name = url.deletingLastPathComponent().deletingLastPathComponent().lastPathComponent
+        let doc = try StoryboardParser.parse(url: corpusRoot.appendingPathComponent("\(name).storyboard"))
+        let vc = doc.scenes[0].viewController
+        let identifier = vc.attributes["storyboardIdentifier"]
+        #expect(entry == identifier ?? "UIViewController-\(vc.id)", "\(url.path)")
+        #expect(StoryboardcLayout.infoPlist(vcID: vc.id, storyboardIdentifier: identifier) == bytes, "\(url.path)")
     }
 }
 

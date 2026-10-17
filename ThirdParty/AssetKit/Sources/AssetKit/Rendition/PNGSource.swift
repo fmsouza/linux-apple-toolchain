@@ -42,14 +42,26 @@ enum PNGSource {
                 pixelsBGRA: bgra,
                 colorSpaceID: context.gamut.colorSpaceID,
                 kind: context.kind,
+                isOpaque: isOpaque(bgra),
                 renditionName: context.filename
             ))
         )]
     }
 
-    /// Decode PNG bytes to BGRA-premultiplied pixels. Shared with SVGSource's
-    /// rasterised fanout, which feeds PNG bytes returned by the SVG rasteriser
-    /// straight through this path.
+    /// True iff every alpha byte of BGRA pixels is 255 (actool's opacity rule).
+    static func isOpaque(_ bgra: [UInt8]) -> Bool {
+        var i = 3
+        while i < bgra.count {
+            if bgra[i] != 255 { return false }
+            i += 4
+        }
+        return true
+    }
+
+    /// Decode PNG bytes to BGRA-premultiplied pixels, `round(c * a / 255)`:
+    /// what actool 27.0 stores (checked pixel by pixel on a decoded app icon).
+    /// Shared with SVGSource's rasterised fanout, which feeds PNG bytes
+    /// returned by the SVG rasteriser straight through this path.
     static func decodeBGRA(_ bytes: Data) throws -> (UInt32, UInt32, [UInt8]) {
         var blob = MemoryBytestream(bytes: [UInt8](bytes))
         let image = try PNG.Image.decompress(stream: &blob)

@@ -1,0 +1,29 @@
+{
+  "expo": {
+    "name": "HelloRN",
+    "slug": "hellorn",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "ios": {
+      "bundleIdentifier": "com.example.hellorn",
+      "buildNumber": "1",
+      "appleTeamId": "ABCDE12345",
+      "supportsTablet": true
+    },
+    "plugins": [
+      [
+        "expo-build-properties",
+        {
+          "ios": {
+            "deploymentTarget": "16.4"
+          }
+        }
+      ],
+      "./plugins/withHelloExtension",
+      "./plugins/withHelloAssetsPod",
+      "./plugins/withSceneLifecycle"
+    ]
+  }
+}

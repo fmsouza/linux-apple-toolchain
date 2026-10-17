@@ -15,10 +15,12 @@ import _CryptoExtras
     #expect(reloaded.pem == key.pem)
 }
 
-/// Self-signed cert from `key` stands in for Apple's issued certificate.
-func selfSigned(_ key: SigningKey) throws -> [UInt8] {
+/// Self-signed cert from `key` stands in for Apple's issued certificate. `team`: the subject carries it as its OU, as
+/// Apple's do (rcodesign reads the signature's team from it).
+func selfSigned(_ key: SigningKey, team: String? = nil) throws -> [UInt8] {
     let pk = Certificate.PrivateKey(key.rsa)
-    let name = try DistinguishedName { CommonName("test") }
+    let name = try team.map { team in try DistinguishedName { CommonName("Apple Distribution: Test (\(team))"); OrganizationalUnitName(team) } }
+        ?? DistinguishedName { CommonName("test") }
     let cert = try Certificate(version: .v3, serialNumber: .init(), publicKey: pk.publicKey,
                                notValidBefore: Date(), notValidAfter: Date().addingTimeInterval(3600),
                                issuer: name, subject: name, signatureAlgorithm: .sha256WithRSAEncryption,

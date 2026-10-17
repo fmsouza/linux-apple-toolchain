@@ -14,7 +14,7 @@ private let testMap = ["com.apple.developer.associated-domains": "ASSOCIATED_DOM
 
 @Test func memoryLimitKeyIsPortalOnlyAndUnmapped() {
     let key = "com.apple.developer.kernel.increased-memory-limit"
-    #expect(Capabilities.map.isEmpty)
+    #expect(Capabilities.map[key] == nil)
     let r = Capabilities.required(entitlements: [key: true], platform: .ios)
     #expect(r.types.isEmpty)
     #expect(r.unmapped == [key])

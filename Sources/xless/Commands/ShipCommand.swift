@@ -5,37 +5,40 @@ import XlessCore
 extension Stage: ExpressibleByArgument {}
 
 struct ShipCommand: AsyncParsableCommand {
-    static let configuration = CommandConfiguration(commandName: "ship", abstract: "Run [prepare →] build → assets → finalize → sign → package → upload (upload: iOS only); --from/--to select a range.")
+    static let configuration = CommandConfiguration(commandName: "ship", abstract: "Run [prepare →] build → assets → finalize → sign → package → upload (upload: iOS only); --from/--to select a range. With --destination simulator: [prepare →] build.")
     @OptionGroup var options: ProjectOptions
     @Option(help: "Resume from this stage.") var from: Stage = .build
-    @Option(help: "Stop after this stage (default: upload, or package for macOS).") var to: Stage = .upload
+    @Option(help: "Stop after this stage (default: upload, or package for macOS; build with --destination simulator).") var to: Stage?
+
+    /// The last stage: `--to`, else upload (build for a simulator build, which has no later stage).
+    var last: Stage { StagePolicy.lastStage(to: to, simulator: options.destination == .simulator) }
 
     func validate() throws {
-        let stages = "use one of: prepare, build, assets, finalize, sign, package, upload"
-        for (flag, stage) in [("--from", from), ("--to", to)] where [.ib, .config, .sdk].contains(stage) {
-            throw ValidationError("\(flag) \(stage.rawValue): `\(stage.rawValue)` is not a ship pipeline stage; \(stages)")
+        if let problem = StagePolicy.shipRangeProblem(from: from, last: last, simulator: options.destination == .simulator) {
+            throw ValidationError(problem)
         }
-        if to < from { throw ValidationError("--to \(to.rawValue) comes before --from \(from.rawValue)") }
     }
 
     func run() async throws {
-        let ctx = try await Context.load(options, fresh: DatedBuildNumber.isFreshRun(command: "ship", from: from))
-        let steps: [(Stage, () async throws -> String)] = [
-            (.prepare, { try await StageRunner.prepare(ctx) }),
-            (.build, { try await StageRunner.build(ctx).path }),
-            (.assets, { try await StageRunner.assets(ctx).path }),
-            (.finalize, { try await StageRunner.finalize(ctx).path }),
-            (.sign, { try await StageRunner.sign(ctx).path }),
-            (.package, { try await StageRunner.package(ctx).path }),
-            (.upload, { try await StageRunner.upload(ctx).report() }),
+        var ctx = try await Context.load(options, fresh: DatedBuildNumber.isFreshRun(command: "ship", from: from))
+        let steps: [(Stage, (Context) async throws -> String)] = [
+            (.prepare, { try await StageRunner.prepare($0) }),
+            (.build, { try await StageRunner.build($0).path }),
+            (.assets, { try await StageRunner.assets($0).path }),
+            (.finalize, { try await StageRunner.finalize($0).path }),
+            (.sign, { try await StageRunner.sign($0).path }),
+            (.package, { try await StageRunner.package($0).path }),
+            (.upload, { try await StageRunner.upload($0).report() }),
         ]
-        // A Tauri build without a freshly synced work copy is never right: starting at build includes prepare.
-        let start: Stage = from == .build && ctx.tauri != nil ? .prepare : from
-        for (stage, step) in steps where stage >= start && stage <= to {
+        // An overlay build without a freshly synced work copy is never right: starting at build includes prepare.
+        let start: Stage = from == .build && ctx.hasPrepare ? .prepare : from
+        for (stage, step) in steps where stage >= start && stage <= last {
             if stage == .upload, ctx.platform == .macos { continue }
-            if stage == .prepare, ctx.tauri == nil { continue }
+            if stage == .prepare, !ctx.hasPrepare { continue }
             print("==> \(stage.rawValue)")
-            print(try await step())
+            print(try await step(ctx))
+            // React Native: the Xcode project exists only after prepare; resolve again (the run's build number is recorded).
+            if stage == .prepare, ctx.isReactNative { ctx = try await Context.load(options, fresh: false) }
         }
     }
 }

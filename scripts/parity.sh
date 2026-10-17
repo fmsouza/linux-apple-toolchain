@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Compares an Xcode build of HelloShip with an xless (Linux) build of the same sources. Run on the Mac.
-# Checks Info.plist keys, the main binary's LC_BUILD_VERSION, bundle file lists and (iOS) Assets.car renditions,
-# validity (assetutil --validate-file) and thinnability;
+# Checks Info.plist keys, the main binary's LC_BUILD_VERSION, bundle file lists and (iOS) Assets.car renditions
+# (`xless tauri compare --assets-only`: per rendition what assetutil --info reports that changes how it draws, such as
+# Opaque, Colorspace and color components), validity (assetutil --validate-file) and thinnability;
 # legitimate differences are listed with reasons in scripts/parity-allowlist.txt. Known AssetKit Assets.car gaps
 # are described in docs/research/parity-known-gaps.md.
 set -euo pipefail
@@ -47,21 +48,15 @@ PY
       || { echo "[ios] xless Assets.car fails assetutil --validate-file:"; cat "$W/car-validate.txt"; status=1; }
     xcrun assetutil -i phone -s 3 -p srgb -M 4 -g MTL5,1 -r 2026 -o "$W/car-thin.car" "$LAPP/Assets.car" >"$W/car-thin.txt" 2>&1
     [[ -f "$W/car-thin.car" ]] || { echo "[ios] xless Assets.car cannot be thinned:"; cat "$W/car-thin.txt"; status=1; }
-    for side in XAPP LAPP; do xcrun assetutil --info "${!side}/Assets.car" | python3 -c '
-import json,sys; print("\n".join(sorted({"|".join(str(r.get(k)) for k in ("Name","Idiom","Scale","PixelWidth")) for r in json.load(sys.stdin) if r.get("Name")})))' > "$W/car-$side.txt"; done
-    python3 - "$W/car-XAPP.txt" "$W/car-LAPP.txt" "$ALLOW" <<'PY' || status=1
-# Rendition lines are Name|Idiom|Scale|PixelWidth; allow-list entries are ios:car:-<line> (only in Xcode's car)
-# or ios:car:+<line> (only in xless's car), matched exactly.
-import sys
-x, l = (set(open(f).read().splitlines()) - {""} for f in sys.argv[1:3])
-allow = {e.split('#')[0].strip() for e in open(sys.argv[3]) if e.split('#')[0].strip()}
-diffs = sorted([f"-{r}" for r in x - l] + [f"+{r}" for r in l - x], key=lambda d: (d[1:], d[0]))
-known = [d for d in diffs if f"ios:car:{d}" in allow]
-bad = [d for d in diffs if d not in known]
-for d in known: print(f"  known (allow-listed): {d}")
-print("[ios] Assets.car renditions " + ("OK" if not bad else "DIFF\n  " + "\n  ".join(bad)))
-sys.exit(1 if bad else 0)
-PY
+    # Renditions: the Xcode app's report (with its asset catalogs) against the xless app's cars; the ios:car: entries
+    # of the allow-list are `car:` compare keys.
+    "$X" tauri report "$XAPP" --json "$W/xcode-report-ios.json"
+    sed -n 's/^ios:\(car:[^#]*\).*/\1/p' "$ALLOW" | sed 's/[[:space:]]*$//' > "$W/car-allow.txt"
+    if "$X" tauri compare --assets-only "$W/xcode-report-ios.json" "$LAPP" --allow-file "$W/car-allow.txt"; then
+      echo "[ios] Assets.car renditions OK (known: $(grep -c . "$W/car-allow.txt") allow-listed)"
+    else
+      echo "[ios] Assets.car renditions DIFF"; status=1
+    fi
   fi
 done
 exit $status

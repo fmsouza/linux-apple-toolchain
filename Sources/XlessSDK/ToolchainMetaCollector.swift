@@ -40,6 +40,20 @@ public enum ToolchainMetaCollector {
         }
         return ToolchainMeta(xcodeVersion: try xcodeVersionCode(short), xcodeBuild: build,
                              buildMachineOSBuild: buildMachineOSBuild, compiler: ToolchainMeta.clangCompiler,
-                             platforms: platforms)
+                             platforms: platforms, swiftVersion: try swiftVersion(xcodeApp: xcodeApp))
+    }
+
+    /// The Swift the Xcode ships (Ruling R10), black-box: its default toolchain's `swift --version`, e.g. "Apple Swift
+    /// version 6.2.3 (swiftlang-6.2.3.3.21 clang-1700.6.3.2)" → "6.2.3".
+    public static func swiftVersion(xcodeApp: URL) throws -> String {
+        let swift = xcodeApp.appendingPathComponent("Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swift")
+        let out: String
+        do { out = try Shell.run(swift.path, ["--version"], stage: .sdk).stdout } catch {
+            throw XlessError(.sdk, "cannot run \(swift.path) --version: \(error)", fix: "pass the path to a full Xcode.app")
+        }
+        guard let v = SwiftToolchain.parseVersion(out) else {
+            throw XlessError(.sdk, "no Swift version in `\(swift.path) --version`: \(out)", fix: "pass the path to a full Xcode.app")
+        }
+        return v
     }
 }

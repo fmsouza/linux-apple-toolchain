@@ -2,7 +2,8 @@ import Foundation
 
 /// A `bplist00` writer that reproduces the bytes ibtool writes for a compiled storyboard's `Info.plist`
 /// (docs/research/nib-encoding.md, section 2). Foundation's writer shares equal strings and orders dictionary keys by
-/// hash, while ibtool's output keeps every string as its own object and keeps the dictionary order it was given.
+/// hash, while ibtool's output keeps every string as its own object, unless it is the same object twice (`tagged` /
+/// `ref`: the storyboard identifier's entry point, `vc-storyboard-identifier`), and keeps the dictionary order it was given.
 ///
 /// Layout: objects are flattened depth-first (a dictionary, then all its keys, then all its values); object references
 /// and offset-table entries use the fewest bytes (1, 2, 4 or 8) that hold the object count and the offset table's own
@@ -14,6 +15,10 @@ public enum BinaryPlistWriter {
         case int(Int)
         /// Entries in the order they are written.
         case dict([Entry])
+        /// A value that a later `ref` with the same tag refers to (one object, referenced twice).
+        case tagged(String, Value)
+        /// Another reference to the object of a `tagged` value; adds no object.
+        case ref(String)
     }
 
     public struct Entry: Equatable, Sendable {
@@ -23,17 +28,34 @@ public enum BinaryPlistWriter {
     }
 
     public static func write(_ top: Value) -> Data {
-        // Every value is its own object (no sharing), numbered in `emitTree` order.
+        // Every value is its own object except a `ref`, numbered in `emitTree` order.
         let count = objectCount(top)
         let refSize = byteCount(UInt64(count))
+        var tags: [String: Int] = [:]
+        var counter = 0
+        func assign(_ v: Value) {
+            switch v {
+            case .ref: return
+            case .tagged(let tag, let inner): tags[tag] = counter; assign(inner)
+            case .dict(let entries):
+                counter += 1
+                for e in entries { assign(e.key) }
+                for e in entries { assign(e.value) }
+            case .string, .int: counter += 1
+            }
+        }
+        assign(top)
 
         var out = Data("bplist00".utf8)
         var offsets: [Int] = []
         var nextRef = 0
         func emit(_ v: Value) {
+            if case .tagged(_, let inner) = v { return emit(inner) }
+            if case .ref = v { return }
             offsets.append(out.count)
             nextRef += 1
             switch v {
+            case .tagged, .ref: break
             case .int(let i):
                 out.append(contentsOf: intBytes(i))
             case .string(let s):
@@ -50,8 +72,9 @@ public enum BinaryPlistWriter {
                 // refs: keys are numbered right after this dict, values after all keys' subtrees
                 var refs: [Int] = []
                 var r = nextRef
-                for e in entries { refs.append(r); r += objectCount(e.key) }
-                for e in entries { refs.append(r); r += objectCount(e.value) }
+                for v in entries.map(\.key) + entries.map(\.value) {
+                    if case .ref(let tag) = v { refs.append(tags[tag]!) } else { refs.append(r); r += objectCount(v) }
+                }
                 for ref in refs { out.append(contentsOf: bigEndian(UInt64(ref), size: refSize)) }
             }
         }
@@ -59,6 +82,7 @@ public enum BinaryPlistWriter {
             if count < 15 { out.append(base | UInt8(count)) } else { out.append(base | 0x0F); out.append(contentsOf: intBytes(count)) }
         }
         func emitTree(_ v: Value) {
+            if case .tagged(_, let inner) = v { return emitTree(inner) }
             emit(v)
             if case .dict(let entries) = v {
                 for e in entries { emitTree(e.key) }
@@ -80,8 +104,12 @@ public enum BinaryPlistWriter {
     }
 
     static func objectCount(_ v: Value) -> Int {
-        if case .dict(let entries) = v { return 1 + entries.reduce(0) { $0 + objectCount($1.key) + objectCount($1.value) } }
-        return 1
+        switch v {
+        case .dict(let entries): return 1 + entries.reduce(0) { $0 + objectCount($1.key) + objectCount($1.value) }
+        case .tagged(_, let inner): return objectCount(inner)
+        case .ref: return 0
+        case .string, .int: return 1
+        }
     }
 
     static func byteCount(_ x: UInt64) -> Int {

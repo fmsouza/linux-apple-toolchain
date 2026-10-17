@@ -90,6 +90,64 @@ public enum InspectReport {
         return out.joined(separator: "\n") + "\n"
     }
 
+    /// The macOS report (`xless tauri inspect --platform macos`): the same `key: value` layout, from `tauri.conf.json` and the
+    /// overlay alone. macOS builds are never looked up in App Store Connect: a `dated` build is the clock when a build starts.
+    public static func makeMac(resolved r: ResolvedTauriMac, overlay: TauriOverlay, contract: TauriContract.Detected, source: URL) -> String {
+        var out: [String] = []
+        func section(_ name: String, _ lines: [String]) { out.append("[\(name)]"); out += lines; out.append("") }
+        func list(_ items: [String]) -> String { items.isEmpty ? "(none)" : items.joined(separator: ", ") }
+        let mac = r.config.platforms[.macos]
+        let bundle = r.tauri.raw["bundle"] as? [String: Any] ?? [:]
+        var resources: [String]
+        do {
+            resources = try TauriMacBundler.resourceMappings(resources: bundle["resources"], tauriDir: source.appendingPathComponent(r.tauriDir)).map(\.target).sorted()
+        } catch let e as XlessError {
+            resources = ["(\(e.cause))"]
+        } catch {
+            resources = ["(\(error))"]
+        }
+        let associations = (bundle["fileAssociations"] as? [Any])?.count ?? 0
+        let wrappers = TauriMacEnvironment.targets.compactMap { try? TauriMacEnvironment.linkerWrapper(target: $0, workRoot: URL(fileURLWithPath: "/")).lastPathComponent }
+
+        section("project", [
+            "overlay: \(overlay.name)",
+            "platform: macos",
+            "bundleID: \(r.config.bundleID(for: .macos))",
+            "teamID: \(r.config.teamID)",
+            "version: \(r.config.version)",
+            "product: \(mac?.product ?? "(none)")",
+            "minimumOS: \(mac?.minimumOS ?? "(none)")",
+            "features: \(list(overlay.macFeatures))\(overlay.macos?.features != nil ? " (macos.features)" : "")",
+            "entitlements: \(mac?.entitlements ?? "(none)")",
+            "infoPlist: \(r.config.infoPlist ?? "(none)")",
+            "usesNonExemptEncryption: \(r.config.usesNonExemptEncryption.map { String($0) } ?? "(unset)")",
+        ])
+        section("contract", [
+            "supported: \(TauriContract.supported).x",
+            "tauri: \(contract.tauri ?? "(not found)")",
+            "cli: \(contract.cli ?? "(not found)")",
+            "status: \(contract.inContract ? "in contract" : "OFF CONTRACT")",
+        ])
+        section("bundle", [
+            "frontendDist: \(r.tauri.frontendDist ?? "(none)")",
+            "beforeBuildCommand: \(r.tauri.beforeBuildCommand ?? "(none)")",
+            "resources: \(list(resources))",
+            "fileAssociations: \(associations)",
+        ])
+        section("link", [
+            "targets: \(TauriMacEnvironment.targets.joined(separator: " "))",
+            "linkerWrapper: \(list(wrappers))",
+            "stripFlag: -Wl,-x",
+        ])
+        section("build", [
+            "scheme: \(r.config.buildScheme == .dated ? "dated" : "fixed")",
+            "number: \(r.config.buildScheme == .dated ? "\(r.config.version).<YYYYMMDDHHmm> (chosen when a build starts)" : r.config.build)",
+            "next: (no App Store Connect lookup for macOS)",
+        ])
+        out.removeLast()
+        return out.joined(separator: "\n") + "\n"
+    }
+
     /// Script name → `built-in`, `ignore` or `UNHANDLED`; the report prints an unmapped script instead of refusing it.
     public static func scripts(target: XcodeGenTarget, overlay: TauriOverlay) -> [String: String] {
         Dictionary(ScriptPolicy.classify(target: target, overlay: overlay).map { ($0.name, $0.handling ?? "UNHANDLED") }, uniquingKeysWith: { $1 })

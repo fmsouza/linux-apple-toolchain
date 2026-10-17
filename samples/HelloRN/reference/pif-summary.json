@@ -1,0 +1,106 @@
+{
+  "project": "HelloRN.xcodeproj",
+  "targets": [
+    {
+      "baseConfigurations": [
+        "Pods-HelloRN.debug.xcconfig",
+        "Pods-HelloRN.release.xcconfig"
+      ],
+      "buildConfigurations": [
+        "Debug",
+        "Release"
+      ],
+      "buildPhases": [
+        {
+          "alwaysOutOfDate": "false",
+          "name": "[CP] Check Pods Manifest.lock",
+          "type": "shell-script"
+        },
+        {
+          "alwaysOutOfDate": "true",
+          "name": "[Expo] Configure project",
+          "type": "shell-script"
+        },
+        {
+          "type": "sources"
+        },
+        {
+          "buildFiles": [
+            {
+              "file": "libPods-HelloRN.a"
+            }
+          ],
+          "type": "frameworks"
+        },
+        {
+          "type": "resources"
+        },
+        {
+          "alwaysOutOfDate": "true",
+          "name": "Bundle React Native code and images",
+          "type": "shell-script"
+        },
+        {
+          "alwaysOutOfDate": "false",
+          "name": "[CP] Copy Pods Resources",
+          "type": "shell-script"
+        },
+        {
+          "buildFiles": [
+            {
+              "target": "HelloExtension"
+            }
+          ],
+          "destinationSubfolder": "$(PLUGINS_FOLDER_PATH)",
+          "destinationSubpath": "",
+          "type": "copy-files"
+        },
+        {
+          "alwaysOutOfDate": "false",
+          "name": "[CP] Embed Pods Frameworks",
+          "type": "shell-script"
+        }
+      ],
+      "dependencies": [],
+      "name": "HelloRN",
+      "product": "HelloRN.app",
+      "productTypeIdentifier": "com.apple.product-type.application",
+      "type": "standard"
+    },
+    {
+      "baseConfigurations": [],
+      "buildConfigurations": [
+        "Debug",
+        "Release"
+      ],
+      "buildPhases": [
+        {
+          "type": "sources"
+        },
+        {
+          "buildFiles": [],
+          "type": "frameworks"
+        },
+        {
+          "type": "resources"
+        }
+      ],
+      "dependencies": [],
+      "name": "HelloExtension",
+      "product": "HelloExtension.appex",
+      "productTypeIdentifier": "com.apple.product-type.app-extension",
+      "type": "standard"
+    }
+  ],
+  "workspaceProjects": [
+    {
+      "name": "HelloRN.xcodeproj",
+      "targets": 2
+    },
+    {
+      "name": "Pods.xcodeproj",
+      "targets": 95
+    }
+  ],
+  "xcodeBuild": "27A266a"
+}

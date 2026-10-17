@@ -2,7 +2,7 @@ import Foundation
 import XlessCore
 import XlessMachO
 
-public struct ExecutableReport: Codable, Equatable, Sendable {
+public struct SliceReport: Codable, Equatable, Sendable {
     public var platform: UInt32
     public var minos: String
     public var linkedLibraries: [String]
@@ -11,12 +11,34 @@ public struct ExecutableReport: Codable, Equatable, Sendable {
     public init(platform: UInt32, minos: String, linkedLibraries: [String], rpaths: [String]) {
         self.platform = platform; self.minos = minos; self.linkedLibraries = linkedLibraries; self.rpaths = rpaths
     }
+}
+
+public struct ExecutableReport: Codable, Equatable, Sendable {
+    public var platform: UInt32
+    public var minos: String
+    public var linkedLibraries: [String]
+    public var rpaths: [String]
+    /// Per-architecture view; present only for fat binaries. The fields above are those of the first slice in arch-name order.
+    public var slices: [String: SliceReport]?
+
+    public init(platform: UInt32, minos: String, linkedLibraries: [String], rpaths: [String], slices: [String: SliceReport]? = nil) {
+        self.platform = platform; self.minos = minos; self.linkedLibraries = linkedLibraries; self.rpaths = rpaths
+        self.slices = slices
+    }
 
     static func read(_ url: URL) throws -> ExecutableReport {
         let data = try Data(contentsOf: url)
-        let bv = try MachO.buildVersions(in: data).first
-        return ExecutableReport(platform: bv?.platform ?? 0, minos: bv.map { MachO.decodeVersion($0.minos) } ?? "",
-                                linkedLibraries: try MachO.linkedLibraries(in: data), rpaths: try MachO.rpaths(in: data))
+        let archs = try MachO.sliceArchitectures(in: data).sorted { $0.name < $1.name }
+        var reports: [String: SliceReport] = [:]
+        for a in archs {
+            let bv = try MachO.buildVersion(in: data, slice: a.range)
+            reports[a.name] = SliceReport(platform: bv?.platform ?? 0, minos: bv.map { MachO.decodeVersion($0.minos) } ?? "",
+                                          linkedLibraries: try MachO.linkedLibraries(in: data, slice: a.range),
+                                          rpaths: try MachO.rpaths(in: data, slice: a.range))
+        }
+        guard let first = archs.first.flatMap({ reports[$0.name] }) else { throw MachOError.notMachO }
+        return ExecutableReport(platform: first.platform, minos: first.minos, linkedLibraries: first.linkedLibraries,
+                                rpaths: first.rpaths, slices: MachO.isFat(data) ? reports : nil)
     }
 }
 
@@ -26,6 +48,9 @@ public struct BundleReport: Codable, Equatable, Sendable {
     public var infoPlist: [String: String]
     public var executable: ExecutableReport
     public var frameworks: [String: ExecutableReport]
+    /// `AssetCatalogReport` lines of each `.car` in the bundle, by bundle-relative path. Recorded only where `xcrun
+    /// assetutil` exists (macOS); absent from reports made elsewhere, and then not compared.
+    public var assetCatalogs: [String: [String]]? = nil
 
     static let volatilePlistKeys: Set<String> = ["BuildMachineOSBuild", "DTCompiler", "DTPlatformBuild", "DTSDKBuild",
                                                  "DTXcode", "DTXcodeBuild", "CFBundleVersion"]
@@ -51,7 +76,11 @@ public struct BundleReport: Codable, Equatable, Sendable {
         }
         files.sort()
 
-        let plistURL = root.appendingPathComponent("Info.plist")
+        // macOS bundles keep everything under Contents/ (Info.plist, MacOS/<exe>, Frameworks/); iOS bundles are flat.
+        let contents = root.appendingPathComponent("Contents")
+        let base = fm.fileExists(atPath: contents.appendingPathComponent("Info.plist").path) ? contents : root
+        let exeDir = base == contents ? contents.appendingPathComponent("MacOS") : root
+        let plistURL = base.appendingPathComponent("Info.plist")
         guard let plistData = try? Data(contentsOf: plistURL),
               let plist = try? PropertyListSerialization.propertyList(from: plistData, options: [], format: nil) as? [String: Any] else {
             throw XlessError(.build, "no readable Info.plist in \(app.path)", fix: "pass the path of a built .app directory")
@@ -63,11 +92,11 @@ public struct BundleReport: Codable, Equatable, Sendable {
             throw XlessError(.build, "Info.plist in \(app.path) has no CFBundleExecutable", fix: "pass the path of a built .app directory")
         }
         let exe: ExecutableReport
-        do { exe = try ExecutableReport.read(root.appendingPathComponent(exeName)) }
+        do { exe = try ExecutableReport.read(exeDir.appendingPathComponent(exeName)) }
         catch { throw XlessError(.build, "cannot read executable \(exeName) in \(app.path): \(error)", fix: "pass the path of a built .app directory") }
 
         var fws: [String: ExecutableReport] = [:]
-        let fwDir = root.appendingPathComponent("Frameworks")
+        let fwDir = base.appendingPathComponent("Frameworks")
         for name in ((try? fm.contentsOfDirectory(atPath: fwDir.path)) ?? []).sorted() where name.hasSuffix(".framework") {
             let bin = fwDir.appendingPathComponent(name).appendingPathComponent(String(name.dropLast(".framework".count)))
             guard let data = try? Data(contentsOf: bin) else { continue }
@@ -78,7 +107,10 @@ public struct BundleReport: Codable, Equatable, Sendable {
             do { fws[name] = try ExecutableReport.read(bin) }
             catch { throw XlessError(.build, "cannot read framework \(name) in \(app.path): \(error)", fix: "pass the path of a built .app directory") }
         }
-        return BundleReport(files: files, infoPlist: info, executable: exe, frameworks: fws)
+        // Bundles without a car (macOS apps with an .icns) report none, so their JSON keeps its shape.
+        let hasCar = files.contains { $0.hasSuffix(".car") }
+        let catalogs = AssetCatalogReport.isAvailable && hasCar ? try AssetCatalogReport.catalogs(in: root, files: files) : nil
+        return BundleReport(files: files, infoPlist: info, executable: exe, frameworks: fws, assetCatalogs: catalogs)
     }
 
     /// Platform-independent rendering of a plist value: sorted dictionary keys, explicit scalar forms.
@@ -118,7 +150,8 @@ public struct BundleReport: Codable, Equatable, Sendable {
         return try enc.encode(self)
     }
 
-    /// One line per difference, each starting with its key (`file:`, `plist:`, `lib:`, `rpath:`, `exe:`, `framework:`).
+    /// One line per difference, each starting with its key (`file:`, `plist:`, `lib:`, `rpath:`, `exe:`, `framework:`,
+    /// `car:`). Asset catalogs are compared only when both reports carry them (both made on a Mac).
     public static func diff(reference: BundleReport, actual: BundleReport, allowed: Set<String>) -> [String] {
         var out: [String] = []
         func add(_ key: String, _ msg: String) { if !allowed.contains(key) { out.append("\(key) \(msg)") } }
@@ -152,6 +185,15 @@ public struct BundleReport: Codable, Equatable, Sendable {
         if reference.executable.minos != actual.executable.minos {
             add("exe:minos", "reference=\(reference.executable.minos) actual=\(actual.executable.minos)")
         }
+        let rs = reference.executable.slices ?? [:], as_ = actual.executable.slices ?? [:]
+        for arch in Set(rs.keys).union(as_.keys).sorted() {
+            guard let r = rs[arch] else { add("exe:slice:\(arch):extra", "not in reference"); continue }
+            guard let a = as_[arch] else { add("exe:slice:\(arch):missing", "missing from actual"); continue }
+            let rl = Set(r.linkedLibraries), al = Set(a.linkedLibraries)
+            for l in rl.subtracting(al).sorted() { add("lib:\(arch):\(l)", "missing from actual") }
+            for l in al.subtracting(rl).sorted() { add("lib:\(arch):\(l)", "not in reference") }
+            if r.minos != a.minos { add("exe:\(arch):minos", "reference=\(r.minos) actual=\(a.minos)") }
+        }
         for n in Set(reference.frameworks.keys).union(actual.frameworks.keys).sorted() {
             let r = reference.frameworks[n], a = actual.frameworks[n]
             if r == nil { add("framework:\(n)", "not in reference") }
@@ -159,6 +201,9 @@ public struct BundleReport: Codable, Equatable, Sendable {
             else if r!.platform != a!.platform || r!.minos != a!.minos {
                 add("framework:\(n)", "reference=\(r!.platform)/\(r!.minos) actual=\(a!.platform)/\(a!.minos)")
             }
+        }
+        if let rc = reference.assetCatalogs, let ac = actual.assetCatalogs {
+            out += AssetCatalogReport.diff(reference: rc, actual: ac, allowed: allowed)
         }
         return out
     }

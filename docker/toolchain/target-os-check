@@ -1,0 +1,82 @@
+#!/bin/sh
+# Ruling R10: the TARGET_OS_* macros an image's clang predefines, against those of the Apple clang its Xcode ships
+# (docker/toolchain/target-os/<Xcode build>.txt, measured black-box by scripts/target-os-macros.sh: the compiler's
+# output for an empty input). docker/Dockerfile.sdk runs it when it builds an image.
+#   target-os-check check <fixture> <clang> [flag …]
+#     For every Darwin triple of the fixture, each macro's value under `#if` through `<clang> -target <triple> [flag …]`
+#     is the fixture's (a macro the clang leaves undefined is "undef"), and the clang defines no TARGET_OS_ macro the
+#     fixture lacks. For every triple the fixture records without macros (Linux), the clang defines none.
+#     TARGET_OS_ALLOW_UNDEF: names the clang may leave undefined (the default chain's open-source clang, which no driver
+#     bridges; docker/Dockerfile.sdk names them in the build log).
+#   target-os-check darwin <fixture> <clang> [flag …]
+#     check's Darwin half only: flags that reach Darwin compiles only (the record's clangFlags).
+#   target-os-check same <fixture> <wrapper> <driver>
+#     For every triple the fixture records without macros: `<wrapper> -dM -E` prints exactly what `<driver> -dM -E`
+#     prints (the clang driver changes nothing for a Linux target).
+#   target-os-check missing <fixture> <clang> [flag …]
+#     The fixture's macros that `<clang> -target <first Darwin triple> [flag …]` leaves undefined, one per line.
+#   target-os-check derive <derived> <name …>
+#     The -D flags defining each name from docker/toolchain/target-os/derived.txt; fails for a name it has no rule for.
+# Exits 1 with the differences on stderr.
+set -eu
+die() { echo "target-os-check: $*" >&2; exit 1; }
+[ $# -ge 2 ] || die "usage: $0 check|darwin|same|missing <fixture> <clang> … | derive <derived> <name …>"
+cmd=$1 fixture=$2; shift 2
+[ -f "$fixture" ] || die "no $fixture"
+tmp=$(mktemp -d); trap 'rm -rf "$tmp"' EXIT
+triples() { grep -v '^#' "$fixture" | awk -v want="$1" 'NF && (want == "darwin" ? $2 != "-" : $2 == "-") { print $1 }' | uniq; }
+expected() { grep -v '^#' "$fixture" | awk -v t="$1" '$1 == t && $2 != "-" { print $2, $3 }'; }
+# The value of each name under #if, or undef: "<name> <value>" lines.
+values() {   # values <triple> <clang> [flag …]  (names on stdin)
+  t=$1; shift
+  while read -r n; do
+    printf '#ifdef %s\n#if %s\nxless_v_%s 1\n#else\nxless_v_%s 0\n#endif\n#else\nxless_v_%s undef\n#endif\n' "$n" "$n" "$n" "$n" "$n"
+  done > "$tmp/probe.c"
+  "$@" -target "$t" -E -P -x c "$tmp/probe.c" | sed -n 's/^xless_v_\([A-Z0-9_]*\) \(.*\)$/\1 \2/p'
+}
+defined() { "$@" -dM -E -x c /dev/null | sed -n 's/^#define \(TARGET_OS_[A-Z0-9_]*\) .*/\1/p' | sort; }
+case "$cmd" in
+  check|darwin)
+    [ $# -ge 1 ] || die "$cmd needs a clang"
+    bad=0
+    for t in $(triples darwin); do
+      expected "$t" | sort > "$tmp/want"
+      awk '{ print $1 }' "$tmp/want" | values "$t" "$@" | sort > "$tmp/got"
+      for n in ${TARGET_OS_ALLOW_UNDEF:-}; do
+        grep -qx "$n undef" "$tmp/got" || continue
+        grep -v "^$n " "$tmp/want" > "$tmp/w2" || true; mv "$tmp/w2" "$tmp/want"
+        grep -v "^$n " "$tmp/got" > "$tmp/g2" || true; mv "$tmp/g2" "$tmp/got"
+      done
+      if ! cmp -s "$tmp/want" "$tmp/got"; then
+        echo "$t: TARGET_OS_ values differ from Apple clang's (< Apple, > $*):" >&2; diff "$tmp/want" "$tmp/got" >&2 || true; bad=1
+      fi
+      extra=$(defined "$@" -target "$t" | while read -r n; do grep -q "^$n " "$tmp/want" || echo "$n"; done)
+      [ -z "$extra" ] || { echo "$t: Apple clang does not define $extra" >&2; bad=1; }
+    done
+    [ "$cmd" = check ] && for t in $(triples linux); do
+      n=$(defined "$@" -target "$t" | wc -l | tr -d ' ')
+      [ "$n" = 0 ] || { echo "$t: $n TARGET_OS_ macros defined; Apple clang defines none for it" >&2; bad=1; }
+    done
+    exit $bad ;;
+  same)
+    [ $# = 2 ] || die "same needs a wrapper and a driver"
+    bad=0
+    for t in $(triples linux); do
+      for x in c c++; do
+        "$1" -target "$t" -dM -E -x $x /dev/null > "$tmp/w"; "$2" -target "$t" -dM -E -x $x /dev/null > "$tmp/d"
+        cmp -s "$tmp/w" "$tmp/d" || { echo "$t ($x): $1 predefines differently from $2:" >&2; diff "$tmp/d" "$tmp/w" >&2 || true; bad=1; }
+      done
+    done
+    exit $bad ;;
+  missing)
+    [ $# -ge 1 ] || die "missing needs a clang"
+    t=$(triples darwin | head -1)
+    expected "$t" | awk '{ print $1 }' | values "$t" "$@" | awk '$2 == "undef" { print $1 }' ;;
+  derive)
+    for n; do
+      rule=$(grep -v '^#' "$fixture" | awk -v n="$n" '$1 == n { $1 = ""; sub(/^ /, ""); print; exit }')
+      [ -n "$rule" ] || die "no rule for $n in $fixture: Apple clang defines it, this clang does not (add a rule, measured from the Xcode's clang, or fix the toolchain)"
+      printf '%s\n' "-D$n=$rule"
+    done ;;
+  *) die "unknown command $cmd" ;;
+esac

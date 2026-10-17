@@ -26,6 +26,11 @@ public enum DatedBuildNumber {
         return candidate
     }
 
+    /// A macOS (Developer ID) dated build: `<version>.<yyyyMMddHHmm>` in UTC. No App Store Connect holds these builds, so the clock is the only input.
+    public static func macOS(version: String, now: Date) -> String {
+        "\(version).\(format(now, "yyyyMMddHHmm"))"
+    }
+
     /// Dotted-integer comparison; missing components count as 0 and non-numeric ones as 0.
     static func compare(_ a: String, _ b: String) -> Int {
         let x = a.split(separator: ".", omittingEmptySubsequences: false).map { Int($0) ?? 0 }
@@ -37,12 +42,14 @@ public enum DatedBuildNumber {
         return 0
     }
 
-    static func dateString(_ d: Date) -> String {
+    static func dateString(_ d: Date) -> String { format(d, "yyyyMMdd") }
+
+    private static func format(_ d: Date, _ pattern: String) -> String {
         let f = DateFormatter()
         f.locale = Locale(identifier: "en_US_POSIX")
         f.timeZone = TimeZone(identifier: "UTC")
         f.calendar = Calendar(identifier: .gregorian)
-        f.dateFormat = "yyyyMMdd"
+        f.dateFormat = pattern
         return f.string(from: d)
     }
 
@@ -118,14 +125,20 @@ public enum DatedBuildNumber {
     /// Settles the build number of a run on `config` (`Context.load`). Runs as the `config` stage, so App Store Connect,
     /// network and decoding failures print `[config] cause — fix` and exit 10. An override is applied (`applyOverride`)
     /// and, for a dated run that starts, recorded in `file` so that later stages run without it read the same number;
-    /// otherwise `build: dated` is resolved (`resolve`) and fixed builds are left alone.
+    /// otherwise `build: dated` is resolved (`resolve`) and fixed builds are left alone. `local` (a build that is never
+    /// uploaded: React Native simulator builds) resolves `dated` without App Store Connect (`resolveLocal`).
     public static func settle(_ config: inout ProjectConfig, override: String?, file: URL, secrets: Secrets, fresh: Bool, today: Date = Date(),
+                              local: Bool = false,
                               makeClient: (ASCCredentials) -> ASCClient = { ASCClient(credentials: $0) }) async throws {
         config = try await withStage(.config) { [config] in
             var c = config
             if let override {
                 try applyOverride(override, to: &c)
                 if fresh, c.buildScheme == .dated { try record(override, in: file) }
+            } else if c.buildScheme == .dated, local {
+                c.build = try resolveLocal(version: c.version, fresh: fresh, file: file, today: today)
+            } else if c.buildScheme == .dated, ProjectConfig.isMacOnly(c.platforms) {
+                c.build = try resolveMac(version: c.version, fresh: fresh, file: file, now: today)
             } else if c.buildScheme == .dated {
                 c.build = try await resolve(version: c.version, bundleID: c.bundleID(for: .ios), fresh: fresh, file: file,
                                             secrets: secrets, today: today, makeClient: makeClient)
@@ -137,15 +150,34 @@ public enum DatedBuildNumber {
     /// The build number of a `build: dated` run. `fresh` (a run starting) queries and records it in `file`; otherwise the record is read.
     public static func resolve(version: String, bundleID: String, fresh: Bool, file: URL, secrets: Secrets, today: Date = Date(),
                                makeClient: (ASCCredentials) -> ASCClient = { ASCClient(credentials: $0) }) async throws -> String {
-        guard fresh else {
-            guard let text = try? String(contentsOf: file, encoding: .utf8),
-                  case let v = text.trimmingCharacters(in: .whitespacesAndNewlines), !v.isEmpty else {
-                throw XlessError(.config, "no build number recorded for this work copy", fix: "run `xless ship` (or `xless build`) first")
-            }
-            return v
-        }
+        guard fresh else { return try recorded(file) }
         let v = try await compute(version: version, bundleID: bundleID, secrets: secrets, today: today, makeClient: makeClient)
         try record(v, in: file)
+        return v
+    }
+
+    /// The build number of a dated macOS run: from the clock when a run starts (recorded in `file`), else the record.
+    public static func resolveMac(version: String, fresh: Bool, file: URL, now: Date = Date()) throws -> String {
+        guard fresh else { return try recorded(file) }
+        let v = macOS(version: version, now: now)
+        try record(v, in: file)
+        return v
+    }
+
+    /// The build number of a dated run that is never uploaded: `<version>.<YYYYMMDD>01` when a run starts (recorded in
+    /// `file`), else the record. No App Store Connect query, so no credentials.
+    public static func resolveLocal(version: String, fresh: Bool, file: URL, today: Date = Date()) throws -> String {
+        guard fresh else { return try recorded(file) }
+        let v = try next(version: version, today: today, existing: [])
+        try record(v, in: file)
+        return v
+    }
+
+    static func recorded(_ file: URL) throws -> String {
+        guard let text = try? String(contentsOf: file, encoding: .utf8),
+              case let v = text.trimmingCharacters(in: .whitespacesAndNewlines), !v.isEmpty else {
+            throw XlessError(.config, "no build number recorded for this work copy", fix: "run `xless ship` (or `xless build`) first")
+        }
         return v
     }
 

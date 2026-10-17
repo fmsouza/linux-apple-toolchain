@@ -1,0 +1,94 @@
+import Foundation
+import XlessCore
+
+/// The environment of the two programs xless runs on Tauri's behalf for the macOS (universal) build.
+/// Values: docs/research/tauri-ios-contract.md, "macOS (desktop)" (what `tauri build` sets on the Mac) and "macOS — spike B"
+/// (what the Linux host needs on top).
+public enum TauriMacEnvironment {
+    public static let targets = ["aarch64-apple-darwin", "x86_64-apple-darwin"]
+
+    /// The `beforeBuildCommand` hook env, once for both architectures. TAURI_ENV_PLATFORM_VERSION is the host macOS version
+    /// on a Mac; on Linux it is the macOS SDK version (open question 5). TAURI_ENV_DEBUG is not set for a release build.
+    public static func frontend(sdk: DarwinSDK) throws -> [String: String] {
+        [
+            "TAURI_ENV_PLATFORM": "darwin",
+            "TAURI_ENV_ARCH": "universal",
+            "TAURI_ENV_TARGET_TRIPLE": "universal-apple-darwin",
+            "TAURI_ENV_FAMILY": "unix",
+            "TAURI_ENV_PLATFORM_VERSION": try sdk.sdkVersion("macosx"),
+        ]
+    }
+
+    /// cargo's env for one `target`. As on the Mac: MACOSX_DEPLOYMENT_TARGET. Added for Linux (spike B): SDKROOT, the C
+    /// toolchain told its target, the target's linker wrapper, clang for `host` build scripts, and no stripping by cargo
+    /// (rust-objcopy can leave a Mach-O that dyld refuses; the wrapper's `-Wl,-x` drops local symbols instead).
+    /// `swift`: the image's app Swift toolchain (Ruling R10), whose clang compiles the target's C code; nil: `clang` on PATH.
+    public static func cargo(resolved: ResolvedTauriMac, target: String, sdk: DarwinSDK, workRoot: URL,
+                             host: String? = TauriEnvironment.defaultHost, swift: SwiftToolchain? = nil) throws -> [String: String] {
+        let arch = try Self.arch(of: target)
+        let sdkRoot = try sdk.sdkPath("macosx").path
+        let minOS = try resolved.config.platform(.macos).minimumOS
+        let cflags = "--target=\(arch)-apple-macos\(minOS) -isysroot \(sdkRoot)"
+        let t = target.replacingOccurrences(of: "-", with: "_")
+        var env = [
+            "SDKROOT": sdkRoot,
+            "MACOSX_DEPLOYMENT_TARGET": minOS,
+            "CC_\(t)": swift?.tool("clang") ?? "clang",
+            "CXX_\(t)": swift?.tool("clang++") ?? "clang++",
+            "AR_\(t)": "llvm-ar",
+            "CFLAGS_\(t)": cflags,
+            "CXXFLAGS_\(t)": cflags,
+            "CARGO_TARGET_\(t.uppercased())_LINKER": try linkerWrapper(target: target, workRoot: workRoot).path,
+            "CARGO_PROFILE_RELEASE_STRIP": "false",
+        ]
+        if let host {
+            let underscored = host.replacingOccurrences(of: "-", with: "_")
+            env["CARGO_TARGET_\(underscored.uppercased())_LINKER"] = "clang"
+            env["CC_\(underscored)"] = "clang"
+            env["CXX_\(underscored)"] = "clang++"
+        }
+        // TAURI_CONFIG (a merge patch) only when the overlay changes the identifier or version tauri.conf.json would compile in.
+        var patch: [String: String] = [:]
+        if resolved.config.bundleID != resolved.tauri.identifier { patch["identifier"] = resolved.config.bundleID }
+        if resolved.config.version != resolved.tauri.version { patch["version"] = resolved.config.version }
+        if !patch.isEmpty {
+            let data = try JSONSerialization.data(withJSONObject: patch, options: [.sortedKeys])
+            env["TAURI_CONFIG"] = String(decoding: data, as: UTF8.self)
+        }
+        return env
+    }
+
+    /// clang's name for a darwin target's architecture.
+    static func arch(of target: String) throws -> String {
+        switch target {
+        case "aarch64-apple-darwin": return "arm64"
+        case "x86_64-apple-darwin": return "x86_64"
+        default: throw XlessError(.build, "unsupported macOS target '\(target)'", fix: "use aarch64-apple-darwin or x86_64-apple-darwin")
+        }
+    }
+
+    /// Like the iOS wrapper, the file name must NOT end in `ld`/`ld64`/`lld`: rustc infers the linker flavor from it.
+    static func linkerWrapper(target: String, workRoot: URL) throws -> URL {
+        let arch = try Self.arch(of: target)
+        return workRoot.appendingPathComponent(".xless/bin/xless-macos-cc-\(arch)")
+    }
+
+    /// cargo's linker for a darwin target: the executable link and any dependency or app library declaring a `cdylib`
+    /// crate type. `-Wl,-framework,Foundation` before the arguments makes the webview crate's cookie-name constants bind
+    /// to Foundation as on the Mac (not CFNetwork); `-Wl,-x` strips local symbols the way Xcode's `strip -x` does.
+    public static func writeLinkerWrapper(target: String, minOS: String, sdk: DarwinSDK, workRoot: URL, swift: SwiftToolchain? = nil) throws -> URL {
+        func q(_ s: String) -> String { "'" + s.replacingOccurrences(of: "'", with: "'\\''") + "'" }
+        let arch = try Self.arch(of: target)
+        let url = try linkerWrapper(target: target, workRoot: workRoot)
+        let text = """
+            #!/bin/sh
+            # Generated by xless: cargo's linker for \(target).
+            exec \(swift.map { q($0.tool("clang")) } ?? "clang") --target=\(arch)-apple-macos\(minOS) -isysroot \(q(try sdk.sdkPath("macosx").path)) -fuse-ld=\(q(sdk.ld64.path)) -mlinker-version=907 -Wl,-framework,Foundation -Wl,-x "$@" \(q(try sdk.clangRuntime(platform: "osx").path))
+
+            """
+        try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try text.write(to: url, atomically: true, encoding: .utf8)
+        try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: url.path)
+        return url
+    }
+}

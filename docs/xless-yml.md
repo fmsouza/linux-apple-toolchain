@@ -28,6 +28,7 @@ infoPlist: Resources/Info.plist
 | `privacyManifest` | path | required for iOS (app-store) | `PrivacyInfo.xcprivacy`, copied into the bundle; `finalize` fails for App Store builds if it is missing. |
 | `infoPlist` | path | no | Extra Info.plist keys merged into the generated one (usage descriptions, orientations, export-compliance keys). |
 | `usesNonExemptEncryption` | boolean | no | Stamps `ITSAppUsesNonExemptEncryption` (export compliance) into the Info.plist. `finalize` refuses iOS App Store builds whose Info.plist has no such key (they would stall at "Missing Compliance" in TestFlight). Set it here, or put the key in the `infoPlist` file. If both define it with different values, `finalize` refuses. `false` means the app uses no encryption beyond what Apple's OS provides or only exempt encryption. `true` is valid, but App Store Connect then needs an export compliance answer for each build before testers can install it. A non-boolean value in the Info.plist is refused. |
+| `xcode` | string | no | The Xcode whose SDK must build the app, e.g. `"26.2"` (Ruling R8; see [react-native.md](react-native.md#pinning-the-xcode-sdk)). `build` refuses an image whose SDK comes from another Xcode, the app compiles with the Swift toolchain that Xcode ships (Ruling R10), `scripts/testflight.sh` runs in the images `make images XCODE=…` made from it (`xless:local-<arch>-xcode<version>`). Default: the image's SDK. |
 | `testflight` | map | no | Deliver uploaded builds to TestFlight groups. See [`testflight`](#testflight). |
 | `launchStoryboard` | path | no | iOS only (ignored for macOS). A launch-screen `.storyboard` (must end in `.storyboard`), relative to the project. See [Launch storyboard](#launch-storyboard). |
 
@@ -37,7 +38,7 @@ infoPlist: Resources/Info.plist
 |---|---|---|---|
 | `minimumOS` | string | yes | Dotted version such as `"17.0"`. For iOS it must be 13.0 or later (Apple's rule, checked at `finalize`). Keep it equal to the `platforms:` in `Package.swift`. |
 | `product` | string | yes | The library product in `Package.swift` that holds the app (e.g. `.library(name: "HelloShip", targets: ["HelloShip"])`). xtool (iOS) and xless (macOS) link it into a generated executable named after it. |
-| `entitlements` | path | no | Entitlements plist, relative to the project. Managed and security-sensitive entitlements are gated against the provisioning profile. |
+| `entitlements` | path | no | Entitlements plist, relative to the project. Managed and security-sensitive entitlements are gated against the provisioning profile. `$(AppIdentifierPrefix)` and `$(TeamIdentifierPrefix)` become `<teamID>.`; on iOS the values of `keychain-access-groups`, `com.apple.security.application-groups` and `com.apple.developer.associated-domains` must be ones the profile allows, and `aps-environment` takes the profile's value, as Xcode signs. |
 | `distribution` | `app-store` or `developer-id` | no | Defaults: iOS `app-store`, macOS `developer-id`. |
 | `bundleID` | string | no | Overrides the top-level `bundleID` for this platform. Same format rule. |
 
@@ -76,8 +77,9 @@ ibtool (`xless storyboard compile` is the same compiler as a standalone command)
   ([research/ib-invocation.md](research/ib-invocation.md)); Info.plist gets `UILaunchStoryboardName = <name>` and loses
   `UILaunchScreen`.
 - Images and named colors the storyboard uses must be in the `assets` catalog (e.g. a `Logo.imageset`).
-- Only a subset is supported: one view controller with a root view, image views, labels, Auto Layout constraints,
-  colors and safe area, views nested at most 32 levels deep, files up to 4 MiB. Anything else, or a storyboard saved by
+- Only a subset is supported: one view controller (optionally with a storyboard ID) with a root view, image views,
+  labels, Auto Layout constraints, colors, safe area and accessibility traits, views nested at most 32 levels deep,
+  files up to 4 MiB; this covers Expo's generated `SplashScreen.storyboard`. Anything else, or a storyboard saved by
   an Xcode newer than 27.0, fails with
   `[assets] launch storyboard <path>: unsupported … at line <n> — …` (exit code 13).
 

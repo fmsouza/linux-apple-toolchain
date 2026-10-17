@@ -131,10 +131,11 @@ private func keyNames(_ a: NIBArchive) -> [String] { a.keys.map { String(decodin
     #expect(try ArchiveBuilder.int(2147517444) == .int64(2147517444))
 }
 
-@Test func int32WidthIsRefused() throws {
-    for v in [32768, Int(Int32.max)] {
-        let e = try #require(throws: XlessError.self) { try ArchiveBuilder.int(v) }
-        #expect(e.cause.hasPrefix("unsupported: integer \(v)"))
-        #expect(e.cause.hasSuffix("(see docs/research/nib-encoding.md#open-questions)"))
-    }
+/// Open question 9, resolved in m3 Task 6b: 32768…2^31-1 are int32 (`acc-traits-grid`: 65536, 65540, 98303;
+/// scratch runs: 32768, 40000, 2^31-1), 2^31 is int64.
+@Test func int32WidthCoversTheInt32Range() throws {
+    #expect(try ArchiveBuilder.int(32768) == .int32(32768))
+    #expect(try ArchiveBuilder.int(65536) == .int32(65536))
+    #expect(try ArchiveBuilder.int(Int(Int32.max)) == .int32(Int32.max))
+    #expect(try ArchiveBuilder.int(Int(Int32.max) + 1) == .int64(Int64(Int32.max) + 1))
 }

@@ -5,19 +5,31 @@ import XlessBuild
 import XlessCore
 import XlessFinalize
 import XlessPackage
+import XlessReactNative
 import XlessSign
 import XlessTauri
 
 /// One function per stage. Each runs inside `withStage`, so every failure (including raw App Store Connect,
 /// network and file errors) prints `[stage] cause — fix` and exits with that stage's code.
 enum StageRunner {
-    /// Tauri overlays only: contract and script checks, the work copy and the toolchains the build needs.
+    /// Overlays only: contract checks, the work copy and what the build needs (Tauri: toolchains; React Native: the JS
+    /// install, Expo prebuild, CocoaPods).
+    /// The image is checked first (`BuildSDKCheck`, as the build stage will): a wrong or missing SDK or Swift toolchain
+    /// is refused before the work copy, the JS install, prebuild and CocoaPods run.
     static func prepare(_ ctx: Context) async throws -> String {
-        guard let tauri = ctx.tauriBuild else { return "skipped (not a Tauri project)" }
+        if ctx.hasPrepare {
+            try await withStage(.prepare) { _ = try BuildSDKCheck.check(pin: ctx.config.xcode, platform: ctx.platform, file: pinFile(ctx), stage: .prepare) }
+        }
+        if let rn = ctx.reactNativeBuild { return try await ReactNativeBuilder.prepare(ctx: rn).path }
+        if let mac = ctx.tauriMacBuild { return try await TauriBuilder.prepareMac(ctx: mac).path }
+        guard let tauri = ctx.tauriBuild else { return "skipped (not an overlay project)" }
         return try await TauriBuilder.prepare(ctx: tauri).path
     }
 
     static func build(_ ctx: Context) async throws -> URL {
+        try await withStage(.build) { try checkSDK(ctx) }
+        if let rn = ctx.reactNativeBuild { return try await ReactNativeBuilder.build(ctx: rn) }
+        if let mac = ctx.tauriMacBuild { return try await TauriBuilder.buildMac(ctx: mac) }
         if let tauri = ctx.tauriBuild { return try await TauriBuilder.build(ctx: tauri) }
         return try await withStage(.build) {
             switch ctx.platform {
@@ -27,35 +39,73 @@ enum StageRunner {
         }
     }
 
+    /// Ruling R8: the image's SDK (its toolchain metadata) against the project's `xcode:` pin, then recorded next to the
+    /// build's output (`BuildSDKRecord`) and printed; finalize stamps from the same SDK. Without metadata (a host with no
+    /// SDK installed) and without a pin there is nothing to check or record.
+    /// Ruling R10: the image's Swift toolchain must be the one that Xcode ships (`SwiftToolchain.check`); it is recorded
+    /// and printed with the SDK, and put on this process's PATH before the image's own Swift (`activate`), so every
+    /// compile the build runs uses it (Swift Build also gets it through its toolset: `SwiftBuildEnvironment`).
+    /// The checks and the record are `BuildSDKCheck`'s (tested there).
+    static func checkSDK(_ ctx: Context) throws {
+        let (result, sdk) = try BuildSDKCheck.checkAndRecord(stageRoot: ctx.paths.root, pin: ctx.config.xcode, platform: ctx.platform, file: pinFile(ctx))
+        result.toolchain?.activate()
+        if let sdk {
+            FileHandle.standardError.write(Data("xless: SDK: \(sdk.summary(platform: ctx.platform)) (recorded in \(BuildSDKRecord.url(in: ctx.paths.root).path))\n".utf8))
+        }
+        if let swift = result.swift { FileHandle.standardError.write(Data("xless: compiler: \(swift.summary)\n".utf8)) }
+    }
+
+    /// Where the pin is written, for the refusals.
+    static func pinFile(_ ctx: Context) -> String { ctx.isReactNative || ctx.isTauri ? "the overlay" : "xless.yml" }
+
     static func assets(_ ctx: Context) async throws -> URL {
         try await withStage(.assets) {
+            try ctx.requireDevice(.assets)
             let input = try ctx.paths.bundle(in: ctx.paths.app, stage: .assets)
+            // Tauri on macOS: nothing to compile (the icon is bundle.icon's .icns, copied by the build); React Native:
+            // Swift Build compiled the asset catalogs and storyboards (actool/ibtool shims). Copy through.
+            if ctx.tauriMac != nil || ctx.isReactNative { return try Files.atomicOutput(ctx.paths.assets) { try Files.copyBundle(input, intoFreshDir: $0) } }
             return try await AssetsStage.run(input: input, outputDir: ctx.paths.assets, platform: ctx.platform, config: ctx.config, project: ctx.project)
         }
     }
 
     static func finalize(_ ctx: Context) async throws -> URL {
         try await withStage(.finalize) {
+            try ctx.requireDevice(.finalize)
             let input = try ctx.paths.bundle(in: ctx.paths.assets, stage: .finalize)
             let meta = try ToolchainMeta.load(from: ToolchainMeta.defaultLocation())
-            return try Finalizer.run(input: input, outputDir: ctx.paths.final, platform: ctx.platform, config: ctx.config, meta: meta)
+            let kind: ProjectKind = ctx.isReactNative ? .reactNative : ctx.isTauri ? .tauri : .xlessYML
+            let built = BuildSDKRecord.load(in: ctx.paths.root)
+            // Ruling R10: the compiler the build recorded (DTCompiler stays Xcode's compiler identifier for every Swift).
+            if let swift = built?.swift { FileHandle.standardError.write(Data("xless: built with \(swift.summary)\n".utf8)) }
+            return try Finalizer.run(input: input, outputDir: ctx.paths.final, platform: ctx.platform, config: ctx.config, meta: meta, kind: kind,
+                                     built: built, identifiers: ctx.rnOverlay?.identifiers ?? .none)
         }
     }
 
     static func sign(_ ctx: Context) async throws -> URL {
         try await withStage(.sign) {
+            try ctx.requireDevice(.sign)
             let input = try ctx.paths.bundle(in: ctx.paths.final, stage: .sign)
+            // The Info.plists carry the map finalize applied: an overlay edited since (`--from sign`) is refused.
+            try (ctx.rnOverlay?.identifiers ?? .none).checkFinalized(in: ctx.paths.final)
             let client = ASCClient(credentials: try ASCCredentials.fromSecrets(ctx.secrets, stage: .sign))
+            // React Native: every bundle's entitlements as the build recorded them, with the overlay's edits.
+            let manifest = ctx.reactNativeBuild.map { EntitlementsManifest(file: $0.entitlementsFile, rewrites: $0.overlay.entitlements) }
             return try await SignStage.run(input: input, outputDir: ctx.paths.signed, platform: ctx.platform, config: ctx.config,
-                                           project: ctx.project, secrets: ctx.secrets, client: client)
+                                           project: ctx.project, secrets: ctx.secrets, client: client, manifest: manifest)
         }
     }
 
     static func package(_ ctx: Context) async throws -> URL {
         try await withStage(.package) {
+            try ctx.requireDevice(.package)
             let input = try ctx.paths.bundle(in: ctx.paths.signed, stage: .package)
             switch ctx.platform {
             case .ios: return try Packager.ipa(signedApp: input, outputDir: ctx.paths.out)
+            // Tauri overlays: a signed, notarized, stapled DMG; xless.yml: a notarized zip of the signed app.
+            case .macos where ctx.tauriMac != nil:
+                return try await DmgBuilder.notarizedDMG(signedApp: input, outputDir: ctx.paths.out, config: ctx.config, secrets: ctx.secrets)
             case .macos: return try Packager.notarizedZip(signedApp: input, outputDir: ctx.paths.out, secrets: ctx.secrets)
             }
         }
@@ -75,6 +125,7 @@ enum StageRunner {
 
     static func upload(_ ctx: Context) async throws -> UploadOutcome {
         try await withStage(.upload) {
+            try ctx.requireDevice(.upload)
             guard ctx.platform == .ios else {
                 throw XlessError(.upload, "upload is App Store only; macOS Developer ID builds are distributed directly", fix: "use the notarized zip from `xless package --platform macos`")
             }

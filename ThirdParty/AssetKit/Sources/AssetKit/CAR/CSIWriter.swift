@@ -12,11 +12,11 @@ enum CSIWriter {
         let tvl = CSITVL.encode([
             .bitmapDescriptor(width: body.width, height: body.height),
             .destRect(width: body.width, height: body.height),
-            .sliceScale,
+            .sliceScale(1),
             .bitmapFlag,
             .bytesPerRow(width: body.width),
         ])
-        let payload = MLECBody.encode(width: body.width, height: body.height, pixelsBGRA: body.pixelsBGRA)
+        let payload = MLECBody.encode(width: body.width, height: body.height, pixelsBGRA: body.pixelsBGRA, opaque: body.isOpaque)
 
         // Bit 4 (0x10): generic-image category; set for `.image`, cleared
         // for `.appIcon`. Matches what UIImage(named:) walks for imageset
@@ -74,7 +74,7 @@ enum CSIWriter {
             // Trimmed TVL for vector renditions: only slice/scale and the
             // bitmap-count flag. Width, height, and bytes-per-row are not
             // meaningful for a scale-free vector source.
-            tvl = CSITVL.encode([.sliceScale, .bitmapFlag])
+            tvl = CSITVL.encode([.sliceScale(1), .bitmapFlag])
             envelope = DWAREnvelope.encode(flags: 1, payload: LZFSE.encode([UInt8](body.sourceData)))
         case .jpeg(let width, let height):
             layout = .bitmapIcon
@@ -89,7 +89,7 @@ enum CSIWriter {
             tvl = CSITVL.encode([
                 .bitmapDescriptor(width: width, height: height),
                 .destRect(width: width, height: height),
-                .sliceScale,
+                .sliceScale(1),
                 .bitmapFlag,
             ])
             envelope = DWAREnvelope.encode(flags: 0, payload: [UInt8](body.sourceData))
@@ -112,29 +112,42 @@ enum CSIWriter {
         return header + tvl + envelope
     }
 
+    /// Named color, as actool 27.0 writes it (measured on neutral colorsets):
+    /// header scale and colorSpace 0, TVL `1004 = (0, 0)` and `1006 = 1`,
+    /// bitmap count 1; body `COLR` (an LE multi-char constant, file bytes
+    /// R,L,O,C), version 1, the color space ID, the component count, then the
+    /// components as doubles (`ColorSetContents` parses them as actool does).
+    /// Upstream wrote the tag as file bytes C,O,L,R with version 0, no TVL,
+    /// scale 100 and the bitmap gamut ID: `assetutil` read that as one
+    /// component (2e-323) in a "generic" space, and UIColor(named:) found no
+    /// color.
     static func color(name: String, body: ColorBody) -> Data {
         let payload = colorBody(body: body)
+        let tvl = CSITVL.encode([.sliceScale(0), .bitmapFlag])
         let header = CSIHeader.encode(
             renditionFlags: 0,
             width: 0,
             height: 0,
-            scaleFactor: 100,
+            scaleFactor: 0,
             pixelFormat: 0,
-            colorSpace: UInt32(body.colorSpaceID),
+            colorSpace: 0,
             layout: .namedColor,
             name: name,
-            tvlLength: 0,
-            bitmapCount: 0,
+            tvlLength: UInt32(tvl.count),
+            bitmapCount: 1,
             renditionLength: UInt32(payload.count)
         )
-        return header + payload
+        return header + tvl + payload
     }
+
+    /// 'COLR' as an LE multi-char constant. Produces file bytes R,L,O,C.
+    static let colorTag: UInt32 = 0x434F4C52
 
     private static func colorBody(body: ColorBody) -> Data {
         var w = ByteWriter()
-        w.writeFourCC("COLR")
-        w.writeLE(UInt32(0))                    // version
-        w.writeLE(UInt32(body.colorSpaceID))    // colorSpaceID with flag bits
+        w.writeLE(colorTag)
+        w.writeLE(UInt32(1))                    // version
+        w.writeLE(UInt32(body.colorSpaceID))    // ColorSetContents.Color.colorSpaceID
         w.writeLE(UInt32(4))                    // numberOfComponents
         for component in [body.red, body.green, body.blue, body.alpha] {
             w.writeLE(component.bitPattern)

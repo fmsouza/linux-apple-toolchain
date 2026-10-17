@@ -49,3 +49,17 @@ import Foundation
         #expect(!e.cause.split(separator: "\n").dropFirst().contains { $0.contains("noise") })   // line 1 is the command
     } catch { Issue.record("\(error)") }
 }
+
+/// captureTo keeps everything, in order, including output a background child writes after the process itself exited
+/// (the pipe stays open until the last writer closes it); the notary parser depends on the full log.
+@Test func captureToKeepsOutputWrittenAfterExit() throws {
+    let log = FileManager.default.temporaryDirectory.appendingPathComponent("shell-capture-\(UUID().uuidString).log")
+    defer { try? FileManager.default.removeItem(at: log) }
+    let script = "i=0; while [ $i -lt 300 ]; do echo l$i; i=$((i+1)); done; (sleep 0.3; i=0; while [ $i -lt 50 ]; do echo late$i; i=$((i+1)); done; echo tail-err >&2) &"
+    try Shell.run("sh", ["-c", script], stage: .package, captureTo: log)
+    let lines = try String(contentsOf: log, encoding: .utf8).split(separator: "\n").map(String.init)
+    #expect(lines.filter { $0.hasPrefix("l") && !$0.hasPrefix("late") } == (0..<300).map { "l\($0)" })
+    #expect(lines.filter { $0.hasPrefix("late") } == (0..<50).map { "late\($0)" })
+    #expect(lines.contains("tail-err"))
+    #expect(lines.count == 351)
+}

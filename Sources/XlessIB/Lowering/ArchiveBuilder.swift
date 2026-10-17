@@ -163,16 +163,16 @@ public final class ArchiveBuilder {
 
     // MARK: Value helpers (section 6, "Common containers")
 
-    /// An integer in the smallest width ibtool was seen to use: int8 for 0…127, int16 for 128…32767,
-    /// int64 for negative values and values ≥ 2^31. int32 was never observed (Open question 9).
+    /// An integer in the smallest signed width that holds it: int8 for 0…127, int16 for 128…32767, int32 for
+    /// 32768…2^31-1, int64 for negative values and values ≥ 2^31 (section 6 "Common containers"; int32:
+    /// `acc-traits-grid` 65536, 65540, 98303, and scratch runs of `numberOfLines` 32768, 40000 and 2^31-1, with 2^31
+    /// as int64).
     static func int(_ v: Int) throws -> NIBValueData {
         switch v {
         case 0...127: return .int8(Int8(v))
         case 128...32767: return .int16(Int16(v))
-        case ..<0, (Int(Int32.max) + 1)...: return .int64(Int64(v))
-        default:
-            throw XlessError(.ib, "unsupported: integer \(v) needs the int32 width, which ibtool was never seen to use (see docs/research/nib-encoding.md#open-questions)",
-                             fix: "use a smaller value")
+        case 32768...Int(Int32.max): return .int32(Int32(v))
+        default: return .int64(Int64(v))
         }
     }
 

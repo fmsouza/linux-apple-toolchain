@@ -1,0 +1,239 @@
+{
+  "SetFile": [
+    [
+      "-c",
+      "icnC",
+      "/Volumes/dmg.<random>/.VolumeIcon.icns"
+    ],
+    [
+      "-a",
+      "C",
+      "/Volumes/dmg.<random>"
+    ]
+  ],
+  "bless": [],
+  "cargo": [
+    {
+      "argv": [
+        "build",
+        "--bins",
+        "--features",
+        "tauri/custom-protocol",
+        "--release",
+        "--target",
+        "aarch64-apple-darwin"
+      ],
+      "cwd": "$WORK/src-tauri",
+      "env": {
+        "MACOSX_DEPLOYMENT_TARGET": "11.0",
+        "TAURI_CLI_VERBOSITY": "1"
+      },
+      "target": "aarch64-apple-darwin"
+    },
+    {
+      "argv": [
+        "build",
+        "--bins",
+        "--features",
+        "tauri/custom-protocol",
+        "--release",
+        "--target",
+        "x86_64-apple-darwin"
+      ],
+      "cwd": "$WORK/src-tauri",
+      "env": {
+        "MACOSX_DEPLOYMENT_TARGET": "11.0",
+        "TAURI_CLI_VERBOSITY": "1"
+      },
+      "target": "x86_64-apple-darwin"
+    }
+  ],
+  "cargoOther": [
+    {
+      "argv": [
+        "metadata",
+        "--no-deps",
+        "--format-version",
+        "1"
+      ],
+      "cwd": "$WORK/src-tauri",
+      "env": {
+        "TAURI_CLI_VERBOSITY": "1"
+      }
+    },
+    {
+      "argv": [
+        "metadata",
+        "--no-deps",
+        "--format-version",
+        "1"
+      ],
+      "cwd": "$WORK/src-tauri",
+      "env": {
+        "TAURI_CLI_VERBOSITY": "1"
+      }
+    },
+    {
+      "argv": [
+        "metadata",
+        "--no-deps",
+        "--format-version",
+        "1"
+      ],
+      "cwd": "$WORK/src-tauri",
+      "env": {
+        "TAURI_CLI_VERBOSITY": "1"
+      }
+    },
+    {
+      "argv": [
+        "metadata",
+        "--no-deps",
+        "--format-version",
+        "1"
+      ],
+      "cwd": "$WORK/src-tauri",
+      "env": {
+        "MACOSX_DEPLOYMENT_TARGET": "11.0",
+        "TAURI_CLI_VERBOSITY": "1"
+      }
+    },
+    {
+      "argv": [
+        "metadata",
+        "--no-deps",
+        "--format-version",
+        "1"
+      ],
+      "cwd": "$WORK/src-tauri",
+      "env": {
+        "MACOSX_DEPLOYMENT_TARGET": "11.0",
+        "TAURI_CLI_VERBOSITY": "1"
+      }
+    },
+    {
+      "argv": [
+        "metadata",
+        "--no-deps",
+        "--format-version",
+        "1"
+      ],
+      "cwd": "$WORK/src-tauri",
+      "env": {
+        "MACOSX_DEPLOYMENT_TARGET": "11.0",
+        "TAURI_CLI_VERBOSITY": "1"
+      }
+    },
+    {
+      "argv": [
+        "metadata",
+        "--no-deps",
+        "--format-version",
+        "1"
+      ],
+      "cwd": "$WORK/src-tauri",
+      "env": {
+        "MACOSX_DEPLOYMENT_TARGET": "11.0",
+        "TAURI_CLI_VERBOSITY": "1"
+      }
+    },
+    {
+      "argv": [
+        "metadata",
+        "--no-deps",
+        "--format-version",
+        "1"
+      ],
+      "cwd": "$WORK/src-tauri",
+      "env": {
+        "MACOSX_DEPLOYMENT_TARGET": "11.0",
+        "TAURI_CLI_VERBOSITY": "1"
+      }
+    }
+  ],
+  "codesign": [],
+  "dmgScript": "$WORK/src-tauri/target/universal-apple-darwin/release/bundle/dmg/bundle_dmg.sh  --volname HelloTauri --icon HelloTauri.app 180 170 --app-drop-link 480 170 --window-size 660 400 --hide-extension HelloTauri.app --volicon $WORK/src-tauri/target/universal-apple-darwin/release/bundle/dmg/icon.icns --skip-jenkins HelloTauri_1.0.0_universal.dmg HelloTauri.app",
+  "frontend": {
+    "TAURI_ENV_ARCH": "universal",
+    "TAURI_ENV_FAMILY": "unix",
+    "TAURI_ENV_PLATFORM": "darwin",
+    "TAURI_ENV_PLATFORM_VERSION": "27.0.1",
+    "TAURI_ENV_TARGET_TRIPLE": "universal-apple-darwin"
+  },
+  "frontendCommand": "node scripts/build.mjs",
+  "hdiutil": [
+    [
+      "create",
+      "-srcfolder",
+      "$WORK/src-tauri/target/universal-apple-darwin/release/bundle/macos/HelloTauri.app",
+      "-volname",
+      "HelloTauri",
+      "-fs",
+      "HFS+",
+      "-fsargs",
+      "-c c=64,a=16,e=16",
+      "-format",
+      "UDRW",
+      "$WORK/src-tauri/target/universal-apple-darwin/release/bundle/macos/rw.<pid>.HelloTauri_1.0.0_universal.dmg"
+    ],
+    [
+      "resize",
+      "-limits",
+      "$WORK/src-tauri/target/universal-apple-darwin/release/bundle/macos/rw.<pid>.HelloTauri_1.0.0_universal.dmg"
+    ],
+    [
+      "resize",
+      "-size",
+      "38m",
+      "$WORK/src-tauri/target/universal-apple-darwin/release/bundle/macos/rw.<pid>.HelloTauri_1.0.0_universal.dmg"
+    ],
+    [
+      "attach",
+      "-mountrandom",
+      "/Volumes",
+      "-readwrite",
+      "-noverify",
+      "-noautoopen",
+      "-nobrowse",
+      "$WORK/src-tauri/target/universal-apple-darwin/release/bundle/macos/rw.<pid>.HelloTauri_1.0.0_universal.dmg"
+    ],
+    [
+      "info"
+    ],
+    [
+      "detach",
+      "/dev/disk<N>"
+    ],
+    [
+      "convert",
+      "$WORK/src-tauri/target/universal-apple-darwin/release/bundle/macos/rw.<pid>.HelloTauri_1.0.0_universal.dmg",
+      "-format",
+      "UDZO",
+      "-imagekey",
+      "zlib-level=9",
+      "-o",
+      "$WORK/src-tauri/target/universal-apple-darwin/release/bundle/macos/HelloTauri_1.0.0_universal.dmg"
+    ],
+    [
+      "internet-enable",
+      "-help"
+    ]
+  ],
+  "lipo": [
+    [
+      "-create",
+      "-output",
+      "$WORK/src-tauri/target/universal-apple-darwin/release/hello-tauri",
+      "$WORK/src-tauri/target/aarch64-apple-darwin/release/hello-tauri",
+      "$WORK/src-tauri/target/x86_64-apple-darwin/release/hello-tauri"
+    ]
+  ],
+  "swift": [],
+  "xcrun": [
+    [
+      "--sdk",
+      "macosx",
+      "--show-sdk-path"
+    ]
+  ]
+}

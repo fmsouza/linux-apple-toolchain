@@ -1,0 +1,53 @@
+name: HelloPIF
+options:
+  deploymentTarget: { iOS: "16.4" }
+settings:
+  base:
+    CODE_SIGNING_ALLOWED: NO
+    SWIFT_VERSION: "5.0"
+    MARKETING_VERSION: 1.0.0
+    CURRENT_PROJECT_VERSION: 1
+targets:
+  HelloCore:
+    type: library.static
+    platform: iOS
+    sources: [HelloCore]
+  HelloKit:
+    type: framework
+    platform: iOS
+    sources: [HelloKit]
+    settings:
+      PRODUCT_BUNDLE_IDENTIFIER: com.example.hellopif.kit
+      GENERATE_INFOPLIST_FILE: YES
+  HelloPIF:
+    type: application
+    platform: iOS
+    sources:
+      - App/main.m
+      - App/AppDelegate.swift
+      - App/Assets.xcassets
+      - App/greeting.txt
+    dependencies:
+      - target: HelloCore
+      - target: HelloKit
+    settings:
+      PRODUCT_BUNDLE_IDENTIFIER: com.example.hellopif
+      INFOPLIST_FILE: App/Info.plist
+      SWIFT_OBJC_BRIDGING_HEADER: App/HelloPIF-Bridging-Header.h
+      ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+      TARGETED_DEVICE_FAMILY: "1,2"
+      OTHER_LDFLAGS: ["$(inherited)", "-ObjC", "-lc++"]
+    postCompileScripts:
+      - name: Write build stamp
+        script: |
+          set -e
+          echo "configuration=${CONFIGURATION} platform=${PLATFORM_NAME}" > "${TARGET_BUILD_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/build-stamp.txt"
+        outputFiles:
+          - $(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/build-stamp.txt
+schemes:
+  HelloPIF:
+    build:
+      targets:
+        HelloPIF: all
+    archive:
+      config: Release

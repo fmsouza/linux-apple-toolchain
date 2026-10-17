@@ -1,0 +1,12 @@
+# TARGET_OS_ macros Apple's clang predefines and an open-source clang lacks even with -fdefine-target-os-macros, each
+# defined from the ones that clang does define (docker/toolchain/target-os-check derive; Ruling R10). Every rule is
+# what Xcode 26.2's and 27.0's clang give, measured black-box (`clang -target <triple> -dM -E -x c /dev/null`) on
+# arm64/arm64e/x86_64 macOS, iOS device, simulator and Mac Catalyst, visionOS, tvOS, watchOS and DriverKit:
+#   ARROW is 1 exactly on arm64 and arm64e macOS; IOSMAC equals MACCATALYST; XR equals VISION; BRIDGE, KERNELKIT are 0.
+# docker/toolchain/target-os-check check then compares the result with the Xcode's own table for every triple xless
+# compiles for. The rules use no `&`, `|` or quote (they pass through sed, JSON and a shell word list).
+TARGET_OS_ARROW (TARGET_OS_OSX?(__is_target_arch(arm64)?1:__is_target_arch(arm64e)):0)
+TARGET_OS_BRIDGE 0
+TARGET_OS_IOSMAC TARGET_OS_MACCATALYST
+TARGET_OS_KERNELKIT 0
+TARGET_OS_XR TARGET_OS_VISION

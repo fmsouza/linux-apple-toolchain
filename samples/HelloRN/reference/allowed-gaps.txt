@@ -1,0 +1,6 @@
+# Known gaps for the asset-catalog comparison of scripts/test-rn-linux.sh (`xless tauri compare --assets-only`, Mac host).
+# Only `car:` keys: the bundle comparison itself allows no gap. See docs/research/parity-known-gaps.md.
+# AssetKit writes no MultiSized Image rendition for the app icon (actool writes one per idiom); xless ships the loose
+# AppIcon60x60@2x.png / AppIcon76x76@2x~ipad.png and their CFBundleIcons entries instead.
+car:Assets.car:AppIcon/pad/1/-/MultiSized Image
+car:Assets.car:AppIcon/phone/1/-/MultiSized Image

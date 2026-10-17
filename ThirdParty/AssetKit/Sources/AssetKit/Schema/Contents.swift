@@ -145,6 +145,21 @@ struct ColorSetContents: Codable, Sendable {
             case components
         }
 
+        /// The color space ID a named color's body carries, as actool 27.0
+        /// writes it: srgb 1, gray-gamma-22 2, display-p3 3, extended-srgb 4,
+        /// extended-linear-srgb 5 (not the bitmap `Gamut.colorSpaceID`).
+        /// Any other name is refused, as a missing `color-space` is (gray
+        /// spaces have no `red` component and fail to decode before this).
+        func colorSpaceID() throws -> UInt8 {
+            switch colorSpace {
+            case "srgb": return 1
+            case "display-p3": return 3
+            case "extended-srgb": return 4
+            case "extended-linear-srgb": return 5
+            default: throw XCAssetCompilerError.unsupportedColorSpace(colorSpace)
+            }
+        }
+
         struct Components: Codable, Sendable {
             var red: String
             var green: String
@@ -160,10 +175,15 @@ struct ColorSetContents: Codable, Sendable {
                         }
                         return Double(n) / 255
                     }
-                    guard let n = Double(s) else {
+                    // actool 27.0: a component without a decimal point is an
+                    // 8-bit value ("255" is 1.0, "1" is 1/255); one with a
+                    // decimal point is taken as is, through Float ("0.2" is
+                    // 0.20000000298…, "1.2" stays 1.2 for extended ranges).
+                    if let n = Int(s) { return Double(n) / 255 }
+                    guard let n = Float(s) else {
                         throw XCAssetCompilerError.invalidColorComponent(s)
                     }
-                    return n > 1 ? n / 255 : n
+                    return Double(n)
                 }
                 return (try parse(red), try parse(green), try parse(blue), try parse(alpha))
             }

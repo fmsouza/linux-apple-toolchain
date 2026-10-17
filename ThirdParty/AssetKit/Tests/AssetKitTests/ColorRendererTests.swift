@@ -69,7 +69,8 @@ struct ColorRendererTests {
             Issue.record("expected color body")
             return
         }
-        #expect(body.colorSpaceID == 2)
+        // A named color's body carries actool's color space ID: display-p3 is 3 (2 is gray-gamma-22).
+        #expect(body.colorSpaceID == 3)
     }
 
     @Test("Parses 0x-prefixed hex components")
@@ -100,5 +101,30 @@ struct ColorRendererTests {
         #expect(abs(body.red - 1) < 1e-9)
         #expect(abs(body.green - 0) < 1e-9)
         #expect(abs(body.blue - 128 / 255) < 1e-9)
+    }
+
+    /// actool 27.0 (measured): "1" is 1/255 and "255" is 1.0, but "1.5" is 1.5 and "0.2" goes through Float.
+    @Test("Integer components are 8-bit values; decimal ones are taken as is, through Float")
+    func integerVersusDecimal() throws {
+        let json = """
+        {
+          "info": { "version": 1, "author": "xcode" },
+          "colors": [
+            { "idiom": "universal", "color": { "color-space": "extended-srgb",
+              "components": { "red": "255", "green": "1", "blue": "1.5", "alpha": "0.2" } } }
+          ]
+        }
+        """
+        let contents = try JSONDecoder().decode(ColorSetContents.self, from: Data(json.utf8))
+        let set = LoadedColorSet(name: "Mixed", directory: URL(fileURLWithPath: "/"), contents: contents)
+        guard case .color(let body) = try ColorRenderer.renditions(for: set)[0].body else {
+            Issue.record("expected color body")
+            return
+        }
+        #expect(body.red == 1)
+        #expect(body.green == 1.0 / 255)
+        #expect(body.blue == 1.5)
+        #expect(body.alpha == Double(Float(0.2)))
+        #expect(body.colorSpaceID == 4)
     }
 }

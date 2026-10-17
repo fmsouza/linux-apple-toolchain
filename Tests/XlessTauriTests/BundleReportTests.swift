@@ -5,10 +5,10 @@ import XlessCore
 @testable import XlessTauri
 
 /// Thin MH_MAGIC_64 with LC_BUILD_VERSION (iOS), LC_LOAD_DYLIB and LC_RPATH.
-func machO(dylibs: [String], rpaths: [String]) -> Data {
+func machO(dylibs: [String], rpaths: [String], cpu: UInt32 = 0x0100000c, minos: UInt32 = 0x110000) -> Data {
     var d = Data(), cmds = Data()
     func u32(_ v: UInt32, _ to: inout Data) { var x = v.littleEndian; withUnsafeBytes(of: &x) { to.append(contentsOf: $0) } }
-    u32(0x32, &cmds); u32(24, &cmds); u32(2, &cmds); u32(0x110000, &cmds); u32(0x1b0000, &cmds); u32(0, &cmds)
+    u32(0x32, &cmds); u32(24, &cmds); u32(2, &cmds); u32(minos, &cmds); u32(0x1b0000, &cmds); u32(0, &cmds)
     func str(_ cmd: UInt32, _ name: String, dylib: Bool) {
         let off = dylib ? 24 : 12
         let size = (off + name.utf8.count + 1 + 7) & ~7
@@ -18,7 +18,7 @@ func machO(dylibs: [String], rpaths: [String]) -> Data {
     }
     for l in dylibs { str(0xc, l, dylib: true) }
     for r in rpaths { str(0x8000001c, r, dylib: false) }
-    u32(0xfeedfacf, &d); u32(0x0100000c, &d); u32(0, &d); u32(2, &d)
+    u32(0xfeedfacf, &d); u32(cpu, &d); u32(0, &d); u32(2, &d)
     u32(UInt32(1 + dylibs.count + rpaths.count), &d); u32(UInt32(cmds.count), &d); u32(0, &d); u32(0, &d)
     return d + cmds
 }
@@ -118,4 +118,72 @@ private func roundTrip(_ plist: [String: Any]) throws -> [String: Any] {
     fat.append(Data(count: 0x4000 - fat.count)); fat.append(slice)
     try fat.write(to: app.appendingPathComponent("Frameworks/x.framework/x"))
     #expect(try BundleReport.make(app: app).frameworks.isEmpty)
+}
+
+private func fatApp(x86Libs: [String] = ["/usr/lib/libx86.dylib"], x86Minos: UInt32 = 0x0a0f00, thinX86: Bool = false) throws -> URL {
+    let app = try makeApp()
+    let arm = machO(dylibs: ["/usr/lib/libSystem.B.dylib", "/usr/lib/libarm.dylib"], rpaths: ["@executable_path/../Frameworks"], minos: 0x0b0000)
+    let x86 = machO(dylibs: x86Libs, rpaths: [], cpu: 0x01000007, minos: x86Minos)
+    try (thinX86 ? arm : MachO.makeFat([x86, arm])).write(to: app.appendingPathComponent("app"))
+    return app
+}
+
+@Test func fatBinaryReportsPerArchitectureSlices() throws {
+    let app = try fatApp(); defer { try? FileManager.default.removeItem(at: app) }
+    let e = try BundleReport.make(app: app).executable
+    #expect(e.slices?["arm64"] == SliceReport(platform: 2, minos: "11.0", linkedLibraries: ["/usr/lib/libSystem.B.dylib", "/usr/lib/libarm.dylib"], rpaths: ["@executable_path/../Frameworks"]))
+    #expect(e.slices?["x86_64"] == SliceReport(platform: 2, minos: "10.15", linkedLibraries: ["/usr/lib/libx86.dylib"], rpaths: []))
+    #expect(e.minos == "11.0" && e.linkedLibraries == e.slices?["arm64"]?.linkedLibraries && e.rpaths == ["@executable_path/../Frameworks"])
+}
+
+@Test func thinBinaryHasNoSlices() throws {
+    let app = try makeApp(); defer { try? FileManager.default.removeItem(at: app) }
+    let r = try BundleReport.make(app: app)
+    #expect(r.executable.slices == nil)
+    #expect(!String(decoding: try r.json(), as: UTF8.self).contains("slices"))
+}
+
+@Test func diffComparesSlicesPerArchitecture() throws {
+    let full = try fatApp(), thinOnly = try fatApp(thinX86: true), other = try fatApp(x86Libs: ["/usr/lib/liby.dylib"], x86Minos: 0x0b0000)
+    defer { for u in [full, thinOnly, other] { try? FileManager.default.removeItem(at: u) } }
+    let rf = try BundleReport.make(app: full), rt = try BundleReport.make(app: thinOnly), ro = try BundleReport.make(app: other)
+    #expect(BundleReport.diff(reference: rf, actual: rf, allowed: []).isEmpty)
+    #expect(BundleReport.diff(reference: rf, actual: rt, allowed: []).contains { $0.hasPrefix("exe:slice:x86_64:missing") })
+    let d = BundleReport.diff(reference: rf, actual: ro, allowed: [])
+    #expect(d.contains { $0.hasPrefix("lib:x86_64:/usr/lib/liby.dylib") })
+    #expect(d.contains { $0.hasPrefix("lib:x86_64:/usr/lib/libx86.dylib") })
+    #expect(d.contains { $0.hasPrefix("exe:x86_64:minos") })
+    #expect(!d.contains { $0.contains("arm64") })
+}
+
+@Test func committedIOSReferenceRoundTripsByteIdentically() throws {
+    var dir = URL(fileURLWithPath: #filePath)
+    while !FileManager.default.fileExists(atPath: dir.appendingPathComponent("Package.swift").path) { dir.deleteLastPathComponent() }
+    let bytes = try Data(contentsOf: dir.appendingPathComponent("samples/HelloTauri/reference/reference.json"))
+    let r = try JSONDecoder().decode(BundleReport.self, from: bytes)
+    #expect(r.executable.slices == nil)
+    #expect(try r.json() == bytes)
+}
+
+@Test func reportsMacOSBundleLayout() throws {
+    let fm = FileManager.default
+    let app = fm.temporaryDirectory.appendingPathComponent("rep-\(UUID().uuidString).app"); defer { try? fm.removeItem(at: app) }
+    let c = app.appendingPathComponent("Contents")
+    for d in ["MacOS", "Resources/resources", "Frameworks/x.framework", "_CodeSignature"] {
+        try fm.createDirectory(at: c.appendingPathComponent(d), withIntermediateDirectories: true)
+    }
+    let plist: [String: Any] = ["CFBundleIdentifier": "com.example.mac", "CFBundleExecutable": "app", "CFBundleVersion": "1"]
+    try PropertyListSerialization.data(fromPropertyList: plist, format: .xml, options: 0).write(to: c.appendingPathComponent("Info.plist"))
+    let arm = machO(dylibs: ["/usr/lib/libSystem.B.dylib"], rpaths: ["@executable_path/../Frameworks"], minos: 0x0b0000)
+    let x86 = machO(dylibs: ["/usr/lib/libSystem.B.dylib"], rpaths: ["@executable_path/../Frameworks"], cpu: 0x01000007, minos: 0x0b0000)
+    try MachO.makeFat([x86, arm]).write(to: c.appendingPathComponent("MacOS/app"))
+    try machO(dylibs: ["/usr/lib/libz.1.dylib"], rpaths: []).write(to: c.appendingPathComponent("Frameworks/x.framework/x"))
+    try Data("hi".utf8).write(to: c.appendingPathComponent("Resources/resources/hello.txt"))
+    try Data("sig".utf8).write(to: c.appendingPathComponent("_CodeSignature/CodeResources"))
+    let r = try BundleReport.make(app: app)
+    #expect(r.files == ["Contents/Frameworks/x.framework/x", "Contents/Info.plist", "Contents/MacOS/app", "Contents/Resources/resources/hello.txt"])
+    #expect(r.infoPlist["CFBundleIdentifier"] == "com.example.mac")
+    #expect(r.executable.slices?.keys.sorted() == ["arm64", "x86_64"])
+    #expect(r.executable.rpaths == ["@executable_path/../Frameworks"])
+    #expect(r.frameworks["x.framework"]?.linkedLibraries == ["/usr/lib/libz.1.dylib"])
 }

@@ -3,7 +3,7 @@ import XlessCore
 /// Adds the keys Xcode stamps into every built product's Info.plist.
 public enum InfoPlistStamper {
     public static func stamp(_ p: inout [String: Any], meta: ToolchainMeta, sdk: PlatformSDKInfo,
-                             platform: Platform, config: ProjectConfig) throws {
+                             platform: Platform, config: ProjectConfig, kind: ProjectKind = .xlessYML) throws {
         let pc = try config.platform(platform)
         p["DTPlatformName"] = sdk.platformName
         p["DTPlatformVersion"] = sdk.platformVersion
@@ -16,7 +16,7 @@ public enum InfoPlistStamper {
         p["BuildMachineOSBuild"] = meta.buildMachineOSBuild
         p["CFBundleShortVersionString"] = config.version
         p["CFBundleVersion"] = config.build
-        try stampEncryptionCompliance(&p, config: config)
+        try stampEncryptionCompliance(&p, config: config, kind: kind)
         p["CFBundleSupportedPlatforms"] = [platform.supportedPlatformName]
         switch platform {
         case .ios:
@@ -29,18 +29,18 @@ public enum InfoPlistStamper {
 
     static let encryptionKey = "ITSAppUsesNonExemptEncryption"
 
-    /// `usesNonExemptEncryption` in xless.yml fills the export-compliance key when the user's Info.plist lacks it; a plist value that
+    /// `usesNonExemptEncryption` in xless.yml (or an overlay) fills the export-compliance key when the user's Info.plist lacks it; a plist value that
     /// disagrees is refused rather than silently overridden.
-    static func stampEncryptionCompliance(_ p: inout [String: Any], config: ProjectConfig) throws {
+    static func stampEncryptionCompliance(_ p: inout [String: Any], config: ProjectConfig, kind: ProjectKind = .xlessYML) throws {
         guard let wanted = config.usesNonExemptEncryption else { return }
         guard let existing = p[encryptionKey] else { p[encryptionKey] = wanted; return }
         guard let have = existing as? Bool else {
             throw XlessError(.finalize, "\(encryptionKey) in the Info.plist is not a boolean (\(existing))",
-                             fix: "make it <true/> or <false/>, or remove it and let `usesNonExemptEncryption` in xless.yml set it")
+                             fix: kind.encryptionNotBooleanFix())
         }
         if have != wanted {
-            throw XlessError(.finalize, "\(encryptionKey) is \(have) in the Info.plist but `usesNonExemptEncryption` in xless.yml is \(wanted)",
-                             fix: "keep one: remove the key from the infoPlist file, or make both values agree")
+            throw XlessError(.finalize, "\(encryptionKey) is \(have) in the Info.plist but `usesNonExemptEncryption` in \(kind.settingsFile) is \(wanted)",
+                             fix: kind.encryptionDisagreesFix())
         }
     }
 }

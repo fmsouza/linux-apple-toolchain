@@ -258,29 +258,65 @@ public enum SwiftPackages {
     /// for 'iphoneos'"), no SDKROOT. The versioned triple gives every module, dependencies included, minos
     /// `minimumIOS`, as swift-rs's `--triple` does on the Mac (contract doc, "Deployment target of the Swift objects").
     /// Returns `.build/out/Products/Release-iphoneos/libXlessTauriSwift.a`, or the only `libXlessTauriSwift.a` under `.build`.
+    /// `swift`: the image's app Swift toolchain (Ruling R10). Another release than the image's own builds with its own
+    /// SwiftPM and Swift Build (as Xcode builds packages with the SwiftPM it ships), in its own scratch directory
+    /// (`.build-swift-<version>`, never a previous toolchain's products), naming the product (SwiftPM 6.2's Swift Build
+    /// builds only targets otherwise). Where that SwiftPM leaves no static library but each target prelinked into
+    /// `<target>.o` (the SDK linker's `-r` writes an `ar` archive), the archives in its products directory are merged into
+    /// `lib<aggregate>.a` with `llvm-libtool-darwin -static`; that directory is deleted before the build, so only this
+    /// build's archives are merged.
     public static func build(aggregateDir: URL, minimumIOS: String, sdk: DarwinSDK = DarwinSDK(),
-                             env: [String: String] = ProcessInfo.processInfo.environment,
+                             env: [String: String] = ProcessInfo.processInfo.environment, swift: SwiftToolchain? = nil,
                              run: Runner = { try Shell.run($0, $1, env: $2, stage: .build, passthrough: true) }) throws -> URL {
         let toolset = sdk.bundle.appendingPathComponent("toolset-swb.json")
         guard FileManager.default.fileExists(atPath: toolset.path) else {
             throw XlessError(.build, "Darwin SDK not installed at \(sdk.bundle.path)", fix: "use the xless SDK image or run `xless sdk install`")
         }
-        try run("swift", ["build", "-c", "release", "--package-path", aggregateDir.path, "--build-system", "swiftbuild",
-                          "--triple", "arm64-apple-ios\(minimumIOS)", "--toolset", toolset.path, "--force-resolved-versions"], [
+        let own = swift.flatMap { $0.isEngine ? nil : $0 }
+        let buildDir = aggregateDir.appendingPathComponent(own.map { ".build-swift-\($0.version)" } ?? ".build", isDirectory: true)
+        // The merge below takes every archive in the products directory, which outlives a build: a plugin removed since
+        // the last one would leave its archive there. So that directory starts empty (Swift Build writes it again).
+        if own != nil, let previous = prelinkedAggregate(under: buildDir) {
+            try FileManager.default.removeItem(at: previous.deletingLastPathComponent())
+        }
+        var args = ["build", "-c", "release", "--package-path", aggregateDir.path, "--build-system", "swiftbuild",
+                    "--triple", "arm64-apple-ios\(minimumIOS)", "--toolset", toolset.path, "--force-resolved-versions"]
+        if own != nil { args += ["--scratch-path", buildDir.path, "--product", aggregateName] }
+        try run(swift?.tool("swift") ?? "swift", args, [
             "SDKROOT": nil,
             "XCODE_EXTRA_PLATFORM_FOLDERS": sdk.bundle.appendingPathComponent("Developer/Platforms").path,
-            "PATH": "\(sdk.bundle.appendingPathComponent("toolset/bin").path):\(env["PATH"] ?? "/usr/bin:/bin")",
+            "PATH": "\(sdk.bundle.appendingPathComponent("toolset/bin").path):\(swift?.path(env["PATH"]) ?? env["PATH"] ?? "/usr/bin:/bin")",
         ])
         let name = "lib\(aggregateName).a"
-        let buildDir = aggregateDir.appendingPathComponent(".build", isDirectory: true)
         let expected = buildDir.appendingPathComponent("out/Products/Release-iphoneos/\(name)")
         if FileManager.default.fileExists(atPath: expected.path) { return expected }
         let found = Files.regularFiles(under: buildDir).filter { $0.lastPathComponent == name }
+        if found.isEmpty, own != nil, let prelinked = prelinkedAggregate(under: buildDir) {
+            let products = prelinked.deletingLastPathComponent()
+            let archives = ((try? FileManager.default.contentsOfDirectory(at: products, includingPropertiesForKeys: nil)) ?? [])
+                .filter { $0.pathExtension == "o" && isArchive($0) }.map(\.path).sorted()
+            let lib = products.appendingPathComponent(name)
+            try run("llvm-libtool-darwin", ["-static", "-o", lib.path] + archives, [:])
+            return lib
+        }
         guard found.count == 1 else {
             throw XlessError(.build, "swift build left \(found.count) \(name) under \(buildDir.path)\(found.isEmpty ? "" : ": \(found.map(\.path).joined(separator: ", "))")",
                              fix: "check the swift build output above; remove \(buildDir.path) and build again")
         }
         return found[0]
+    }
+
+    /// The aggregate prelinked into `<aggregate>.o` in a `Release-iphoneos` products directory under `buildDir`.
+    static func prelinkedAggregate(under buildDir: URL) -> URL? {
+        Files.regularFiles(under: buildDir).first {
+            $0.lastPathComponent == "\(aggregateName).o" && $0.deletingLastPathComponent().lastPathComponent == "Release-iphoneos"
+        }
+    }
+
+    static func isArchive(_ url: URL) -> Bool {
+        guard let h = try? FileHandle(forReadingFrom: url) else { return false }
+        defer { try? h.close() }
+        return (try? h.read(upToCount: 8)) == Data("!<arch>\n".utf8)
     }
 
     // MARK: checks

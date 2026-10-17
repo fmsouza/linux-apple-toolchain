@@ -1,0 +1,12 @@
+# frozen_string_literal: true
+
+source "https://rubygems.org"
+
+# Default gems that Ruby 3.4 no longer bundles but CocoaPods 1.15 still requires.
+gem 'base64'
+gem 'bigdecimal'
+gem 'mutex_m'
+gem 'nkf'
+gem 'ostruct'
+
+gem 'cocoapods', '~> 1.15.2'

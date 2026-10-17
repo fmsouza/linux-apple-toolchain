@@ -136,7 +136,7 @@ struct AssetutilParseTests {
     }
 }
 
-private enum ProcessLauncher {
+enum ProcessLauncher {
     struct Invocation {
         var exitCode: Int32
         var stdout: Data

@@ -28,6 +28,11 @@ func makeFakeXcode() throws -> URL {
         try json(["CanonicalName": canon, "Version": "27.0"], "\(base)/Developer/SDKs/\(plat).sdk/SDKSettings.json")
         try plist(["ProductBuildVersion": build], "\(base)/Developer/SDKs/\(plat).sdk/System/Library/CoreServices/SystemVersion.plist")
     }
+    let swift = root.appendingPathComponent("Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swift")
+    try fm.createDirectory(at: swift.deletingLastPathComponent(), withIntermediateDirectories: true)
+    try "#!/bin/sh\necho 'swift-driver version: 1.168.6 Apple Swift version 6.4 (swiftlang-6.4.0.34.1 clang-2100.3.34.1)'\necho 'Target: arm64-apple-macosx27.0'\n"
+        .write(to: swift, atomically: true, encoding: .utf8)
+    try fm.setAttributes([.posixPermissions: 0o755], ofItemAtPath: swift.path)
     return root
 }
 
@@ -40,6 +45,14 @@ func makeFakeXcode() throws -> URL {
     #expect(ios == PlatformSDKInfo(sdkName: "iphoneos27.0", sdkVersion: "27.0", sdkBuild: "23A340",
                                    platformName: "iphoneos", platformVersion: "27.0", platformBuild: "23A340"))
     #expect(try meta.sdk(for: .macos).sdkName == "macosx27.0")
+    #expect(meta.swiftVersion == "6.4")
+}
+
+@Test func metadataWithoutSwiftVersionStillDecodes() throws {
+    // Exported before Ruling R10.
+    let json = #"{"buildMachineOSBuild":"26A100","compiler":"c","platforms":{},"xcodeBuild":"17C52","xcodeVersion":"2620"}"#
+    let meta = try JSONDecoder().decode(ToolchainMeta.self, from: Data(json.utf8))
+    #expect(meta.swiftVersion == nil)
 }
 
 @Test func missingXcodeIsSDKError() {

@@ -41,3 +41,18 @@ platforms:
     #expect(MacBuilder.builtExecutable(named: "HelloShipMac", under: root)?.resolvingSymlinksInPath().path
         == root.appendingPathComponent("Release/HelloShipMac").resolvingSymlinksInPath().path)
 }
+
+@Test func swiftBuildNamesTheProductWithTheAppSwiftToolchain() {
+    // Ruling R10: SwiftPM 6.2's Swift Build builds only targets unless --product names the executable (as for Tauri's
+    // Swift aggregate); the image's own SwiftPM keeps the invocation it always had.
+    let w = URL(fileURLWithPath: "/p/.xless/macos-pkg"), t = URL(fileURLWithPath: "/sdk/toolset-swb.json")
+    // It also selects one architecture by --swift-sdk and --arch: with --triple it builds arm64 and x86_64 and needs lipo.
+    let base = ["build", "--package-path", "/p/.xless/macos-pkg", "--scratch-path", "/p/.xless/macos-build-x86_64-swift-6.2.3",
+                "-c", "release", "--build-system", "swiftbuild"]
+    let scratch = URL(fileURLWithPath: "/p/.xless/macos-build-x86_64-swift-6.2.3")
+    #expect(MacBuilder.swiftBuildArguments(wrapper: w, scratch: scratch, arch: "x86_64", minimumOS: "14.0", toolset: t, product: "HelloShip",
+                                           own: SwiftToolchain(version: "6.2.3", root: "/opt/xless/toolchains/swift-6.2.3"))
+            == base + ["--swift-sdk", "x86_64-apple-macosx", "--arch", "x86_64", "--toolset", "/sdk/toolset-swb.json", "--product", "HelloShipMac"])
+    #expect(MacBuilder.swiftBuildArguments(wrapper: w, scratch: scratch, arch: "x86_64", minimumOS: "14.0", toolset: t, product: "HelloShip",
+                                           own: nil) == base + ["--triple", "x86_64-apple-macosx14.0", "--toolset", "/sdk/toolset-swb.json"])
+}

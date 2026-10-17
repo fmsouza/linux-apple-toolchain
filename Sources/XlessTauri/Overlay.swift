@@ -9,6 +9,24 @@ public struct OverlayIOS: Sendable, Equatable, Decodable {
     public var entitlements: String?
 }
 
+/// macOS-specific overrides in an overlay's `macos:` block.
+public struct OverlayMac: Sendable, Equatable, Decodable {
+    public var product: String?
+    public var minimumOS: String?
+    /// `OverlayLocation.load` makes it absolute (relative paths resolve against the overlay file's directory).
+    public var entitlements: String?
+    /// A plist merged last into the macOS Info.plist. The top-level `infoPlist` is iOS-only (it carries Xcode
+    /// placeholders such as `$(EXECUTABLE_NAME)`). `OverlayLocation.load` makes it absolute, like `entitlements`.
+    public var infoPlist: String?
+    /// Cargo features for the macOS build. When present (an empty list included) it replaces `tauri.features`, which
+    /// may name iOS-only features; when absent, `tauri.features` applies.
+    public var features: [String]?
+
+    public init(product: String? = nil, minimumOS: String? = nil, entitlements: String? = nil, infoPlist: String? = nil, features: [String]? = nil) {
+        self.product = product; self.minimumOS = minimumOS; self.entitlements = entitlements; self.infoPlist = infoPlist; self.features = features
+    }
+}
+
 /// A prebuilt binary that replaces a CocoaPods dependency.
 public struct BinaryDependency: Sendable, Equatable, Decodable {
     public struct Fixes: Sendable, Equatable, Decodable {
@@ -51,6 +69,7 @@ public struct TauriOverlay: Sendable, Equatable {
     /// `"dated"` or an explicit build number.
     public var build: String
     public var ios: OverlayIOS?
+    public var macos: OverlayMac?
     public var assets: String?
     public var launchStoryboard: String?
     public var infoPlist: String?
@@ -62,6 +81,11 @@ public struct TauriOverlay: Sendable, Equatable {
     public var scripts: [String: ScriptHandling]
     public var usesNonExemptEncryption: Bool?
     public var testflight: TestFlightConfig?
+    /// `xcode:`: the Xcode whose SDK must build the app (`XcodePin`); nil: the image's SDK.
+    public var xcode: String? = nil
+
+    /// The cargo features of the macOS build: `macos.features` when set, else `tauri.features`.
+    public var macFeatures: [String] { macos?.features ?? features }
 }
 
 private struct BuildNumber: Decodable {
@@ -82,6 +106,7 @@ private struct Raw: Decodable {
     var version: BuildNumber?
     var build: BuildNumber?
     var ios: OverlayIOS?
+    var macos: OverlayMac?
     var assets: String?
     var launchStoryboard: String?
     var infoPlist: String?
@@ -91,6 +116,7 @@ private struct Raw: Decodable {
     var scripts: [String: ScriptHandling]?
     var usesNonExemptEncryption: Bool?
     var testflight: TestFlightConfig?
+    var xcode: String?
 }
 
 extension TauriOverlay {
@@ -102,7 +128,7 @@ extension TauriOverlay {
             throw XlessError(.config, "overlay \(name) is invalid: \(error)", fix: "see samples/HelloTauri/xless.overlay.example.yml for the schema")
         }
         guard raw.type == "tauri" else {
-            throw XlessError(.config, "overlay \(name): type '\(raw.type)' is not supported", fix: "set type: tauri")
+            throw XlessError(.config, "overlay \(name): type '\(raw.type)' is not supported", fix: "set type: tauri (type: react-native is a React Native / Expo overlay)")
         }
         if raw.teamID.wholeMatch(of: /[A-Z0-9]{10}/) == nil {
             throw XlessError(.config, "overlay \(name): teamID '\(raw.teamID)' is not a 10-character Apple team ID", fix: "copy it from developer.apple.com → Membership")
@@ -122,13 +148,14 @@ extension TauriOverlay {
                 throw XlessError(.config, "overlay \(name): binaryDependencies[\(i)].to '\(d.to)' must be a relative path without '..'", fix: "use a path inside the work copy, e.g. src-tauri/gen/apple/Pods/X/X.xcframework")
             }
         }
+        if let pin = raw.xcode { try XcodePin.validate(pin, file: "overlay \(name)") }
         let version = raw.version?.value
         return TauriOverlay(
             name: name, source: raw.source, tauriDir: raw.tauri?.dir ?? "src-tauri", features: raw.tauri?.features ?? [],
             bundleID: raw.bundleID, teamID: raw.teamID, version: (version == nil || version == "tauri") ? nil : version,
-            build: raw.build?.value ?? "dated", ios: raw.ios, assets: raw.assets, launchStoryboard: raw.launchStoryboard,
+            build: raw.build?.value ?? "dated", ios: raw.ios, macos: raw.macos, assets: raw.assets, launchStoryboard: raw.launchStoryboard,
             infoPlist: raw.infoPlist, privacyManifest: raw.privacyManifest, linkFlags: raw.linkFlags ?? [], binaryDependencies: deps, scripts: raw.scripts ?? [:],
-            usesNonExemptEncryption: raw.usesNonExemptEncryption, testflight: raw.testflight)
+            usesNonExemptEncryption: raw.usesNonExemptEncryption, testflight: raw.testflight, xcode: raw.xcode)
     }
 }
 
@@ -142,31 +169,69 @@ public struct OverlayLocation: Sendable, Equatable {
     /// (`~` expanded; relative resolves against the overlay file's directory). `workRoot` is
     /// `$XLESS_WORK_ROOT` (default `~/.cache/xless/work`) + `/<overlay name>`.
     public static func load(from url: URL, sourceOverride: String? = nil, env: [String: String] = ProcessInfo.processInfo.environment) throws -> OverlayLocation {
+        let text = try OverlayPaths.read(url)
+        let paths = OverlayPaths(overlay: url, env: env)
+        var overlay = try TauriOverlay.parse(yaml: text, name: paths.name)
+        overlay.privacyManifest = overlay.privacyManifest.map { paths.resolve($0).path }
+        if var mac = overlay.macos {
+            mac.entitlements = mac.entitlements.map { paths.resolve($0).path }
+            mac.infoPlist = mac.infoPlist.map { paths.resolve($0).path }
+            overlay.macos = mac
+        }
+        let sourceRoot = try paths.sourceRoot(source: overlay.source, sourceOverride: sourceOverride)
+        let workRoot = paths.workRoot
+        return OverlayLocation(overlay: overlay, sourceRoot: sourceRoot, workRoot: workRoot)
+    }
+}
+
+/// Where an overlay's paths lead, for every overlay type: its name (the file's basename without extension), `~`
+/// expansion, paths relative to the overlay file's directory, the source tree and the work copy location.
+public struct OverlayPaths: Sendable {
+    public let name: String
+    let home: String
+    let overlayDir: URL
+    let env: [String: String]
+
+    public init(overlay url: URL, env: [String: String] = ProcessInfo.processInfo.environment) {
+        name = url.deletingPathExtension().lastPathComponent
+        home = env["HOME"].flatMap { $0.isEmpty ? nil : $0 } ?? NSHomeDirectory()
+        overlayDir = url.deletingLastPathComponent()
+        self.env = env
+    }
+
+    /// The overlay file's text.
+    public static func read(_ url: URL) throws -> String {
         guard let text = try? String(contentsOf: url, encoding: .utf8) else {
             throw XlessError(.config, "cannot read overlay \(url.path)", fix: "pass the path of an existing overlay file to --config")
         }
-        let name = url.deletingPathExtension().lastPathComponent
-        var overlay = try TauriOverlay.parse(yaml: text, name: name)
-        let home = env["HOME"].flatMap { $0.isEmpty ? nil : $0 } ?? NSHomeDirectory()
-        func expand(_ p: String) -> String {
-            p == "~" ? home : p.hasPrefix("~/") ? home + String(p.dropFirst(1)) : p
-        }
-        let overlayDir = url.deletingLastPathComponent()
-        func resolve(_ p: String) -> URL {
-            let e = expand(p)
-            return (e.hasPrefix("/") ? URL(fileURLWithPath: e) : URL(fileURLWithPath: e, relativeTo: overlayDir)).standardizedFileURL
-        }
-        overlay.privacyManifest = overlay.privacyManifest.map { resolve($0).path }
-        let sourceRoot: URL
-        if let s = sourceOverride {
-            sourceRoot = URL(fileURLWithPath: expand(s)).standardizedFileURL
-        } else if let s = overlay.source {
-            sourceRoot = resolve(s)
-        } else {
-            throw XlessError(.config, "overlay \(name) has no source", fix: "set source: in the overlay or pass --source <dir>")
-        }
+        return text
+    }
+
+    /// The `type:` of an overlay file, before it is parsed as that type (nil when there is no string `type:`).
+    public static func type(of text: String) -> String? {
+        (try? Yams.load(yaml: text) as? [String: Any])?["type"] as? String
+    }
+
+    public func expand(_ p: String) -> String {
+        p == "~" ? home : p.hasPrefix("~/") ? home + String(p.dropFirst(1)) : p
+    }
+
+    /// `p` with `~` expanded; a relative path resolves against the overlay file's directory.
+    public func resolve(_ p: String) -> URL {
+        let e = expand(p)
+        return (e.hasPrefix("/") ? URL(fileURLWithPath: e) : URL(fileURLWithPath: e, relativeTo: overlayDir)).standardizedFileURL
+    }
+
+    /// `sourceOverride` (`~` expanded, relative to the current directory), else the overlay's `source:` (`resolve`).
+    public func sourceRoot(source: String?, sourceOverride: String?) throws -> URL {
+        if let s = sourceOverride { return URL(fileURLWithPath: expand(s)).standardizedFileURL }
+        if let s = source { return resolve(s) }
+        throw XlessError(.config, "overlay \(name) has no source", fix: "set source: in the overlay or pass --source <dir>")
+    }
+
+    /// `$XLESS_WORK_ROOT` (default `~/.cache/xless/work`) + `/<overlay name>`.
+    public var workRoot: URL {
         let base = env["XLESS_WORK_ROOT"].flatMap { $0.isEmpty ? nil : expand($0) } ?? home + "/.cache/xless/work"
-        let workRoot = URL(fileURLWithPath: base).appendingPathComponent(name).standardizedFileURL
-        return OverlayLocation(overlay: overlay, sourceRoot: sourceRoot, workRoot: workRoot)
+        return URL(fileURLWithPath: base).appendingPathComponent(name).standardizedFileURL
     }
 }

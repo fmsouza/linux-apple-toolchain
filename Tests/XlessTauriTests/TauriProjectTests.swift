@@ -83,3 +83,54 @@ private func overlay(_ extra: String = "") throws -> TauriOverlay {
     do { _ = try TauriProject.resolve(overlay: overlay(), source: src); Issue.record("expected throw") }
     catch let e as XlessError { #expect(e.stage == .prepare && e.fix.contains("tauri ios init")) }
 }
+
+// MARK: macOS
+
+private func makeMacSource(tauri: String? = nil, mac: String? = #"{"bundle":{"macOS":{"minimumSystemVersion":"11.0"}}}"#) throws -> URL {
+    let root = FileManager.default.temporaryDirectory.appendingPathComponent("tauri-mac-\(UUID().uuidString)")
+    let dir = root.appendingPathComponent("src-tauri")
+    try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)   // no gen/apple, no project.yml
+    try (tauri ?? #"{"productName":"Hello","version":"1.0.0","identifier":"com.example.hello"}"#).write(to: dir.appendingPathComponent("tauri.conf.json"), atomically: true, encoding: .utf8)
+    if let mac { try mac.write(to: dir.appendingPathComponent("tauri.macos.conf.json"), atomically: true, encoding: .utf8) }
+    return root
+}
+
+@Test func resolveMacMergesMacOSConfigWithoutAnXcodeProject() throws {
+    let r = try TauriProject.resolveMac(overlay: overlay(), source: makeMacSource())
+    let p = try #require(r.config.platforms[.macos])
+    #expect(r.config.platforms.count == 1 && p.minimumOS == "11.0" && p.product == "Hello" && p.distribution == .developerID)
+    #expect(r.config.bundleID == "com.example.hello.linux" && r.config.version == "1.0.0")
+    #expect(r.config.buildScheme == .dated && r.config.build == "1.0.0.200001010000")
+    #expect(r.config.assets == nil && r.config.launchStoryboard == nil && r.config.privacyManifest == nil)
+    #expect(r.tauriDir == "src-tauri" && r.mainBinaryName == nil)
+}
+
+@Test func resolveMacDefaultsAndOverrides() throws {
+    let bare = try TauriProject.resolveMac(overlay: overlay(), source: makeMacSource(mac: nil))
+    #expect(bare.config.platforms[.macos]?.minimumOS == "10.13")   // Tauri's default
+    let o = try overlay("macos: { product: Custom, minimumOS: \"12.0\", entitlements: /abs/o.entitlements }\nbuild: 7\n")
+    let r = try TauriProject.resolveMac(overlay: o, source: makeMacSource(tauri: #"{"productName":"Hello","version":"1.0.0","identifier":"x.y","mainBinaryName":"hello-bin"}"#))
+    let p = try #require(r.config.platforms[.macos])
+    #expect(p.minimumOS == "12.0" && p.product == "Custom" && p.entitlements == "/abs/o.entitlements")
+    #expect(r.config.build == "7" && r.config.buildScheme == .fixed && r.mainBinaryName == "hello-bin")
+}
+
+@Test func resolveMacTauriEntitlementsComeFirstRelativeToTauriDir() throws {
+    let o = try overlay("macos: { entitlements: /abs/o.entitlements }\n")
+    let src = try makeMacSource(mac: #"{"bundle":{"macOS":{"entitlements":"Entitlements.plist"}}}"#)
+    #expect(try TauriProject.resolveMac(overlay: o, source: src).config.platforms[.macos]?.entitlements == "src-tauri/Entitlements.plist")
+}
+
+/// resolveMac takes `macos.infoPlist` only; the top-level `infoPlist` (the iOS target's) is never used for macOS.
+@Test func resolveMacUsesOnlyMacOSInfoPlist() throws {
+    let src = try makeMacSource()
+    #expect(try TauriProject.resolveMac(overlay: overlay("infoPlist: ios/Info.plist\n"), source: src).config.infoPlist == nil)
+    let both = try overlay("infoPlist: ios/Info.plist\nmacos: { infoPlist: /abs/mac/Info.plist }\n")
+    #expect(try TauriProject.resolveMac(overlay: both, source: src).config.infoPlist == "/abs/mac/Info.plist")
+    #expect(try TauriProject.resolve(overlay: both, source: makeSource()).config.infoPlist == "ios/Info.plist")
+}
+
+@Test func resolveMacNeedsAProductName() throws {
+    let src = try makeMacSource(tauri: #"{"version":"1.0.0","identifier":"com.example.hello"}"#)
+    #expect(throws: XlessError.self) { try TauriProject.resolveMac(overlay: overlay(), source: src) }
+}

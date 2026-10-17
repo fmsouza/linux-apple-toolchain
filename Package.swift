@@ -31,19 +31,28 @@ let package = Package(
             .product(name: "Crypto", package: "swift-crypto"),
         ]),
         .target(name: "XlessSign", dependencies: [
-            "XlessCore", "XlessASC",
+            "XlessCore", "XlessASC", "XlessMachO",
             .product(name: "X509", package: "swift-certificates"),
             .product(name: "Crypto", package: "swift-crypto"),
             .product(name: "_CryptoExtras", package: "swift-crypto"),
         ]),
-        .target(name: "XlessPackage", dependencies: ["XlessCore", "XlessSign"]),
+        .target(name: "XlessPackage", dependencies: ["XlessCore", "XlessSign", "XlessASC"]),
+        // Xcode workspace / project / scheme reader and Swift Build PIF writer (React Native / CocoaPods subset).
+        .target(name: "XlessXcode", dependencies: ["XlessCore", "XlessMachO"]),
         .target(name: "XlessTauri", dependencies: [
             "XlessCore", "XlessMachO",
             .product(name: "Yams", package: "Yams"),
             .product(name: "Crypto", package: "swift-crypto"),
         ]),
+        // React Native / Expo iOS apps (`type: react-native` overlays): prepare (prebuild, CocoaPods) and the Swift Build build.
+        .target(name: "XlessReactNative", dependencies: [
+            "XlessCore", "XlessMachO", "XlessXcode", "XlessTauri",
+            .product(name: "Yams", package: "Yams"),
+            .product(name: "Crypto", package: "swift-crypto"),
+        ]),
         .executableTarget(name: "xless", dependencies: [
             "XlessCore", "XlessTauri", "XlessSDK", "XlessBuild", "XlessAssets", "XlessFinalize", "XlessSign", "XlessASC", "XlessPackage", "XlessIB",
+            "XlessXcode", "XlessReactNative",
             .product(name: "ArgumentParser", package: "swift-argument-parser"),
         ]),
         // Research tool: compares the storyboard compiler with ibtool outputs (scripts/ib-corpus/differential.py).
@@ -62,7 +71,7 @@ let package = Package(
             .product(name: "Crypto", package: "swift-crypto"),
         ]),
         .testTarget(name: "XlessSignTests", dependencies: [
-            "XlessSign", "XlessASC", "XlessCore",
+            "XlessSign", "XlessASC", "XlessCore", "XlessMachO",
             .product(name: "X509", package: "swift-certificates"),
             .product(name: "SwiftASN1", package: "swift-asn1"),
             .product(name: "Crypto", package: "swift-crypto"),
@@ -72,5 +81,7 @@ let package = Package(
         .testTarget(name: "XlessIBTests", dependencies: ["XlessIB", "XlessCore"]),
         .testTarget(name: "XlessTauriTests", dependencies: ["XlessTauri", "XlessCore", "XlessMachO", .product(name: "Crypto", package: "swift-crypto")], exclude: ["Fixtures"]),
         .testTarget(name: "XlessMachOTests", dependencies: ["XlessMachO"]),
+        .testTarget(name: "XlessReactNativeTests", dependencies: ["XlessReactNative", "XlessXcode", "XlessCore", "XlessTauri", "XlessASC"]),
+        .testTarget(name: "XlessXcodeTests", dependencies: ["XlessXcode", "XlessCore", "XlessTauri", "XlessMachO"], exclude: ["Fixtures"]),
     ]
 )

@@ -267,3 +267,52 @@ func datedOverrideMustBeADatedBuildOfTheVersion(override: String) async {
     let e = await settleError(c, override: "1.0.0.2026101501", transport: MockTransport([]))
     #expect(e?.stage == .config)
 }
+
+// MARK: macOS (Developer ID: no App Store Connect)
+
+private func macConfig(build: String = "1.0.0.200001010000") -> ProjectConfig {
+    ProjectConfig(bundleID: "com.example.app", teamID: "ABCDE12345", version: "1.0.0", build: build,
+                  platforms: [.macos: PlatformConfig(minimumOS: "11.0", product: "App", distribution: .developerID)], buildScheme: .dated)
+}
+
+@Test func macOSBuildNumberIsMinuteResolutionUTC() {
+    // 2026-10-16 15:30:45 UTC
+    #expect(DatedBuildNumber.macOS(version: "1.0.0", now: Date(timeIntervalSince1970: 1_792_164_645)) == "1.0.0.202610161530")
+}
+
+@Test func macOSDatedValidationAcceptsOnlyTheTwelveDigitForm() throws {
+    try macConfig().validate()
+    try macConfig(build: "1.0.0.202610162359").validate()
+    for bad in ["1.0.0.2026101501", "1.0.0.202610162400", "1.0.0.202610151560", "1.0.1.202610151530", "7"] {
+        #expect(throws: XlessError.self, "\(bad)") { try macConfig(build: bad).validate() }
+    }
+    // iOS keeps the ten-digit form only.
+    var ios = datedConfig(); ios.build = "1.0.0.202610151530"
+    #expect(throws: XlessError.self) { try ios.validate() }
+}
+
+@Test func macOSDatedSettleUsesTheClockAndNeverQueriesAppStoreConnect() async throws {
+    var c = macConfig()
+    let f = tempFile()
+    try await DatedBuildNumber.settle(&c, override: nil, file: f, secrets: Secrets(env: [:]), fresh: true, today: today,
+                                      makeClient: { _ in fatalError("macOS dated builds make no App Store Connect call") })
+    #expect(c.build == "1.0.0.202610151200" && c.buildScheme == .dated)
+    var later = macConfig()
+    try await DatedBuildNumber.settle(&later, override: nil, file: f, secrets: Secrets(env: [:]), fresh: false, today: Date(),
+                                      makeClient: { _ in fatalError("no network") })
+    #expect(later.build == "1.0.0.202610151200")   // later stages read the recorded number
+    var over = macConfig()
+    try await DatedBuildNumber.settle(&over, override: "1.0.0.202601010101", file: tempFile(), secrets: Secrets(env: [:]), fresh: true, today: today,
+                                      makeClient: { _ in fatalError("no network") })
+    #expect(over.build == "1.0.0.202601010101")
+}
+
+/// A build that is never uploaded (a React Native simulator build) chooses `<version>.<YYYYMMDD>01` without App Store
+/// Connect when it starts, and later stages read the record.
+@Test func localDatedBuildNumbersNeedNoAppStoreConnect() throws {
+    let file = FileManager.default.temporaryDirectory.appendingPathComponent("xless-local-\(UUID().uuidString)/build-number")
+    defer { try? FileManager.default.removeItem(at: file.deletingLastPathComponent()) }
+    #expect(throws: XlessError.self) { try DatedBuildNumber.resolveLocal(version: "1.0.0", fresh: false, file: file) }
+    #expect(try DatedBuildNumber.resolveLocal(version: "1.0.0", fresh: true, file: file, today: today) == "1.0.0.2026101501")
+    #expect(try DatedBuildNumber.resolveLocal(version: "1.0.0", fresh: false, file: file) == "1.0.0.2026101501")
+}

@@ -110,3 +110,15 @@ func fatWrap(_ slices: [Data]) -> Data {
     let mixed = fatWrap([try thin(), arArchive()])
     #expect(throws: MachOError.self) { try MachO.containsLoadableImage(mixed) }
 }
+
+@Test func listsSliceArchitectures() throws {
+    let t = try thin()
+    let one = try MachO.sliceArchitectures(in: t)
+    #expect(one.count == 1 && one[0].name == "arm64" && one[0].range == 0..<t.count)
+    let x = try thin(cpu: 0x01000007)
+    let fat = try MachO.makeFat([x, t])
+    let two = try MachO.sliceArchitectures(in: fat)
+    #expect(two.map(\.name) == ["x86_64", "arm64"])
+    #expect(two[0].cpuType == 0x01000007 && two[1].cpuType == 0x0100000c)
+    #expect(Data(fat[two[1].range]) == t)
+}

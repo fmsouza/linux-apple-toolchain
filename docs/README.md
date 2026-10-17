@@ -3,11 +3,11 @@
 xless builds, signs and ships Apple-platform apps from Linux. It takes a SwiftPM project plus an `xless.yml` and produces:
 
 - iOS/iPadOS: a signed `.ipa`, uploaded to App Store Connect (TestFlight).
-- macOS: a Developer ID signed, notarized and stapled `.app` inside a `.zip`. There is no `.dmg`, no Mac App Store `.pkg` ([why](research/mas-pkg.md)), and no upload step for macOS.
+- macOS: a Developer ID signed, notarized and stapled `.app` inside a `.zip`. A SwiftPM `xless.yml` project gets no `.dmg` (a Tauri v2 macOS app does: see [notarized DMG](#one-command-notarized-dmg-tauri-macos)); there is no Mac App Store `.pkg` ([why](research/mas-pkg.md)) and no upload step for macOS.
 
 It does this without Xcode on the build machine. The Darwin SDK comes from a copy of Xcode 27.0 (27A266a) that you export once on a Mac. Only this Xcode generation is supported.
 
-Docs: [bootstrap.md](bootstrap.md) (one-time Apple setup), [xless-yml.md](xless-yml.md) (config reference), [tauri.md](tauri.md) (Tauri v2 iOS apps), [research/](research/) (notes on App Store Connect upload, Mac App Store `.pkg`, and known parity gaps).
+Docs: [bootstrap.md](bootstrap.md) (one-time Apple setup), [xless-yml.md](xless-yml.md) (config reference), [tauri.md](tauri.md) (Tauri v2 iOS and macOS apps), [react-native.md](react-native.md) (React Native / Expo iOS apps, with app extensions), [research/](research/) (notes on App Store Connect upload, Mac App Store `.pkg`, and known parity gaps).
 
 ## Apple software
 
@@ -34,12 +34,12 @@ Each stage reads only the previous stage's directory under `.xless/build/<platfo
 
 | Stage | Command | Output | Exit code on failure |
 |---|---|---|---|
-| prepare | `xless prepare` | Tauri overlays only (`--config`, see [tauri.md](tauri.md)): work copy, dependencies, toolchains | 19 |
+| prepare | `xless prepare` | Overlays only (`--config`, see [tauri.md](tauri.md), [react-native.md](react-native.md)): work copy, dependencies, toolchains (React Native: `expo prebuild`, `pod install`) | 19 |
 | build | `xless build` | `app/` unsigned bundle | 12 |
 | assets | `xless assets` | `assets/` (iOS: `Assets.car`; macOS: `.icns`) | 13 |
 | finalize | `xless finalize` | `final/` Xcode metadata stamped, binaries patched | 14 |
 | sign | `xless sign` | `signed/` | 15 |
-| package | `xless package` | `out/` `.ipa` or notarized `.zip` | 16 |
+| package | `xless package` | `out/` `.ipa`, notarized `.zip`, or (Tauri macOS) notarized and stapled `.dmg` | 16 |
 | upload | `xless upload` | `upload.json` (iOS only; rewritten at every state change, so it keeps the build ID if processing fails or times out). With a [`testflight:` block](xless-yml.md#testflight) it then delivers the processed build to your TestFlight groups. | 17 |
 
 Config errors exit 10, SDK errors exit 11, and `prepare` errors exit 19. Errors are printed as `[stage] cause — fix`. Other commands: `xless inspect <bundle> --platform <p>` prints Info.plist and Mach-O build versions as JSON (useful when comparing with an Xcode build); `xless sdk meta|export|install` manage the SDK.
@@ -48,7 +48,7 @@ All stage commands take `--platform ios|macos`, `--project <dir>` (default `.`) 
 
 ## Secrets
 
-Secrets come only from environment variables or a `NAME_FILE` variable naming a file with the value. They are never CLI flags and are never logged. xless removes them (and their `_FILE` forms) from the environment of every tool it runs, so package code executed during `build` (SwiftPM macros and plugins) cannot read them from its environment; rcodesign gets keys through mode-0600 temporary files. A file named by a `_FILE` variable is another matter: code that runs on the same machine or in the same container as the build, with the same user, can still read it. `scripts/testflight.sh` with a project directory mounts the secret files into the container that also builds; with `--config` (Tauri apps) the build runs in a container without any secret ([tauri.md](tauri.md#shipping)).
+Secrets come only from environment variables or a `NAME_FILE` variable naming a file with the value. They are never CLI flags and are never logged. xless removes them (and their `_FILE` forms) from the environment of every tool it runs, so package code executed during `build` (SwiftPM macros and plugins) cannot read them from its environment; rcodesign gets keys through mode-0600 temporary files. A file named by a `_FILE` variable is another matter: code that runs on the same machine or in the same container as the build, with the same user, can still read it. `scripts/testflight.sh` with a project directory mounts the secret files into the container that also builds; with `--config` (Tauri and React Native apps) the build runs in a container without any secret ([tauri.md](tauri.md#shipping), [react-native.md](react-native.md#shipping-three-containers)).
 
 | Variable | Purpose | Needed for |
 |---|---|---|
@@ -80,9 +80,13 @@ The container runs as root, so the directories it creates in your project (`.xle
 
 For GitHub Actions see [.github/workflows/example-ios.yml](../.github/workflows/example-ios.yml). It runs the private image as the job container; set the repo variable `XLESS_IMAGE` and secrets `XLESS_REGISTRY_TOKEN`, `ASC_KEY_ID`, `ASC_ISSUER_ID`, `ASC_KEY_P8`, `XLESS_DIST_KEY`. The runner is x86_64 and the image is multi-arch; this workflow has not been run yet (needs real secrets).
 
+### One command: notarized DMG (Tauri macOS)
+
+`make dmg CONFIG=<overlay.yml>` builds a Tauri v2 macOS app, universal (arm64 and x86_64), signs it with your Developer ID key, notarizes and staples a DMG, and prints its path. It is `scripts/testflight.sh --config <overlay.yml> --platform macos`: the build runs without any secret, then `sign` and `package` run with `XLESS_DEVID_KEY_FILE` and the App Store Connect key. Details, prerequisites and known gaps: [tauri.md](tauri.md#macos). The exit codes are those in the [pipeline table](#pipeline) (prepare 19, build 12, finalize 14, sign 15, package 16).
+
 ### One command: TestFlight
 
-`make testflight PROJECT=<dir>` builds, signs, uploads and delivers an iOS project to TestFlight with `xless ship --platform ios`. It wraps [scripts/testflight.sh](../scripts/testflight.sh), which you can also call directly (extra arguments go to `xless ship`, for example `--from upload`). For a Tauri app described by an overlay use `make testflight CONFIG=<overlay.yml>` ([tauri.md](tauri.md#shipping)).
+`make testflight PROJECT=<dir>` builds, signs, uploads and delivers an iOS project to TestFlight with `xless ship --platform ios`. It wraps [scripts/testflight.sh](../scripts/testflight.sh), which you can also call directly (extra arguments go to `xless ship`, for example `--from upload`). For an app described by an overlay use `make testflight CONFIG=<overlay.yml>`: a Tauri app ([tauri.md](tauri.md#shipping)) or a React Native / Expo app ([react-native.md](react-native.md#shipping-three-containers)). `ARGS="…"` passes extra arguments, for example `ARGS="--from upload"`.
 
 - **Where it runs.** On macOS, inside the xless Linux image through docker (the image is `xless:local-<arch>` unless `XLESS_IMAGE` says otherwise; the docker context is `DOCKER_CONTEXT`, else `colima-xless` when that context exists, else the current one). On Linux it runs natively when `xless` is on PATH, otherwise through docker. `XLESS_USE_DOCKER=1|0` forces either.
 - **Build number.** `XLESS_BUILD_NUMBER` if set, else `$(( $(date +%s) / 60 ))`, which is monotonic across machines ([Secrets](#secrets)). With `CONFIG=` the overlay's `build:` decides instead ([tauri.md](tauri.md#build-numbers)).
@@ -110,6 +114,7 @@ make base-push sdk-export sdk-push
 - `make sdk-export` (target `base-local` first) runs `xless sdk export`, which runs `xtool sdk build` inside the per-arch base image with Xcode mounted read-only, and writes `dist/sdk/`.
 - `make sdk-push` builds the SDK image on top of the base image and pushes it. It fails unless the registry is marked private.
 - `make sdk-local` builds the same image locally without pushing. `make test-linux` runs the unit tests in Linux.
+- `make images XCODE=<Xcode.app | Xcode_*.xip> [ARCHS=arm64]` builds the whole local chain (`xless-base`, `xless`, `xless-tauri`, `xless-rn`) from one Xcode and tags it `:local-<arch>-xcode<version>`, for projects that pin that Xcode with `xcode:` ([react-native.md](react-native.md#pinning-the-xcode-sdk)). Its SDK export goes to `dist/sdk-xcode<version>/`. The local targets also take `ARCHS`, `IMAGE_SUFFIX` and `SDK_DIR`.
 
 All of these use the active Docker context. To use a separate engine (for example a dedicated Colima VM), set `DOCKER_CONTEXT`; nothing in the repo hardcodes a context.
 
@@ -161,11 +166,12 @@ Other things worth knowing:
 
 - Apple's upload requirements (checked 2026-10-13): built with SDK 26 or later; iOS minimum OS 13.0 or later. `finalize` refuses older SDKs.
 - Loose `.dylib` files are rejected at `finalize`; xless does not wrap them as frameworks.
+- `finalize` refuses a Mach-O image whose LINKEDIT tables `dyld` would reject as misaligned (the app would crash at launch); `xless inspect` lists them per binary (`linkeditProblems`).
 - The App Store Connect app record cannot be created through the API; create it by hand after the bundle ID is registered ([bootstrap.md](bootstrap.md) steps 4 and 5).
 
 ## Known gaps
 
-- Two `Assets.car` differences from Xcode output (no MultiSized Image rendition for the app icon, colorsets stored in the generic colorspace) come from AssetKit. See [research/parity-known-gaps.md](research/parity-known-gaps.md).
+- One `Assets.car` difference from Xcode output that matters (no MultiSized Image rendition for the app icon) comes from AssetKit; transparent images and colorsets now match actool's (`Opaque`, colour space, scale). See [research/parity-known-gaps.md](research/parity-known-gaps.md).
 - Single-size app icon sets with dark or tinted variants are not handled. xless falls back to AssetKit's output, and the resulting `CFBundleIcons` may be malformed (not verified against App Store Connect). Use a plain single 1024px icon.
 - Whether App Store Connect accepts the build despite these gaps has not been confirmed (needs a real upload).
 - AssetKit (pinned in `versions.env`) is MIT-licensed (its `LICENSE` file at revision e763558), so it can be vendored.

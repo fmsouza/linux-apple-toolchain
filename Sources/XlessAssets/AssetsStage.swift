@@ -31,31 +31,18 @@ public enum AssetsStage {
         let layout = BundleLayout(platform: platform)
         let plistURL = app.appendingPathComponent(layout.infoPlist)
         var info = try Plist.read(plistURL, stage: .assets)
-        let icons = try appIconPNGs(catalog: catalog)
-
         switch platform {
         case .ios:
-            try checkIconsOpaque(icons)
-            let source = try iosIconSource(catalog: catalog)
-            let result: CompileResult
-            let scratch = FileManager.default.temporaryDirectory.appendingPathComponent("xless-assets-\(UUID().uuidString)", isDirectory: true)
-            defer { try? FileManager.default.removeItem(at: scratch) }
-            do {
-                let copy = try normalizedCatalogCopy(catalog, in: scratch, singleSizeIcon: source?.filename)
-                result = try await XCAssetCompiler(deploymentTarget: try config.platform(.ios).minimumOS).compile(catalog: copy)
-            } catch {
-                throw XlessError(.assets, "AssetKit failed on \(catalog.path): \(error)", fix: "remove unsupported asset types (PDF, data sets, stickers) or report to xtool-org/AssetKit")
-            }
-            try result.carData.write(to: app.appendingPathComponent("Assets.car"))
-            if let icon = result.appIconBundle, let source {
-                for f in try XcodeAppIcon.looseFiles(name: icon.primaryIconName, icon1024: source.png) {
-                    try f.data.write(to: app.appendingPathComponent(f.name))
-                }
+            let compiled = try await compileIOSCatalog(catalog, deploymentTarget: try config.platform(.ios).minimumOS)
+            try compiled.car.write(to: app.appendingPathComponent("Assets.car"))
+            if let icon = compiled.icon {
+                for f in icon.files { try f.data.write(to: app.appendingPathComponent(f.name)) }
                 let family = (info["UIDeviceFamily"] as? [Any])?.compactMap { ($0 as? Int) ?? ($0 as? NSNumber)?.intValue } ?? [1, 2]
-                for (k, v) in XcodeAppIcon.plistAdditions(name: icon.primaryIconName, deviceFamily: family) { info[k] = v }
+                for (k, v) in XcodeAppIcon.plistAdditions(name: icon.name, deviceFamily: family) { info[k] = v }
                 info.removeValue(forKey: "CFBundleIconFile")
             }
         case .macos:
+            let icons = try appIconPNGs(catalog: catalog)
             guard !icons.isEmpty else { return }
             let icns: Data
             do { icns = try ICNS.make(pngs: icons) } catch {
@@ -65,6 +52,44 @@ public enum AssetsStage {
             info["CFBundleIconFile"] = "AppIcon"
         }
         try Plist.write(info, to: plistURL, stage: .assets)
+    }
+
+    /// A compiled iOS asset catalog: the `Assets.car` bytes and, when the catalog's app icon set was compiled, its name
+    /// and the loose fallback PNGs that go next to `Assets.car` (`XcodeAppIcon`).
+    public struct IOSCatalog {
+        public var car: Data
+        public var icon: (name: String, files: [LooseFile])?
+    }
+
+    /// The one iOS asset-catalog compile path, shared by the `assets` stage and the `actool` shim (`ActoolShim`).
+    /// With `includeAppIcon`, the catalog's app icon set is checked (opaque, ITMS-90717) and compiled in Xcode's
+    /// single-size form from its 1024px image (`iosIconSource`); without it, app icon sets are left out of the car, as
+    /// actool does without `--app-icon`. Failures are `[assets]` errors.
+    public static func compileIOSCatalog(_ catalog: URL, includeAppIcon: Bool = true, deploymentTarget: String) async throws -> IOSCatalog {
+        let source: (filename: String, png: Data)?
+        if includeAppIcon {
+            try checkIconsOpaque(appIconPNGs(catalog: catalog))
+            source = try iosIconSource(catalog: catalog)
+        } else {
+            source = nil
+        }
+        let result: CompileResult
+        let fm = FileManager.default
+        let scratch = fm.temporaryDirectory.appendingPathComponent("xless-assets-\(UUID().uuidString)", isDirectory: true)
+        defer { try? fm.removeItem(at: scratch) }
+        do {
+            let copy = try normalizedCatalogCopy(catalog, in: scratch, singleSizeIcon: source?.filename)
+            if !includeAppIcon {
+                for set in (try? fm.contentsOfDirectory(at: copy, includingPropertiesForKeys: nil)) ?? [] where set.pathExtension == "appiconset" {
+                    try fm.removeItem(at: set)
+                }
+            }
+            result = try await XCAssetCompiler(deploymentTarget: deploymentTarget).compile(catalog: copy)
+        } catch {
+            throw XlessError(.assets, "AssetKit failed on \(catalog.path): \(error)", fix: "remove unsupported asset types (PDF, data sets, stickers) or report to xtool-org/AssetKit")
+        }
+        guard let bundle = result.appIconBundle, let source else { return IOSCatalog(car: result.carData, icon: nil) }
+        return IOSCatalog(car: result.carData, icon: (bundle.primaryIconName, try XcodeAppIcon.looseFiles(name: bundle.primaryIconName, icon1024: source.png)))
     }
 
     /// Copies the catalog into `dir`, adding the missing "scale" to app icon entries (AssetKit requires it).

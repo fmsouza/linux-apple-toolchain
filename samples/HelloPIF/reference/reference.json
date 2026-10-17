@@ -1,0 +1,90 @@
+{
+  "executable" : {
+    "linkedLibraries" : [
+      "\/usr\/lib\/libc++.1.dylib",
+      "@rpath\/HelloKit.framework\/HelloKit",
+      "\/System\/Library\/Frameworks\/Foundation.framework\/Foundation",
+      "\/usr\/lib\/libobjc.A.dylib",
+      "\/usr\/lib\/libSystem.B.dylib",
+      "\/System\/Library\/Frameworks\/CoreFoundation.framework\/CoreFoundation",
+      "\/System\/Library\/Frameworks\/UIKit.framework\/UIKit",
+      "\/usr\/lib\/swift\/libswiftCore.dylib",
+      "\/usr\/lib\/swift\/libswiftCoreAudio.dylib",
+      "\/usr\/lib\/swift\/libswiftCoreFoundation.dylib",
+      "\/usr\/lib\/swift\/libswiftCoreImage.dylib",
+      "\/usr\/lib\/swift\/libswiftCoreLocation.dylib",
+      "\/usr\/lib\/swift\/libswiftDarwin.dylib",
+      "\/usr\/lib\/swift\/libswiftDispatch.dylib",
+      "\/usr\/lib\/swift\/libswiftMetal.dylib",
+      "\/usr\/lib\/swift\/libswiftOSLog.dylib",
+      "\/usr\/lib\/swift\/libswiftObjectiveC.dylib",
+      "\/usr\/lib\/swift\/libswiftQuartzCore.dylib",
+      "\/usr\/lib\/swift\/libswiftSpatial.dylib",
+      "\/usr\/lib\/swift\/libswiftUniformTypeIdentifiers.dylib",
+      "\/usr\/lib\/swift\/libswiftXPC.dylib",
+      "\/usr\/lib\/swift\/libswiftos.dylib",
+      "\/usr\/lib\/swift\/libswiftsimd.dylib",
+      "\/usr\/lib\/swift\/libswiftUIKit.dylib"
+    ],
+    "minos" : "16.4",
+    "platform" : 2,
+    "rpaths" : [
+      "\/usr\/lib\/swift",
+      "@executable_path\/Frameworks"
+    ]
+  },
+  "files" : [
+    "AppIcon60x60@2x.png",
+    "AppIcon76x76@2x~ipad.png",
+    "Assets.car",
+    "Frameworks\/HelloKit.framework\/HelloKit",
+    "Frameworks\/HelloKit.framework\/Info.plist",
+    "HelloPIF",
+    "Info.plist",
+    "PkgInfo",
+    "build-stamp.txt",
+    "greeting.txt"
+  ],
+  "frameworks" : {
+    "HelloKit.framework" : {
+      "linkedLibraries" : [
+        "\/System\/Library\/Frameworks\/Foundation.framework\/Foundation",
+        "\/usr\/lib\/libobjc.A.dylib",
+        "\/usr\/lib\/libSystem.B.dylib",
+        "\/usr\/lib\/swift\/libswiftCore.dylib",
+        "\/usr\/lib\/swift\/libswiftCoreFoundation.dylib",
+        "\/usr\/lib\/swift\/libswiftDarwin.dylib",
+        "\/usr\/lib\/swift\/libswiftDispatch.dylib",
+        "\/usr\/lib\/swift\/libswiftObjectiveC.dylib",
+        "\/usr\/lib\/swift\/libswiftXPC.dylib"
+      ],
+      "minos" : "16.4",
+      "platform" : 2,
+      "rpaths" : [
+        "\/usr\/lib\/swift",
+        "@executable_path\/Frameworks"
+      ]
+    }
+  },
+  "infoPlist" : {
+    "CFBundleDevelopmentRegion" : "en",
+    "CFBundleDisplayName" : "HelloPIF",
+    "CFBundleExecutable" : "HelloPIF",
+    "CFBundleIcons" : "{\"CFBundlePrimaryIcon\":{\"CFBundleIconFiles\":[\"AppIcon60x60\"],\"CFBundleIconName\":\"AppIcon\"}}",
+    "CFBundleIcons~ipad" : "{\"CFBundlePrimaryIcon\":{\"CFBundleIconFiles\":[\"AppIcon60x60\",\"AppIcon76x76\"],\"CFBundleIconName\":\"AppIcon\"}}",
+    "CFBundleIdentifier" : "com.example.hellopif",
+    "CFBundleInfoDictionaryVersion" : "6.0",
+    "CFBundleName" : "HelloPIF",
+    "CFBundlePackageType" : "APPL",
+    "CFBundleShortVersionString" : "1.0.0",
+    "CFBundleSupportedPlatforms" : "[\"iPhoneOS\"]",
+    "DTPlatformName" : "iphoneos",
+    "DTPlatformVersion" : "27.0",
+    "DTSDKName" : "iphoneos27.0",
+    "LSRequiresIPhoneOS" : "true",
+    "MinimumOSVersion" : "16.4",
+    "UIDeviceFamily" : "[1,2]",
+    "UILaunchScreen" : "{}",
+    "UIRequiredDeviceCapabilities" : "[\"arm64\"]"
+  }
+}

@@ -11,6 +11,7 @@ struct CSIWriterTests {
             pixelsBGRA: [UInt8](repeating: 0, count: 60 * 60 * 4),
             colorSpaceID: 1,
             kind: .appIcon,
+            isOpaque: true,
             renditionName: "icon@2x.png"
         )
         let data = CSIWriter.bitmap(name: "AppIcon", body: body, scaleFactor: 200)
@@ -50,14 +51,14 @@ struct CSIWriterTests {
         #expect(data.count >= 184)
     }
 
-    @Test("Color CSI body starts with COLR magic and four IEEE-754 doubles")
+    @Test("Color CSI body starts with the COLR tag (file bytes RLOC) and four IEEE-754 doubles")
     func colorBody() {
         let body = ColorBody(red: 1, green: 0, blue: 0.5, alpha: 1, colorSpaceID: 0)
         let data = CSIWriter.color(name: "Accent", body: body)
-        // CSI header is 184 bytes; body starts at offset 184
-        #expect(data.count >= 184 + 4 + 4 + 4 + 4 + 8 * 4)
-        let payloadStart = 184
+        // CSI header is 184 bytes, then the TVL block (1004 + 1006, 28 bytes), then the body
+        let payloadStart = 184 + 28
+        #expect(data.count == payloadStart + 4 + 4 + 4 + 4 + 8 * 4)
         let magic = data.subdata(in: payloadStart..<(payloadStart + 4))
-        #expect(Array(magic) == Array("COLR".utf8))
+        #expect(Array(magic) == Array("RLOC".utf8))
     }
 }

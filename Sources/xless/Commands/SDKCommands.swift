@@ -40,7 +40,7 @@ struct SDKExportCommand: AsyncParsableCommand {
 
     @Option(help: "Path to Xcode.app.") var xcode: String = "/Applications/Xcode.app"
     @Option(help: "Output directory.") var out: String = "dist/sdk"
-    @Option(help: "Base image name prefix; '-<arch>' is appended.") var baseImage: String = "xless-base:local"
+    @Option(help: "Base image: '{arch}' in it is replaced by the architecture, else '-<arch>' is appended.") var baseImage: String = "xless-base:local"
     @Option(parsing: .upToNextOption, help: "Docker architectures.") var arch: [String] = ["arm64", "amd64"]
 
     func run() async throws {
@@ -51,7 +51,7 @@ struct SDKExportCommand: AsyncParsableCommand {
         try meta.write(to: outDir.appendingPathComponent("toolchain-meta.json"))
 
         for a in arch {
-            let image = "\(baseImage)-\(a)"
+            let image = baseImage.contains("{arch}") ? baseImage.replacingOccurrences(of: "{arch}", with: a) : "\(baseImage)-\(a)"
             let probe = try? Shell.run("docker", ["run", "--rm", "--platform", "linux/\(a)", "-v", "\(xcode):/xcode:ro", image,
                                                   "test", "-d", "/xcode/Contents/Developer"], stage: .sdk)
             guard probe != nil else {

@@ -15,7 +15,7 @@ public enum WorkCopy {
                             baseEnvironment: [String: String] = ProcessInfo.processInfo.environment) throws -> Int {
         let fm = FileManager.default
         try gitCheckout(source, baseEnvironment: baseEnvironment)
-        try checkOrigin(origin ?? source.resolvingSymlinksInPath().standardizedFileURL.path, work: work)
+        try checkOrigin(origin ?? source.resolvingSymlinksInPath().standardizedFileURL.path, work: work, volume: baseEnvironment["XLESS_WORK_VOLUME"])
 
         // Entries look like `<mode> <sha> <stage>\t<path>`, NUL-separated; run in `source`, paths are relative to it.
         let listing = try Shell.run("git", git(source, ["ls-files", "-s", "-z", "--", "."]), baseEnvironment: baseEnvironment, stage: .prepare).stdout
@@ -78,7 +78,7 @@ public enum WorkCopy {
 
     /// Read-only git arguments for `source`. `safe.directory=*`: in docker the source belongs to the host user, not to
     /// root, and git would otherwise refuse it ("detected dubious ownership"). Nothing is written to the repository.
-    static func git(_ source: URL, _ args: [String]) -> [String] {
+    public static func git(_ source: URL, _ args: [String]) -> [String] {
         ["-c", "safe.directory=*", "-C", source.path] + args
     }
 
@@ -98,13 +98,17 @@ public enum WorkCopy {
         }
     }
 
-    /// `<work>/.xless/source` names the source a work copy was first synced from; a different one is refused.
-    static func checkOrigin(_ origin: String, work: URL) throws {
+    /// `<work>/.xless/source` names the source a work copy was first synced from; a different one is refused. `volume`
+    /// (`XLESS_WORK_VOLUME`, set by scripts/testflight.sh) is the docker volume the work copy lives in.
+    static func checkOrigin(_ origin: String, work: URL, volume: String? = nil) throws {
         let file = work.appendingPathComponent(".xless/source")
         if let recorded = (try? String(contentsOf: file, encoding: .utf8))?.trimmingCharacters(in: .newlines), !recorded.isEmpty {
             guard recorded == origin else {
                 throw XlessError(.prepare, "the work copy \(work.path) was synced from \(recorded), not from \(origin)",
-                                 fix: "the work copy is named after the overlay file: rename one of the overlay files, or delete \(work.path)")
+                                 fix: "the work copy is named after the overlay file: rename one of the overlay files, or delete \(work.path)"
+                                    + (volume.flatMap { $0.isEmpty ? nil : $0 }.map {
+                                        " (it is in the docker volume \($0): docker run --rm -v \($0):/w alpine rm -rf /w/\(work.lastPathComponent))"
+                                    } ?? ""))
             }
             return
         }

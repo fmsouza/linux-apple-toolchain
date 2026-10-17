@@ -80,24 +80,30 @@ public enum MachO {
         }
     }
 
+    /// Calls `body(offset, cmd, size)` for each load command of a 64-bit slice, bounds-checked.
+    static func forEachLoadCommand(_ data: Data, slice r: Range<Int>, _ body: (Int, UInt32, Int) throws -> Void) throws {
+        let b = r.lowerBound
+        guard r.count >= 32 else { throw MachOError.truncated }
+        guard try data.u32(b) == mhMagic64 else { throw MachOError.unsupported("non-64-bit slice") }
+        var off = b + 32
+        for _ in 0..<Int(try data.u32(b + 16)) {
+            guard off + 8 <= r.upperBound else { throw MachOError.truncated }
+            let size = Int(try data.u32(off + 4))
+            guard size >= 8, off + size <= r.upperBound else { throw MachOError.truncated }
+            try body(off, try data.u32(off), size)
+            off += size
+        }
+    }
+
     static func forEachBuildVersion(_ data: Data, _ body: (Int, Int32) throws -> Void) throws {
         for r in try slices(data) {
-            let b = r.lowerBound
             guard r.count >= 32 else { throw MachOError.truncated }
-            guard try data.u32(b) == mhMagic64 else { throw MachOError.unsupported("non-64-bit slice") }
-            let cpu = Int32(bitPattern: try data.u32(b + 4))
-            let ncmds = Int(try data.u32(b + 16))
-            var off = b + 32
-            for _ in 0..<ncmds {
-                guard off + 8 <= r.upperBound else { throw MachOError.truncated }
-                let cmd = try data.u32(off)
-                let size = Int(try data.u32(off + 4))
-                guard size >= 8, off + size <= r.upperBound else { throw MachOError.truncated }
+            let cpu = Int32(bitPattern: try data.u32(r.lowerBound + 4))
+            try forEachLoadCommand(data, slice: r) { off, cmd, size in
                 if cmd == lcBuildVersion {
                     guard size >= 24 else { throw MachOError.truncated }
                     try body(off, cpu)
                 }
-                off += size
             }
         }
     }
@@ -117,8 +123,8 @@ public enum MachO {
     static let lcRpath: UInt32 = 0x8000001c
 
     /// Names of the load commands whose type is in `kinds`, in load-command order. Thin 64-bit only; a fat binary uses its first slice.
-    static func pathCommands(_ data: Data, _ kinds: Set<UInt32>) throws -> [String] {
-        guard let r = try slices(data).first else { return [] }
+    static func pathCommands(_ data: Data, _ kinds: Set<UInt32>, slice: Range<Int>? = nil) throws -> [String] {
+        guard let r = try slice ?? slices(data).first else { return [] }
         let b = r.lowerBound
         guard r.count >= 32 else { throw MachOError.truncated }
         guard try data.u32(b) == mhMagic64 else { throw MachOError.unsupported("non-64-bit slice") }
@@ -143,12 +149,64 @@ public enum MachO {
     }
 
     /// LC_LOAD_DYLIB, LC_LOAD_WEAK_DYLIB and LC_REEXPORT_DYLIB names, in load-command order.
-    public static func linkedLibraries(in data: Data) throws -> [String] {
-        try pathCommands(data, [lcLoadDylib, lcLoadWeakDylib, lcReexportDylib])
+    /// `slice` selects one slice range (from `sliceArchitectures`); nil keeps the first-slice behaviour.
+    public static func linkedLibraries(in data: Data, slice: Range<Int>? = nil) throws -> [String] {
+        try pathCommands(data, [lcLoadDylib, lcLoadWeakDylib, lcReexportDylib], slice: slice)
     }
 
-    public static func rpaths(in data: Data) throws -> [String] {
-        try pathCommands(data, [lcRpath])
+    public static func rpaths(in data: Data, slice: Range<Int>? = nil) throws -> [String] {
+        try pathCommands(data, [lcRpath], slice: slice)
+    }
+
+    /// LC_BUILD_VERSION of one slice (nil when the slice has none).
+    public static func buildVersion(in data: Data, slice: Range<Int>) throws -> BuildVersion? {
+        let b = slice.lowerBound
+        guard slice.count >= 32 else { throw MachOError.truncated }
+        guard try data.u32(b) == mhMagic64 else { throw MachOError.unsupported("non-64-bit slice") }
+        let cpu = Int32(bitPattern: try data.u32(b + 4))
+        let ncmds = Int(try data.u32(b + 16))
+        var off = b + 32
+        for _ in 0..<ncmds {
+            guard off + 8 <= slice.upperBound else { throw MachOError.truncated }
+            let cmd = try data.u32(off)
+            let size = Int(try data.u32(off + 4))
+            guard size >= 8, off + size <= slice.upperBound else { throw MachOError.truncated }
+            if cmd == lcBuildVersion {
+                guard size >= 24 else { throw MachOError.truncated }
+                return BuildVersion(cpuType: cpu, platform: try data.u32(off + 8),
+                                    minos: try data.u32(off + 12), sdk: try data.u32(off + 16))
+            }
+            off += size
+        }
+        return nil
+    }
+
+    /// The load command types of every slice, in file order (thin and fat 64-bit images).
+    public static func loadCommandTypes(in data: Data) throws -> [UInt32] {
+        var out: [UInt32] = []
+        for r in try slices(data) { try forEachLoadCommand(data, slice: r) { _, cmd, _ in out.append(cmd) } }
+        return out
+    }
+
+    /// True when `data` is a fat (universal) wrapper rather than a thin image.
+    public static func isFat(_ data: Data) -> Bool {
+        (try? data.u32(0, bigEndian: true)) == fatMagic
+    }
+
+    /// Architecture of each slice, in file order. A thin image yields one entry.
+    /// `arm64` = 0x0100000c, `x86_64` = 0x01000007; any other cpu type is named `cpu<hex>`.
+    public static func sliceArchitectures(in data: Data) throws -> [(cpuType: Int32, name: String, range: Range<Int>)] {
+        try slices(data).map { r in
+            guard r.count >= 8 else { throw MachOError.truncated }
+            let raw = try data.u32(r.lowerBound + 4)
+            let name: String
+            switch raw {
+            case 0x0100000c: name = "arm64"
+            case 0x01000007: name = "x86_64"
+            default: name = "cpu" + String(raw, radix: 16)
+            }
+            return (Int32(bitPattern: raw), name, r)
+        }
     }
 
     /// Rewrites LC_BUILD_VERSION.sdk in every slice. Returns the number of commands patched.

@@ -9,6 +9,10 @@ public struct TauriConfig: @unchecked Sendable {
     public var beforeBuildCommand: String?
     public var frontendDist: String?
     public var iosMinimumSystemVersion: String?
+    public var macOSMinimumSystemVersion: String?
+    /// `bundle.macOS.entitlements`, as written (relative to the Tauri directory).
+    public var macOSEntitlements: String?
+    public var mainBinaryName: String?
     /// The merged JSON object.
     public var raw: [String: Any]
 
@@ -46,9 +50,12 @@ public struct TauriConfig: @unchecked Sendable {
         }
         let build = raw["build"] as? [String: Any]
         let ios = (raw["bundle"] as? [String: Any])?["iOS"] as? [String: Any]
+        let mac = (raw["bundle"] as? [String: Any])?["macOS"] as? [String: Any]
         return TauriConfig(
             productName: raw["productName"] as? String, identifier: identifier, version: version,
             beforeBuildCommand: build?["beforeBuildCommand"] as? String, frontendDist: build?["frontendDist"] as? String,
-            iosMinimumSystemVersion: ios?["minimumSystemVersion"] as? String, raw: raw)
+            iosMinimumSystemVersion: ios?["minimumSystemVersion"] as? String,
+            macOSMinimumSystemVersion: mac?["minimumSystemVersion"] as? String, macOSEntitlements: mac?["entitlements"] as? String,
+            mainBinaryName: raw["mainBinaryName"] as? String, raw: raw)
     }
 }

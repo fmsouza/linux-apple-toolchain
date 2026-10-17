@@ -34,6 +34,11 @@ struct BitmapBody: Sendable {
     var pixelsBGRA: [UInt8]
     var colorSpaceID: UInt8
     var kind: Kind
+    /// True iff every pixel's alpha is 255. actool decides opacity from the
+    /// pixels, not from the PNG colour type: an RGBA PNG whose alpha is all
+    /// 255 is opaque, one alpha of 254 makes it not. Written into the MLEC
+    /// flags (`MLECBody`); CoreUI ignores the alpha of an opaque rendition.
+    var isOpaque: Bool
     /// True iff this bitmap was rasterised from a vector source (SVG, PDF)
     /// rather than supplied directly as bitmap pixels. The reference actool
     /// output tags vector-rasterised bitmaps with extra bits in the CSI

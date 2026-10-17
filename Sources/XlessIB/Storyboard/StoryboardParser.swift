@@ -55,7 +55,7 @@ public enum StoryboardParser {
     /// The empty-string key lists the permitted root.
     static let children: [String: Set<String>] = {
         let viewContent: Set<String> = ["subviews", "rect", "autoresizingMask", "viewLayoutGuide", "color",
-                                        "fontDescription", "nil", "constraints"]
+                                        "fontDescription", "nil", "constraints", "accessibility"]
         return [
             "": ["document"],
             "document": ["device", "dependencies", "scenes", "resources"],
@@ -73,6 +73,7 @@ public enum StoryboardParser {
             "constraints": ["constraint"],
             "resources": ["systemColor", "namedColor", "image"],
             "systemColor": ["color"], "namedColor": ["color"],
+            "accessibility": ["accessibilityTraits"],
         ]
     }()
 
@@ -82,9 +83,12 @@ public enum StoryboardParser {
         "systemColor", "namedColor", "image", "viewControllerLayoutGuide", "adaptation",
     ]
     static let viewKinds: Set<String> = ["view", "imageView", "label"]
-    /// Elements that are only allowed with one `key`: `<string key="text">` (label text containing a newline) and
-    /// `<imageReference key="image">` (Xcode's image-reference form).
-    static let requiredKey: [String: String] = ["string": "text", "imageReference": "image"]
+    /// Elements that are only allowed with one `key`: `<string key="text">` (label text containing a newline),
+    /// `<imageReference key="image">` (Xcode's image-reference form) and the accessibility traits
+    /// (`<accessibility key="accessibilityConfiguration">` with `<accessibilityTraits key="traits">`).
+    static let requiredKey: [String: String] = [
+        "string": "text", "imageReference": "image", "accessibility": "accessibilityConfiguration", "accessibilityTraits": "traits",
+    ]
 }
 
 /// Generic element tree; the allow-list is enforced while it is built.
@@ -346,7 +350,11 @@ private enum Lowerer {
             frame: frame, autoresizingMask: n.child(named: "autoresizingMask")?.attributes, safeArea: safeArea,
             colors: colors, fontDescription: n.child(named: "fontDescription")?.attributes, text: text, image: image,
             subviews: subviews, constraints: constraints,
-            nilKeys: Set(n.children(named: "nil").compactMap { $0.attributes["key"] }), line: n.line, rawPath: n.path)
+            nilKeys: Set(n.children(named: "nil").compactMap { $0.attributes["key"] }),
+            accessibility: n.child(named: "accessibility").map {
+                IBAccessibility(attributes: $0.attributes, traits: $0.child(named: "accessibilityTraits")?.attributes, line: $0.line)
+            },
+            line: n.line, rawPath: n.path)
     }
 
     static func color(_ n: XMLNode) throws -> IBColor {

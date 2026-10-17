@@ -44,6 +44,8 @@ enum FacetKeys {
                 ]
             case .color:
                 return [
+                    (UInt16(AttributeID.element.rawValue), RenditionKey.Element.bitmap.rawValue),
+                    (UInt16(AttributeID.part.rawValue), RenditionKey.Part.color.rawValue),
                     (UInt16(AttributeID.identifier.rawValue), identifier),
                 ]
             }

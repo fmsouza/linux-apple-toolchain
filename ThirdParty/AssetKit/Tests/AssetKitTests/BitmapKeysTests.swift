@@ -14,7 +14,7 @@ struct BitmapKeysTests {
         Rendition(
             name: name, idiom: idiom, scale: scale,
             appearance: dark ? .dark : nil, gamut: nil,
-            body: .bitmap(BitmapBody(width: 1, height: 1, pixelsBGRA: [0, 0, 0, 255], colorSpaceID: 1, kind: kind, renditionName: "x.png"))
+            body: .bitmap(BitmapBody(width: 1, height: 1, pixelsBGRA: [0, 0, 0, 255], colorSpaceID: 1, kind: kind, isOpaque: true, renditionName: "x.png"))
         )
     }
 

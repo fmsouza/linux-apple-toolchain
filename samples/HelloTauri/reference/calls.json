@@ -10,7 +10,6 @@
       "cwd": "$WORK/src-tauri",
       "env": {
         "IPHONEOS_DEPLOYMENT_TARGET": "16.0",
-        "SDKROOT": "$DEVELOPER/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk",
         "TAURI_CLI_VERBOSITY": "1"
       }
     },
@@ -24,7 +23,6 @@
       "cwd": "$WORK/src-tauri",
       "env": {
         "IPHONEOS_DEPLOYMENT_TARGET": "16.0",
-        "SDKROOT": "$DEVELOPER/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk",
         "TAURI_CLI_VERBOSITY": "1",
         "TAURI_IOS_APP_NAME": "hello-tauri",
         "TAURI_IOS_PROJECT_PATH": "$WORK/src-tauri/gen/apple"
@@ -40,7 +38,6 @@
       "cwd": "$WORK/src-tauri",
       "env": {
         "IPHONEOS_DEPLOYMENT_TARGET": "16.0",
-        "SDKROOT": "$DEVELOPER/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk",
         "TAURI_CLI_VERBOSITY": "1",
         "TAURI_IOS_APP_NAME": "hello-tauri",
         "TAURI_IOS_PROJECT_PATH": "$WORK/src-tauri/gen/apple"
@@ -56,7 +53,6 @@
       "cwd": "$WORK/src-tauri",
       "env": {
         "IPHONEOS_DEPLOYMENT_TARGET": "16.0",
-        "SDKROOT": "$DEVELOPER/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk",
         "TAURI_CLI_VERBOSITY": "1",
         "TAURI_IOS_APP_NAME": "hello-tauri",
         "TAURI_IOS_PROJECT_PATH": "$WORK/src-tauri/gen/apple"

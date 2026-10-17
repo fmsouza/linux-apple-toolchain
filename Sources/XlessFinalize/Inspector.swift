@@ -2,7 +2,13 @@ import Foundation
 import XlessCore
 import XlessMachO
 
-public struct BinaryReport: Codable, Sendable, Equatable { public var path: String; public var buildVersions: [String] }
+/// `linkeditProblems`: the LINKEDIT tables dyld would refuse as mis-aligned (`MachO.linkeditAlignmentProblems`), or
+/// "malformed LINKEDIT: …" when its load commands cannot be read; empty when fine.
+public struct BinaryReport: Codable, Sendable, Equatable {
+    public var path: String
+    public var buildVersions: [String]
+    public var linkeditProblems: [String]
+}
 public struct InspectReport: Codable, Sendable { public var infoPlist: [String: String]; public var binaries: [BinaryReport] }
 
 public enum Inspector {
@@ -22,7 +28,11 @@ public enum Inspector {
             let versions = try MachO.buildVersions(in: d).map {
                 "platform=\($0.platform) minos=\(MachO.decodeVersion($0.minos)) sdk=\(MachO.decodeVersion($0.sdk))"
             }
-            bins.append(.init(path: String(f.standardizedFileURL.path.dropFirst(base.count + 1)), buildVersions: versions))
+            // A LINKEDIT the validator cannot read is reported, not thrown: inspect describes what finalize would refuse.
+            let problems: [String]
+            do { problems = try MachO.linkeditAlignmentProblems(in: d) } catch { problems = ["malformed LINKEDIT: \(error)"] }
+            bins.append(.init(path: String(f.standardizedFileURL.path.dropFirst(base.count + 1)), buildVersions: versions,
+                              linkeditProblems: problems))
         }
         return InspectReport(infoPlist: flat, binaries: bins.sorted { $0.path < $1.path })
     }

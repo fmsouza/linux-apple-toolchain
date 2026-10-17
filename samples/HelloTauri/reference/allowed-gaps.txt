@@ -7,3 +7,18 @@ plist:ITSAppUsesNonExemptEncryption
 
 # the overlay's privacyManifest is copied into the bundle (App Store builds need one); the reference app has none
 file:PrivacyInfo.xcprivacy
+
+
+# Assets.car (compared on a Mac host only, `xless tauri compare --assets-only`): Tauri's AppIcon set is multi-size, which
+# Xcode compiles to one Icon Image per size plus MultiSized Image renditions; xless compiles every iOS app icon set in
+# Xcode's single-size form (its 1024 image, one Icon Image per idiom at scale 1) and writes no MultiSized Image. The
+# app has no other asset, so these keys are all app-icon ones.
+car:Assets.car:AppIcon/marketing/1/-/Icon Image
+car:Assets.car:AppIcon/marketing/1/-/MultiSized Image
+car:Assets.car:AppIcon/pad/1/-/Icon Image
+car:Assets.car:AppIcon/pad/1/-/MultiSized Image
+car:Assets.car:AppIcon/pad/2/-/Icon Image
+car:Assets.car:AppIcon/phone/1/-/Icon Image
+car:Assets.car:AppIcon/phone/1/-/MultiSized Image
+car:Assets.car:AppIcon/phone/2/-/Icon Image
+car:Assets.car:AppIcon/phone/3/-/Icon Image

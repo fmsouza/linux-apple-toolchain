@@ -21,6 +21,8 @@ final class ViewNibLowering {
         var ref: ObjectRef
         var entry: [ObjectRef]
         var subviews: [Lowered]
+        /// The view's accessibility traits (`AccessibilityRule`), nil without an `<accessibility>` element.
+        var accessibilityTraits: Int?
 
         /// The objects list after the root's entry: the subviews' entries breadth-first, level by level and in subview
         /// order within a level (`order-objects-bfs`: root → A{A1{A11}}, B{B1} lists A, B, then A1, then B1, then A11).
@@ -28,6 +30,17 @@ final class ViewNibLowering {
             var queue = subviews, out: [ObjectRef] = [], i = 0
             while i < queue.count {
                 out += queue[i].entry
+                queue += queue[i].subviews
+                i += 1
+            }
+            return out
+        }
+
+        /// The views of `subviews` with accessibility traits, in the same breadth-first order (`acc-kinds-order`).
+        static func accessibilityBreadthFirst(_ subviews: [Lowered]) -> [(ref: ObjectRef, traits: Int)] {
+            var queue = subviews, out: [(ref: ObjectRef, traits: Int)] = [], i = 0
+            while i < queue.count {
+                if let t = queue[i].accessibilityTraits { out.append((queue[i].ref, t)) }
                 queue += queue[i].subviews
                 i += 1
             }
@@ -63,8 +76,13 @@ final class ViewNibLowering {
         }
         entry += Lowered.breadthFirst(subviews)
         try ViewRule.encode(rootView, into: root, parts: parts, lowering: self)
+        // Accessibility configurations last: they are encoded after the views (their traits number reuses a font's).
+        let accessible = (try AccessibilityRule.value(rootView).map { [(ref: root, traits: $0)] } ?? [])
+            + Lowered.accessibilityBreadthFirst(subviews)
+        let configurations = try AccessibilityRule.encode(accessible, into: b)
         let top = [owner, responder, root]
-        let nibRoot = b.nibRoot(topLevel: top, objects: top + entry, connections: [b.outlet("view", source: owner, destination: root)])
+        let nibRoot = b.nibRoot(topLevel: top, objects: top + entry, connections: [b.outlet("view", source: owner, destination: root)],
+                                accessibilityConfigurations: configurations)
         return try b.finish(root: nibRoot)
     }
 
@@ -88,7 +106,8 @@ final class ViewNibLowering {
         case .imageView: try ImageViewRule.encode(v, into: ref, parts: parts, lowering: self)
         case .label: try LabelRule.encode(v, plan: label!, into: ref, parts: parts, lowering: self)
         }
-        return Lowered(ref: ref, entry: constraints + subviews.map(\.ref), subviews: subviews)
+        return Lowered(ref: ref, entry: constraints + subviews.map(\.ref), subviews: subviews,
+                       accessibilityTraits: try AccessibilityRule.value(v))
     }
 
     // MARK: Constraints

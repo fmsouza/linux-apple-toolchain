@@ -1,4 +1,31 @@
 {
+  "assetCatalogs" : {
+    "Assets.car" : [
+      "AssetType=Icon Image|Name=AppIcon|Idiom=marketing|Scale=1|Opaque=true|Encoding=ARGB|ColorModel=RGB|Colorspace=srgb|BitsPerComponent=8|PixelWidth=1024|PixelHeight=1024|Icon Index=8",
+      "AssetType=Icon Image|Name=AppIcon|Idiom=pad|Scale=1|Opaque=true|Encoding=ARGB|ColorModel=RGB|Colorspace=srgb|BitsPerComponent=8|PixelWidth=20|PixelHeight=20|Icon Index=1",
+      "AssetType=Icon Image|Name=AppIcon|Idiom=pad|Scale=1|Opaque=true|Encoding=ARGB|ColorModel=RGB|Colorspace=srgb|BitsPerComponent=8|PixelWidth=29|PixelHeight=29|Icon Index=2",
+      "AssetType=Icon Image|Name=AppIcon|Idiom=pad|Scale=1|Opaque=true|Encoding=ARGB|ColorModel=RGB|Colorspace=srgb|BitsPerComponent=8|PixelWidth=40|PixelHeight=40|Icon Index=3",
+      "AssetType=Icon Image|Name=AppIcon|Idiom=pad|Scale=1|Opaque=true|Encoding=ARGB|ColorModel=RGB|Colorspace=srgb|BitsPerComponent=8|PixelWidth=76|PixelHeight=76|Icon Index=5",
+      "AssetType=Icon Image|Name=AppIcon|Idiom=pad|Scale=2|Opaque=true|Encoding=ARGB|ColorModel=RGB|Colorspace=srgb|BitsPerComponent=8|PixelWidth=152|PixelHeight=152|Icon Index=5",
+      "AssetType=Icon Image|Name=AppIcon|Idiom=pad|Scale=2|Opaque=true|Encoding=ARGB|ColorModel=RGB|Colorspace=srgb|BitsPerComponent=8|PixelWidth=167|PixelHeight=167|Icon Index=6",
+      "AssetType=Icon Image|Name=AppIcon|Idiom=pad|Scale=2|Opaque=true|Encoding=ARGB|ColorModel=RGB|Colorspace=srgb|BitsPerComponent=8|PixelWidth=40|PixelHeight=40|Icon Index=1",
+      "AssetType=Icon Image|Name=AppIcon|Idiom=pad|Scale=2|Opaque=true|Encoding=ARGB|ColorModel=RGB|Colorspace=srgb|BitsPerComponent=8|PixelWidth=58|PixelHeight=58|Icon Index=2",
+      "AssetType=Icon Image|Name=AppIcon|Idiom=pad|Scale=2|Opaque=true|Encoding=ARGB|ColorModel=RGB|Colorspace=srgb|BitsPerComponent=8|PixelWidth=80|PixelHeight=80|Icon Index=3",
+      "AssetType=Icon Image|Name=AppIcon|Idiom=phone|Scale=2|Opaque=true|Encoding=ARGB|ColorModel=RGB|Colorspace=srgb|BitsPerComponent=8|PixelWidth=120|PixelHeight=120|Icon Index=4",
+      "AssetType=Icon Image|Name=AppIcon|Idiom=phone|Scale=2|Opaque=true|Encoding=ARGB|ColorModel=RGB|Colorspace=srgb|BitsPerComponent=8|PixelWidth=180|PixelHeight=180|Icon Index=7",
+      "AssetType=Icon Image|Name=AppIcon|Idiom=phone|Scale=2|Opaque=true|Encoding=ARGB|ColorModel=RGB|Colorspace=srgb|BitsPerComponent=8|PixelWidth=40|PixelHeight=40|Icon Index=1",
+      "AssetType=Icon Image|Name=AppIcon|Idiom=phone|Scale=2|Opaque=true|Encoding=ARGB|ColorModel=RGB|Colorspace=srgb|BitsPerComponent=8|PixelWidth=58|PixelHeight=58|Icon Index=2",
+      "AssetType=Icon Image|Name=AppIcon|Idiom=phone|Scale=2|Opaque=true|Encoding=ARGB|ColorModel=RGB|Colorspace=srgb|BitsPerComponent=8|PixelWidth=80|PixelHeight=80|Icon Index=3",
+      "AssetType=Icon Image|Name=AppIcon|Idiom=phone|Scale=3|Opaque=true|Encoding=ARGB|ColorModel=RGB|Colorspace=srgb|BitsPerComponent=8|PixelWidth=120|PixelHeight=120|Icon Index=3",
+      "AssetType=Icon Image|Name=AppIcon|Idiom=phone|Scale=3|Opaque=true|Encoding=ARGB|ColorModel=RGB|Colorspace=srgb|BitsPerComponent=8|PixelWidth=180|PixelHeight=180|Icon Index=4",
+      "AssetType=Icon Image|Name=AppIcon|Idiom=phone|Scale=3|Opaque=true|Encoding=ARGB|ColorModel=RGB|Colorspace=srgb|BitsPerComponent=8|PixelWidth=60|PixelHeight=60|Icon Index=1",
+      "AssetType=Icon Image|Name=AppIcon|Idiom=phone|Scale=3|Opaque=true|Encoding=ARGB|ColorModel=RGB|Colorspace=srgb|BitsPerComponent=8|PixelWidth=87|PixelHeight=87|Icon Index=2",
+      "AssetType=MultiSized Image|Name=AppIcon|Idiom=marketing|Scale=1|Sizes=[\"1024x1024 index:8 idiom:marketing\"]",
+      "AssetType=MultiSized Image|Name=AppIcon|Idiom=pad|Scale=1|Sizes=[\"20x20 index:1 idiom:pad\",\"29x29 index:2 idiom:pad\",\"40x40 index:3 idiom:pad\",\"76x76 index:5 idiom:pad\",\"83x83 index:6 idiom:pad\"]",
+      "AssetType=MultiSized Image|Name=AppIcon|Idiom=phone|Scale=1|Sizes=[\"20x20 index:1 idiom:phone\",\"29x29 index:2 idiom:phone\",\"40x40 index:3 idiom:phone\",\"60x60 index:4 idiom:phone\"]",
+      "AssetType=MultiSized Image|Name=AppIcon|Idiom=phone|Scale=1|Sizes=[\"90x90 index:7 idiom:phone subtype:1792\"]"
+    ]
+  },
   "executable" : {
     "linkedLibraries" : [
       "\/System\/Library\/Frameworks\/CoreGraphics.framework\/CoreGraphics",
@@ -55,13 +82,15 @@
     "LaunchScreen.storyboardc\/Info.plist",
     "LaunchScreen.storyboardc\/UIViewController-Y6W-OH-hqX.nib",
     "LaunchScreen.storyboardc\/Y6W-OH-hqX-view-5EZ-qb-Rvc.nib",
-    "PkgInfo"
+    "PkgInfo",
+    "assets\/resources\/hello.txt"
   ],
   "frameworks" : {
 
   },
   "infoPlist" : {
     "CFBundleDevelopmentRegion" : "en",
+    "CFBundleDocumentTypes" : "[{\"CFBundleTypeExtensions\":[\"hello\"],\"CFBundleTypeName\":\"Hello document\",\"CFBundleTypeRole\":\"Editor\",\"LSHandlerRank\":\"Default\"}]",
     "CFBundleExecutable" : "HelloTauri",
     "CFBundleIcons" : "{\"CFBundlePrimaryIcon\":{\"CFBundleIconFiles\":[\"AppIcon60x60\"],\"CFBundleIconName\":\"AppIcon\"}}",
     "CFBundleIcons~ipad" : "{\"CFBundlePrimaryIcon\":{\"CFBundleIconFiles\":[\"AppIcon60x60\",\"AppIcon76x76\"],\"CFBundleIconName\":\"AppIcon\"}}",

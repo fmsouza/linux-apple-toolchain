@@ -3,17 +3,18 @@ import XlessASC
 import XlessCore
 
 struct PrepareCommand: AsyncParsableCommand {
-    static let configuration = CommandConfiguration(commandName: "prepare", abstract: "Tauri overlays: check the project, sync the work copy, install dependencies and toolchains.")
+    static let configuration = CommandConfiguration(commandName: "prepare", abstract: "Overlays (Tauri, React Native): check the project, sync the work copy, install dependencies and toolchains (React Native: Expo prebuild, CocoaPods).")
     @OptionGroup var options: ProjectOptions
     func run() async throws { print(try await StageRunner.prepare(Context.load(options, fresh: DatedBuildNumber.isFreshRun(command: "prepare")))) }
 }
 
 struct BuildCommand: AsyncParsableCommand {
-    static let configuration = CommandConfiguration(commandName: "build", abstract: "Build an unsigned .app into .xless/build/<platform>/app (Tauri overlays: after prepare).")
+    static let configuration = CommandConfiguration(commandName: "build", abstract: "Build an unsigned .app into .xless/build/<platform>/app (overlays: after prepare).")
     @OptionGroup var options: ProjectOptions
     func run() async throws {
-        let ctx = try await Context.load(options, fresh: DatedBuildNumber.isFreshRun(command: "build"))
-        if ctx.tauri != nil { _ = try await StageRunner.prepare(ctx) }
+        var ctx = try await Context.load(options, fresh: DatedBuildNumber.isFreshRun(command: "build"))
+        if ctx.hasPrepare { _ = try await StageRunner.prepare(ctx) }
+        if ctx.isReactNative { ctx = try await Context.load(options, fresh: false) }
         print(try await StageRunner.build(ctx).path)
     }
 }
@@ -31,7 +32,7 @@ struct FinalizeCommand: AsyncParsableCommand {
 }
 
 struct PackageCommand: AsyncParsableCommand {
-    static let configuration = CommandConfiguration(commandName: "package", abstract: "Create the .ipa (iOS) or notarized .zip (macOS) in .xless/build/<platform>/out.")
+    static let configuration = CommandConfiguration(commandName: "package", abstract: "Create the .ipa (iOS) or notarized .zip (macOS; .dmg for Tauri) in .xless/build/<platform>/out.")
     @OptionGroup var options: ProjectOptions
     func run() async throws { print(try await StageRunner.package(Context.load(options)).path) }
 }

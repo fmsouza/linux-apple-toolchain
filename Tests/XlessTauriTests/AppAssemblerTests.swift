@@ -127,6 +127,61 @@ private func workTree() throws -> URL {
         #expect(!all.contains { $0.contains("libapp") })
     }
 
+    /// As `tauri ios build` does: bundle.resources are staged into gen/apple/assets/ (the `assets` folder reference) with
+    /// Tauri's path mapping, and bundle.fileAssociations become CFBundleDocumentTypes (ruling R5).
+    @Test func appliesBundleResourcesAndFileAssociations() throws {
+        let work = try workTree()
+        try write(#"{"productName":"Demo","version":"1.2.3","identifier":"com.example.demo","bundle":{"resources":["resources/"],"fileAssociations":[{"ext":["hello"],"name":"Hello document","role":"Editor"}]}}"#,
+                  work.appendingPathComponent("src-tauri/tauri.conf.json"))
+        try write("hi\n", work.appendingPathComponent("src-tauri/resources/hello.txt"))
+        let overlay = try TauriOverlay.parse(yaml: "type: tauri\nbundleID: com.example.demo\nteamID: ABCDE12345\nbuild: 42\n", name: "demo")
+        let resolved = try TauriProject.resolve(overlay: overlay, source: work)
+        let exe = work.appendingPathComponent(".xless/link/Demo")
+        try write("exe", exe)
+        let app = try AppAssembler.assemble(resolved: resolved, workRoot: work, executable: exe, into: work.appendingPathComponent("out", isDirectory: true), note: { _ in })
+        #expect(try String(contentsOf: app.appendingPathComponent("assets/resources/hello.txt"), encoding: .utf8) == "hi\n")
+        #expect(try String(contentsOf: app.appendingPathComponent("assets/a/b.txt"), encoding: .utf8) == "b\n")
+        let info = try Plist.read(app.appendingPathComponent("Info.plist"), stage: .build)
+        #expect(BundleReport.canonical(info["CFBundleDocumentTypes"] as Any, top: true)
+                == #"[{"CFBundleTypeExtensions":["hello"],"CFBundleTypeName":"Hello document","CFBundleTypeRole":"Editor","LSHandlerRank":"Default"}]"#)
+    }
+
+    /// A resource dropped from the app (or from bundle.resources) since the last build does not ship: the files xless copied
+    /// into gen/apple/assets/ are recorded in .xless/ios-resources.txt and removed before the next copy. The app's own
+    /// files in assets/ (here a/b.txt) stay, and so does a file the repository tracks even if the record names it.
+    @Test func staleBundleResourcesDoNotShip() throws {
+        let work = try workTree()
+        try write(#"{"productName":"Demo","version":"1.2.3","identifier":"com.example.demo","bundle":{"resources":["resources/"]}}"#,
+                  work.appendingPathComponent("src-tauri/tauri.conf.json"))
+        try write("hi\n", work.appendingPathComponent("src-tauri/resources/hello.txt"))
+        try write("old\n", work.appendingPathComponent("src-tauri/resources/old/stale.txt"))
+        let overlay = try TauriOverlay.parse(yaml: "type: tauri\nbundleID: com.example.demo\nteamID: ABCDE12345\nbuild: 42\n", name: "demo")
+        let exe = work.appendingPathComponent(".xless/link/Demo")
+        try write("exe", exe)
+        func assemble(_ out: String) throws -> URL {
+            try AppAssembler.assemble(resolved: TauriProject.resolve(overlay: overlay, source: work), workRoot: work, executable: exe,
+                                      into: work.appendingPathComponent(out, isDirectory: true), note: { _ in })
+        }
+        let first = try assemble("out1")
+        #expect(fm.fileExists(atPath: first.appendingPathComponent("assets/resources/old/stale.txt").path))
+        #expect(try String(contentsOf: work.appendingPathComponent(".xless/ios-resources.txt"), encoding: .utf8)
+                == "resources/hello.txt\nresources/old/stale.txt\n")
+
+        try fm.removeItem(at: work.appendingPathComponent("src-tauri/resources/old"))
+        let second = try assemble("out2")
+        let assets = work.appendingPathComponent("src-tauri/gen/apple/assets")
+        #expect(!fm.fileExists(atPath: second.appendingPathComponent("assets/resources/old").path))
+        #expect(!fm.fileExists(atPath: assets.appendingPathComponent("resources/old").path))
+        #expect(fm.fileExists(atPath: second.appendingPathComponent("assets/resources/hello.txt").path))
+        #expect(try String(contentsOf: second.appendingPathComponent("assets/a/b.txt"), encoding: .utf8) == "b\n")
+
+        // A tracked file named by the record is kept.
+        try "resources/hello.txt\na/b.txt\n".write(to: work.appendingPathComponent(".xless/ios-resources.txt"), atomically: true, encoding: .utf8)
+        try "src-tauri/gen/apple/assets/a/b.txt\0".write(to: work.appendingPathComponent(".xless/tracked.txt"), atomically: true, encoding: .utf8)
+        let third = try assemble("out3")
+        #expect(try String(contentsOf: third.appendingPathComponent("assets/a/b.txt"), encoding: .utf8) == "b\n")
+    }
+
     @Test func refusesMissingPrivacyManifest() throws {
         let work = try workTree()
         let overlay = try TauriOverlay.parse(yaml: "type: tauri\nbundleID: com.example.demo\nteamID: ABCDE12345\nprivacyManifest: /nonexistent/PrivacyInfo.xcprivacy\n", name: "demo")

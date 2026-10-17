@@ -281,6 +281,14 @@ class Checker:
             expected += c + s
             queue += s
         self.check("objects list = root entry + breadth-first entries", listed == expected, where)
+        # UINibAccessibilityConfigurationsKey: one configuration per view with an <accessibility> element, in
+        # objects-list order (`acc-kinds-order`); the shared empty array without any.
+        configs = array_items(objs, keys, vals, root_vals["UINibAccessibilityConfigurationsKey"][1])
+        if configs:
+            targets = [d(c)["UIAccessibileObject"][1] for c in configs]
+            views = [i for i in listed if names[objs[i][0]] in ("UIView", "UIImageView", "UILabel")]
+            self.check("accessibility configurations = objects-list order", targets == [v for v in views if v in targets]
+                       and len(set(targets)) == len(targets), where)
 
     def view_nib(self, case, fs, doc, objs, keys, vals, names, where):
         root_vals = dict(obj_values(objs, keys, vals, 0))

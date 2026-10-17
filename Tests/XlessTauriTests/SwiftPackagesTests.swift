@@ -295,6 +295,53 @@ private func fixtureMetadata() throws -> (data: Data, work: URL, registry: URL) 
         #expect(throws: XlessError.self) { try run([".build/a/libXlessTauriSwift.a", ".build/b/libXlessTauriSwift.a"]) }
     }
 
+    /// Ruling R10: another Swift than the image's own builds with its own SwiftPM, in its own scratch directory; the
+    /// per-target archives SwiftPM 6.2 leaves are merged into the library.
+    @Test func buildWithTheAppSwiftToolchainUsesItsSwiftPMAndMergesTargetArchives() throws {
+        let bundle = tmp(), agg = tmp()
+        try write("{}", to: bundle.appendingPathComponent("toolset-swb.json"))
+        let swift = SwiftToolchain(version: "6.2.3", root: "/opt/xless/toolchains/swift-6.2.3")
+        let products = agg.appendingPathComponent(".build-swift-6.2.3/arm64-apple-ios/Products/Release-iphoneos")
+        var calls: [(String, [String])] = []
+        let lib = try SwiftPackages.build(aggregateDir: agg, minimumIOS: "16.0", sdk: DarwinSDK(bundle: bundle), env: ["PATH": "/x:/usr/bin"], swift: swift) { exe, args, env in
+            calls.append((exe, args))
+            if exe.hasSuffix("/swift") {
+                #expect(env["PATH"] == "\(bundle.appendingPathComponent("toolset/bin").path):/x:/opt/xless/toolchains/swift-6.2.3/usr/bin:/usr/bin")
+                for t in ["XlessTauriSwift", "Tauri", "SwiftRs"] { try write("!<arch>\n", to: products.appendingPathComponent("\(t).o")) }
+                try write("not an archive", to: products.appendingPathComponent("stray.o"))
+            }
+        }
+        func real(_ u: URL) -> String { u.path.replacingOccurrences(of: "/private/var/", with: "/var/") }
+        #expect(real(lib) == real(products.appendingPathComponent("libXlessTauriSwift.a")))
+        #expect(calls.count == 2)
+        #expect(calls[0].0 == "/opt/xless/toolchains/swift-6.2.3/usr/bin/swift")
+        #expect(calls[0].1.suffix(4) == ["--scratch-path", agg.appendingPathComponent(".build-swift-6.2.3").path, "--product", "XlessTauriSwift"])
+        #expect(calls[1].0 == "llvm-libtool-darwin")
+        #expect(calls[1].1.map { $0.hasPrefix("/") ? real(URL(fileURLWithPath: $0)) : $0 }
+            == ["-static", "-o", real(products.appendingPathComponent("libXlessTauriSwift.a"))]
+            + ["SwiftRs.o", "Tauri.o", "XlessTauriSwift.o"].map { real(products.appendingPathComponent($0)) })
+    }
+
+    @Test func theArchiveMergeTakesOnlyThisBuildsArchives() throws {
+        // A plugin removed since the last build leaves its archive in the products directory, which outlives builds.
+        let bundle = tmp(), agg = tmp()
+        try write("{}", to: bundle.appendingPathComponent("toolset-swb.json"))
+        let swift = SwiftToolchain(version: "6.2.3", root: "/opt/xless/toolchains/swift-6.2.3")
+        let products = agg.appendingPathComponent(".build-swift-6.2.3/arm64-apple-ios/Products/Release-iphoneos")
+        for t in ["XlessTauriSwift", "Tauri", "RemovedPlugin"] { try write("!<arch>\n", to: products.appendingPathComponent("\(t).o")) }
+        try write("!<arch>\n", to: products.appendingPathComponent("libXlessTauriSwift.a"))
+        var merged: [String] = []
+        _ = try SwiftPackages.build(aggregateDir: agg, minimumIOS: "16.0", sdk: DarwinSDK(bundle: bundle), env: [:], swift: swift) { exe, args, _ in
+            if exe.hasSuffix("/swift") {
+                #expect(!FileManager.default.fileExists(atPath: products.path))
+                for t in ["XlessTauriSwift", "Tauri"] { try write("!<arch>\n", to: products.appendingPathComponent("\(t).o")) }
+            } else {
+                merged = args.dropFirst(3).map { URL(fileURLWithPath: $0).lastPathComponent }
+            }
+        }
+        #expect(merged == ["Tauri.o", "XlessTauriSwift.o"])
+    }
+
     @Test func buildWithoutTheSDKIsABuildError() {
         #expect(throws: XlessError.self) {
             try SwiftPackages.build(aggregateDir: tmp(), minimumIOS: "16.0", sdk: DarwinSDK(bundle: tmp()), env: [:]) { _, _, _ in }

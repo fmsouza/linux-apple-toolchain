@@ -5,10 +5,18 @@ import Foundation
 /// Layout verified against actool's reference Assets.car:
 ///
 ///   MLEC magic        4 bytes
-///   compressionType   u32  (0 = raw, 3 = LZFSE)
-///   bytesPerPixel     u32  (4 for BGRA8)
+///   flags             u32  bit 1 (0x2) = every pixel is opaque; bit 0 (0x1) is
+///                          set in every chunked body actool writes
+///   compression       u32  (4 = LZFSE in KCBC chunks)
 ///   chunkCount        u32  (1 or 3)
 ///   then chunkCount * KCBC chunks
+///
+/// The flags word is what `assetutil --info` reports as `Opaque`, and CoreUI
+/// draws a rendition flagged opaque without its alpha (a transparent PNG
+/// shows on a black square). Measured with actool 27.0 on neutral PNGs:
+/// chunked LZFSE app icons carry 3 when every alpha is 255 and 1 otherwise;
+/// actool's deepmap2 bodies (compression 11, not written here) carry 2 and 0
+/// by the same rule.
 ///
 /// Each KCBC chunk:
 ///
@@ -23,7 +31,11 @@ import Foundation
 /// single chunk covering the whole image. The 3-chunk split is mimicry
 /// rather than a correctness requirement: CoreUI accepts both layouts.
 enum MLECBody {
-    static func encode(width: UInt32, height: UInt32, pixelsBGRA: [UInt8]) -> Data {
+    static let flagChunked: UInt32 = 0x1
+    static let flagOpaque: UInt32 = 0x2
+    static let compressionLZFSE: UInt32 = 4
+
+    static func encode(width: UInt32, height: UInt32, pixelsBGRA: [UInt8], opaque: Bool) -> Data {
         let bytesPerRow = Int(width) * 4
         let canChunkInThree = height % 3 == 0
         let chunkCount: UInt32 = canChunkInThree ? 3 : 1
@@ -39,8 +51,8 @@ enum MLECBody {
 
         var w = ByteWriter()
         w.writeFourCC("MLEC")
-        w.writeLE(UInt32(3))                    // compressionType = 3 (LZFSE)
-        w.writeLE(UInt32(4))                    // bytesPerPixel (BGRA8 = 4)
+        w.writeLE(flagChunked | (opaque ? flagOpaque : 0))
+        w.writeLE(compressionLZFSE)
         w.writeLE(chunkCount)
 
         for chunk in chunks {

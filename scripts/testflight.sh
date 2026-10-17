@@ -1,30 +1,48 @@
 #!/usr/bin/env bash
 # Builds, signs and uploads an iOS project and delivers it to TestFlight (`xless ship --platform ios`).
 # Usage: scripts/testflight.sh <project-dir> [extra xless ship args...]     (or: make testflight PROJECT=<dir>)
-#        scripts/testflight.sh --config <overlay.yml> [extra xless ship args...]   (or: make testflight CONFIG=<overlay.yml>)
+#        scripts/testflight.sh --config <overlay.yml> [extra xless ship args...]   (or: make testflight CONFIG=<overlay.yml> [ARGS="…"])
 #
-# --config: a Tauri v2 app described by an overlay file (docs/tauri.md) instead of an xless.yml project.
+# --config: an app described by an overlay file instead of an xless.yml project: a Tauri v2 app (`type: tauri`,
+#   docs/tauri.md) or a React Native / Expo app (`type: react-native`, docs/react-native.md). The script reads the
+#   overlay's top-level `type:` line to choose the images and caches below.
 #   The app source is the overlay's `source:` (`~` expanded, relative to the overlay file's directory), or $XLESS_SOURCE
-#   when set, which wins. `source:` must be a plain top-level `source: <path>` line (optionally quoted, with a trailing
-#   comment); anything fancier (flow style, anchors, multi-line) is not read by this script: set XLESS_SOURCE instead.
-#   The overlay path may start with `~/`. The source is never written to.
-#   The app's build runs third-party code (npm scripts, build.rs, proc-macros), so it never runs next to a secret.
-#   Three steps, each its own container (or process, natively):
-#     1. xless tauri next-build      with the App Store Connect key only: the next dated build number (read-only).
-#                                    Skipped when XLESS_BUILD_NUMBER is set, or when resuming after build.
+#   when set, which wins. `source:` and `type:` must be plain top-level `key: value` lines (optionally quoted, with a
+#   trailing comment); anything fancier (flow style, anchors, multi-line) is not read by this script: set XLESS_SOURCE
+#   instead. The overlay path may start with `~/`. The source is never written to.
+#   The app's build runs third-party code (npm scripts, build.rs, proc-macros, CocoaPods, Xcode build phases), so it
+#   never runs next to a secret. Three steps, each its own container (or process, natively):
+#     1. xless next-build            with the App Store Connect key only: the next dated build number (read-only).
+#                                    (`xless tauri next-build` for a Tauri overlay.) Skipped when XLESS_BUILD_NUMBER or
+#                                    --build-number is given, or when resuming after build.
 #     2. xless ship --to finalize    WITHOUT any secret mount or variable: prepare, build, assets, finalize, with
 #                                    XLESS_BUILD_NUMBER from step 1.
 #     3. xless ship --from sign      with the secrets: sign, package, upload (no build code runs here).
-#   --from/--to among the extra args select which steps run. In docker:
+#   --from/--to among the extra args select which steps run (`--to prepare` alone starts at prepare); the secrets each
+#   step needs are required only when that step runs (`--build-number <n> --to finalize` needs none, and neither does
+#   step 1 for a fixed `build:`). In docker (bind mounts as --mount, so any path works):
 #     the source           mounted read-only at /source           and passed as --source /source
+#       (a source inside a git checkout, not at its top, mounts the checkout's top and passes --source /source/<path>:
+#        xless reads the source's tracked files with git)
 #     the overlay's folder mounted read-only at /config           and passed as --config /config/<file>
 #       (the whole folder, so a relative `privacyManifest:` or `assets:` in the overlay resolves; `source:` would
 #        resolve inside /config too, which is why --source overrides it). Keep the overlay in its own directory: the
-#        script refuses an overlay directory that holds the env file or a secret file.
+#        script refuses an overlay directory, or a mounted source directory, that holds the env file or a secret file
+#        (compared by inode), and either one that is /, your home directory or a directory above it.
+#   Tauri (image xless-tauri:local-<arch>, or XLESS_IMAGE, for all three steps):
 #     ~/.cache/xless/work (steps 2 and 3) and ~/.cache/xless/downloads (step 2) at /cache/work and /cache/downloads
 #     volumes xless-rustup and xless-cargo at /cache/rustup and /cache/cargo (step 2; Rust toolchains survive between runs)
-#   The image defaults to xless-tauri:local-<arch>. XLESS_BUILD_NUMBER is not defaulted: the overlay's `build:` decides
-#   (`dated` asks App Store Connect for the next number in step 1). When set it is passed to steps 2 and 3.
+#   React Native (step 2: xless-rn:local-<arch>, or XLESS_IMAGE; steps 1 and 3: xless-base:local-<arch>, or
+#   XLESS_SIGN_IMAGE, which holds xless and rcodesign and no build tool; the script stops when the two images hold
+#   different xless binaries):
+#     volume xless-rn-work-<overlay name>-<hash of the overlay path> (or XLESS_RN_WORK_VOLUME) at /cache/work (steps 2
+#       and 3): the work copy, its derived data and the pnpm store. A docker volume, not a host folder: the build needs a case-sensitive file system (a macOS
+#       folder shared into the VM is case-insensitive, and the build's lowercase framework links would collide).
+#     volumes xless-corepack, xless-bundle, xless-cocoapods-home, xless-cocoapods-cache (step 2): corepack's package
+#       managers, the app's gems, CocoaPods' specs repo and pod downloads. Docker creates every volume on first use.
+#     XLESS_RN_CLEAN=1 is passed to step 2 (prepare regenerates ios/ and the pods).
+#   XLESS_BUILD_NUMBER is not defaulted: the overlay's `build:` decides (`dated` asks App Store Connect for the next
+#   number in step 1). When set it is passed to steps 2 and 3.
 #
 # Where it runs
 #   macOS            inside the xless Linux image, through docker.
@@ -37,19 +55,58 @@
 #   ASC_KEY_ID               App Store Connect API key ID                      (required)
 #   ASC_ISSUER_ID_FILE       file holding the issuer ID   (or ASC_ISSUER_ID)   (required)
 #   ASC_KEY_P8_FILE          the API key .p8 file                              (required)
-#   XLESS_DIST_KEY_FILE      the Apple Distribution private key (PEM)          (required)
-#   XLESS_IMAGE              docker image; default xless:local-<arch> (xless-tauri:local-<arch> with --config)
+#   XLESS_DIST_KEY_FILE      the Apple Distribution private key (PEM)          (required, except with --platform macos)
+#   XLESS_DEVID_KEY_FILE     the Developer ID Application private key (PEM)    (required with --platform macos)
+#     (with --config, "required" means: when a step that uses it runs; see above)
+#   XLESS_IMAGE              docker image; default xless:local-<arch> (with --config: see above)
+#   XLESS_SIGN_IMAGE         React Native only: the image of steps 1 and 3; default xless-base:local-<arch>
 #   DOCKER_CONTEXT           docker context; default colima-xless if it exists, else the current one
 #   XLESS_BUILD_NUMBER       build number; default minutes since 1970 (monotonic across machines); not defaulted with --config
-#   XLESS_TESTFLIGHT_DRY_RUN=1   print what would run (no secret values are ever printed) and exit
+#   XLESS_TESTFLIGHT_DRY_RUN=1 (or --dry-run)   print what would run (no secret values are ever printed) and exit
 # With docker, secret files and the project must live under a directory the docker VM can see (on macOS typically somewhere under
 # $HOME; Colima shares $HOME, Docker Desktop shares the directories listed in its file-sharing settings).
+#
+# --platform macos (default ios; only with a Tauri --config): a notarized, stapled DMG of a Tauri macOS app (`make dmg`).
+#   Step 1 (next-build) is skipped: macOS builds have no App Store Connect build number, `dated` uses the clock when the run
+#   starts (XLESS_BUILD_NUMBER, if set, still wins and is passed on). Step 2 is unchanged (no secrets). Step 3 runs
+#   `xless ship --platform macos --from sign --to package` with XLESS_DEVID_KEY_FILE and the App Store Connect key (the
+#   read-only certificate lookup and notarization); it prints the DMG path last. `--from package` reuses the signed app.
+# xcode: "<version>" (a top-level line of the overlay, or of xless.yml; Ruling R8): with docker, every step runs in the
+#   images made from that Xcode by `make images XCODE=<Xcode.app | .xip>`: <image>:local-<arch>-xcode<version>, e.g.
+#   xless-rn:local-arm64-xcode26.2 and xless-base:local-arm64-xcode26.2. For versions.env's XCODE_VERSION the plain
+#   local-<arch> images serve when the suffixed ones do not exist. A missing image stops the script (exit 2) with the
+#   `make images` command that builds it. XLESS_IMAGE / XLESS_SIGN_IMAGE still win. Prepare (exit 19; the build stage
+#   for xless.yml) checks the SDK inside the image against the pin either way (natively too).
+# --destination simulator (only with a React Native --config): an ad-hoc signed app for the iOS Simulator (`make simulator`).
+#   Step 2 only, with no secret and no App Store Connect query (a dated build number comes from the clock):
+#   `xless ship --destination simulator --to build`, into the work volume's .xless/build/ios-simulator/app, with its own
+#   derived data (the device build's outputs are left alone). It prints the app as `volume:<work volume>:<path>`, the
+#   argument scripts/sim-launch.sh takes to install and launch it on this Mac's simulator. --from/--to may only name
+#   prepare and build; nothing is signed with a distribution identity or uploaded.
 # The exit code is xless's (2 for a usage or configuration error in this script).
 set -euo pipefail
 
 die() { echo "testflight: $*" >&2; exit 2; }
 
-usage="usage: $0 <project-dir> [extra xless ship args...]   or   $0 --config <overlay.yml> [extra args...]"
+usage="usage: $0 <project-dir> [extra xless ship args...]   or   $0 --config <overlay.yml> [--platform ios|macos] [--destination device|simulator] [--dry-run] [extra args...]"
+[[ $# -ge 1 ]] || die "$usage"
+PLATFORM=ios
+DESTINATION=device
+args=()
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --platform) [[ $# -ge 2 ]] || die "--platform needs ios or macos"; PLATFORM="$2"; shift 2 ;;
+    --platform=*) PLATFORM="${1#--platform=}"; shift ;;
+    --destination) [[ $# -ge 2 ]] || die "--destination needs device or simulator"; DESTINATION="$2"; shift 2 ;;
+    --destination=*) DESTINATION="${1#--destination=}"; shift ;;
+    --dry-run) XLESS_TESTFLIGHT_DRY_RUN=1; shift ;;
+    *) args+=("$1"); shift ;;
+  esac
+done
+[[ "$PLATFORM" == ios || "$PLATFORM" == macos ]] || die "--platform must be ios or macos"
+[[ "$DESTINATION" == device || "$DESTINATION" == simulator ]] || die "--destination must be device or simulator"
+SIM=0; [[ "$DESTINATION" == device ]] || SIM=1
+set -- ${args[@]+"${args[@]}"}
 [[ $# -ge 1 ]] || die "$usage"
 OVERLAY=""
 PROJECT=""
@@ -63,6 +120,8 @@ if [[ "$1" == --config ]]; then
 else
   PROJECT="$1"; shift
   for a in "$@"; do [[ "$a" != --config && "$a" != --config=* ]] || die "--config replaces <project-dir>; give one or the other"; done
+  [[ $SIM == 0 ]] || die "--destination simulator needs --config <overlay.yml> (a React Native app)"
+  [[ "$PLATFORM" == ios ]] || die "--platform macos needs --config <overlay.yml> (a Tauri app)"
   [[ -f "$PROJECT/xless.yml" ]] || die "$PROJECT/xless.yml not found (is '$PROJECT' an xless project?)"
   PROJECT="$(cd "$PROJECT" && pwd)"
 fi
@@ -75,12 +134,28 @@ if [[ -f "$ENV_FILE" ]]; then
   set +a
 fi
 
+yaml_top() {   # FILE KEY: FILE's top-level `KEY: value` line, without a trailing comment and surrounding quotes
+  sed -n "s/^$2:[[:space:]]*//p" "$1" | head -1 | sed -E "s/[[:space:]]+#.*$//; s/^\"(.*)\"$/\1/; s/^'(.*)'$/\1/"
+}
+top_value() { yaml_top "$OVERLAY" "$1"; }   # KEY: the overlay's
+# Ruling R8: the Xcode whose SDK builds the app (its images are selected below; prepare and the build stage check the SDK).
+pin_file="$OVERLAY"; [[ -n "$pin_file" ]] || pin_file="$PROJECT/xless.yml"
+XCODE_PIN="$(yaml_top "$pin_file" xcode)"
+[[ -z "$XCODE_PIN" || "$XCODE_PIN" =~ ^[0-9]+(\.[0-9]+){0,2}$ ]] || die "xcode: '$XCODE_PIN' in $pin_file is not an Xcode version (e.g. xcode: \"26.2\")"
+# The pin as image tags spell the Xcode version (scripts/build-images.sh): major.minor, plus the patch when it is not 0
+# ("26" and "26.0.0" → 26.0, "26.2.0" → 26.2, "26.0.1" stays). xless compares versions the same way (27 = 27.0 = 27.0.0).
+canonical_xcode() { local IFS=.; local p=($1); local v="$((10#${p[0]})).$((10#${p[1]:-0}))"
+  [[ -z "${p[2]:-}" ]] || [[ $((10#${p[2]})) -eq 0 ]] || v+=".$((10#${p[2]}))"; echo "$v"; }
+XCODE_TAG=""; [[ -z "$XCODE_PIN" ]] || XCODE_TAG="$(canonical_xcode "$XCODE_PIN")"
 SOURCE=""
+RN=0
 if [[ -n "$OVERLAY" ]]; then
+  [[ "$(top_value type)" != react-native ]] || RN=1
+  [[ $RN == 0 || "$PLATFORM" == ios ]] || die "React Native overlays build iOS apps only (drop --platform macos)"
+  [[ $SIM == 0 || $RN == 1 ]] || die "--destination simulator builds React Native overlays only"
   SOURCE="${XLESS_SOURCE:-}"
   if [[ -z "$SOURCE" ]]; then
-    # the top-level `source:` line: drop a trailing comment and surrounding quotes
-    SOURCE="$(sed -n 's/^source:[[:space:]]*//p' "$OVERLAY" | head -1 | sed -E "s/[[:space:]]+#.*$//; s/^\"(.*)\"$/\1/; s/^'(.*)'$/\1/")"
+    SOURCE="$(top_value source)"
     [[ -n "$SOURCE" ]] || die "$OVERLAY has no source: (set it, or set XLESS_SOURCE)"
   fi
   case "$SOURCE" in "~") SOURCE="$HOME" ;; "~/"*) SOURCE="$HOME/${SOURCE#\~/}" ;; esac
@@ -88,9 +163,50 @@ if [[ -n "$OVERLAY" ]]; then
   [[ -d "$SOURCE" ]] || die "the app source $SOURCE does not exist"
   SOURCE="$(cd "$SOURCE" && pwd)"
 fi
+# What docker mounts at /source: the source, or the top of the git checkout it is inside of (xless lists the tracked
+# files with git, which needs the checkout's .git); --source then names the source below /source.
+SOURCE_MOUNT="$SOURCE"; SOURCE_SUB=""
+if [[ -n "$SOURCE" ]] && top="$(git -C "$SOURCE" rev-parse --show-toplevel 2>/dev/null)" && [[ -n "$top" ]]; then
+  sp="$(cd "$SOURCE" && pwd -P)"; tp="$(cd "$top" && pwd -P)"
+  if [[ "$sp" == "$tp"/* ]]; then SOURCE_MOUNT="$tp"; SOURCE_SUB="${sp#"$tp"}"; fi
+fi
 
-[[ -n "${ASC_KEY_ID:-}" ]] || die "set ASC_KEY_ID in the environment or $ENV_FILE"
-[[ -n "${ASC_ISSUER_ID_FILE:-}${ASC_ISSUER_ID:-}" ]] || die "set ASC_ISSUER_ID_FILE (or ASC_ISSUER_ID) in the environment or $ENV_FILE"
+# --config: the three steps of the header. --from/--to are placed by this script; other extra args go to both ship steps.
+from=build; to=upload; extra=(); [[ "$PLATFORM" != macos ]] || to=package; [[ $SIM == 0 ]] || to=build; given_build=0; given_from=0
+stages=(prepare build assets finalize sign package upload)
+index() { local i; for i in "${!stages[@]}"; do [[ "${stages[$i]}" != "$1" ]] || { echo "$i"; return 0; }; done
+  die "unknown stage '$1' (use one of: ${stages[*]})"; }
+step1=0; step3=1
+if [[ -n "$OVERLAY" ]]; then
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --from|--to) [[ $# -ge 2 ]] || die "$1 needs a stage"; if [[ "$1" == --from ]]; then from="$2"; given_from=1; else to="$2"; fi; shift 2 ;;
+      --from=*) from="${1#--from=}"; given_from=1; shift ;;
+      --to=*) to="${1#--to=}"; shift ;;
+      --build-number|--build-number=*) given_build=1; extra+=("$1"); shift ;;
+      *) extra+=("$1"); shift ;;
+    esac
+  done
+  fi_="$(index "$from")"; ti="$(index "$to")"
+  # `--to prepare` alone: the run starts at prepare (the default --from is build, which includes prepare)
+  if [[ $given_from == 0 && $ti -lt $fi_ ]]; then from=prepare; fi_=0; fi
+  [[ $fi_ -le $ti ]] || die "--to $to comes before --from $from"
+  [[ $SIM == 0 || $ti -le 1 ]] || die "--destination simulator builds stop at build (--to $to)"
+  # Step 1 (the build number) only for a run that starts with `build: dated` (the default): later stages read the one
+  # recorded in the work copy, and a fixed build needs no App Store Connect query.
+  build_kind="$(top_value build)"
+  [[ "$PLATFORM" != ios || $SIM == 1 || -n "${XLESS_BUILD_NUMBER:-}" || $given_build == 1 || $fi_ -gt 1 || ( -n "$build_kind" && "$build_kind" != dated ) ]] || step1=1
+  [[ $ti -ge 4 ]] || step3=0
+fi
+
+# The secrets of the steps that run (all of them for a project directory: one container).
+need_asc=0; need_key=0
+[[ $step1 == 0 && $step3 == 0 ]] || need_asc=1
+[[ $step3 == 0 ]] || need_key=1
+if [[ $need_asc == 1 ]]; then
+  [[ -n "${ASC_KEY_ID:-}" ]] || die "set ASC_KEY_ID in the environment or $ENV_FILE"
+  [[ -n "${ASC_ISSUER_ID_FILE:-}${ASC_ISSUER_ID:-}" ]] || die "set ASC_ISSUER_ID_FILE (or ASC_ISSUER_ID) in the environment or $ENV_FILE"
+fi
 # Secret file paths are made absolute (docker -v needs absolute host paths) and must be readable.
 abs_file() {   # NAME: resolve $NAME to an absolute path in place
   local v="$1" p="${!1}"
@@ -98,29 +214,16 @@ abs_file() {   # NAME: resolve $NAME to an absolute path in place
   [[ "$p" == /* ]] || p="$(cd "$(dirname "$p")" && pwd)/$(basename "$p")"
   printf -v "$v" '%s' "$p"
 }
-for v in ASC_KEY_P8_FILE XLESS_DIST_KEY_FILE; do
+secret_files=()
+[[ $need_asc == 0 ]] || secret_files+=(ASC_KEY_P8_FILE)
+if [[ $need_key == 1 ]]; then
+  if [[ "$PLATFORM" == macos ]]; then secret_files+=(XLESS_DEVID_KEY_FILE); else secret_files+=(XLESS_DIST_KEY_FILE); fi
+fi
+for v in ${secret_files[@]+"${secret_files[@]}"}; do
   [[ -n "${!v:-}" ]] || die "set $v in the environment or $ENV_FILE"
   abs_file "$v"
 done
-if [[ -n "${ASC_ISSUER_ID_FILE:-}" ]]; then abs_file ASC_ISSUER_ID_FILE; fi
-
-# The overlay's directory is mounted into the container that runs the app's build code: no secret may live below it.
-physical() {   # PATH: absolute path with every symlink (the file's own and its directories') resolved
-  local p="$1" t n=0
-  while [[ -L "$p" && $n -lt 40 ]]; do t="$(readlink "$p")"; [[ "$t" == /* ]] || t="$(dirname "$p")/$t"; p="$t"; n=$((n + 1)); done
-  printf '%s/%s' "$(cd -P "$(dirname "$p")" && pwd -P)" "$(basename "$p")"
-}
-if [[ -n "$OVERLAY" ]]; then
-  overlay_dir="$(cd -P "$(dirname "$OVERLAY")" && pwd -P)"
-  for v in ENV_FILE ASC_KEY_P8_FILE XLESS_DIST_KEY_FILE ASC_ISSUER_ID_FILE; do
-    f="${!v:-}"
-    [[ -n "$f" && -e "$f" ]] || continue
-    [[ "$(physical "$f")" != "$overlay_dir"/* ]] || die "$v ($f) is inside the overlay's directory $overlay_dir, which is mounted into the build container; keep the overlay in its own directory, away from secrets"
-  done
-fi
-
-# With --config the overlay's `build:` decides (dated by default); an explicit XLESS_BUILD_NUMBER still wins.
-if [[ -z "$OVERLAY" ]]; then export XLESS_BUILD_NUMBER="${XLESS_BUILD_NUMBER:-$(( $(date +%s) / 60 ))}"; fi
+if [[ $need_asc == 1 && -n "${ASC_ISSUER_ID_FILE:-}" ]]; then abs_file ASC_ISSUER_ID_FILE; fi
 
 use_docker=0
 case "${XLESS_USE_DOCKER:-auto}" in
@@ -130,8 +233,47 @@ case "${XLESS_USE_DOCKER:-auto}" in
   *) die "XLESS_USE_DOCKER must be 0, 1 or unset" ;;
 esac
 
+# With docker, the overlay's directory and the source are mounted into the container that runs the app's build code:
+# no secret may live below them. (Natively nothing is mounted: the build runs on the host, without the secret variables.)
+physical() {   # PATH: absolute path with every symlink (the file's own and its directories') resolved
+  local p="$1" t n=0
+  while [[ -L "$p" && $n -lt 40 ]]; do t="$(readlink "$p")"; [[ "$t" == /* ]] || t="$(dirname "$p")/$t"; p="$t"; n=$((n + 1)); done
+  printf '%s/%s' "$(cd -P "$(dirname "$p")" && pwd -P)" "$(basename "$p")"
+}
+inside() {   # FILE DIR: FILE (symlinks resolved) is somewhere below DIR, compared by inode (-ef), so neither a symlink
+  # nor another spelling of the path (case on macOS file systems) hides it
+  local d; d="$(dirname "$(physical "$1")")"
+  while :; do
+    [[ ! "$d" -ef "$2" ]] || return 0
+    [[ "$d" != / ]] || return 1
+    d="$(dirname "$d")"
+  done
+}
+if [[ -n "$OVERLAY" && $use_docker == 1 ]]; then
+  overlay_dir="$(cd -P "$(dirname "$OVERLAY")" && pwd -P)"
+  source_dir="$(cd -P "$SOURCE_MOUNT" && pwd -P)"
+  # Both are mounted whole: never the file system root, the home directory or a directory above it.
+  for d in "$overlay_dir" "$source_dir"; do
+    if [[ "$d" -ef / || "$d" -ef "$HOME" ]] || inside "$HOME/." "$d"; then
+      die "$d would be mounted into the build container, and it is / or holds your home directory; keep the overlay in its own directory and point source: at the app's checkout"
+    fi
+  done
+  for v in ENV_FILE ASC_KEY_P8_FILE XLESS_DIST_KEY_FILE XLESS_DEVID_KEY_FILE ASC_ISSUER_ID_FILE; do
+    f="${!v:-}"
+    [[ -n "$f" && -e "$f" ]] || continue
+    ! inside "$f" "$overlay_dir" || die "$v (${!v}) is inside the overlay's directory $overlay_dir, which is mounted into the build container; keep the overlay in its own directory, away from secrets"
+    ! inside "$f" "$source_dir" || die "$v (${!v}) is inside the app source $source_dir, which is mounted into the build container; keep secrets out of the source"
+  done
+fi
+
+# With --config the overlay's `build:` decides (dated by default); an explicit XLESS_BUILD_NUMBER still wins.
+if [[ -z "$OVERLAY" ]]; then export XLESS_BUILD_NUMBER="${XLESS_BUILD_NUMBER:-$(( $(date +%s) / 60 ))}"; fi
+
+shq() {   # WORD: WORD quoted for a shell when it needs it (single quotes), as the dry run prints commands
+  if [[ "$1" =~ ^[A-Za-z0-9_./:=,@%+-]+$ ]]; then printf '%s' "$1"; else printf "'%s'" "${1//\'/\'\\\'\'}"; fi
+}
 run() {
-  if [[ "${XLESS_TESTFLIGHT_DRY_RUN:-0}" == 1 ]]; then printf '%q ' "$@"; echo; return 0; fi
+  if [[ "${XLESS_TESTFLIGHT_DRY_RUN:-0}" == 1 ]]; then for w in "$@"; do shq "$w"; printf ' '; done; echo; return 0; fi
   "$@"
 }
 
@@ -141,23 +283,55 @@ finish() {   # CODE: report and exit with xless's exit code
   exit "$1"
 }
 
+bind() {   # SRC DST [ro]: a `docker run --mount` bind spec; a path with ',' or '"' is CSV-quoted, so any path works
+  local src="src=$1"
+  case "$1" in *,*|*\"*) src="\"src=${1//\"/\"\"}\"" ;; esac
+  printf 'type=bind,%s,dst=%s%s' "$src" "$2" "${3:+,readonly}"
+}
+
+asc_secrets=(); dist_secret=()
 if [[ $use_docker == 1 ]]; then
   command -v docker >/dev/null 2>&1 || die "docker is not installed (and no native xless is on PATH)"
   ctx="${DOCKER_CONTEXT:-}"
   if [[ -z "$ctx" ]] && docker context ls --format '{{.Name}}' 2>/dev/null | grep -qx 'colima-xless'; then ctx=colima-xless; fi
   case "$(uname -m)" in arm64|aarch64) arch=arm64 ;; *) arch=amd64 ;; esac
-  docker_run=(docker)
-  [[ -z "$ctx" ]] || docker_run+=(--context "$ctx")
-  docker_run+=(run --rm)
+  docker_cli=(docker)
+  [[ -z "$ctx" ]] || docker_cli+=(--context "$ctx")
+  docker_run=("${docker_cli[@]}" run --rm)
   # Secrets by path or by name: values never appear on a command line.
-  asc_secrets=(-v "$ASC_KEY_P8_FILE:/secrets/asc.p8:ro" -e ASC_KEY_ID -e ASC_KEY_P8_FILE=/secrets/asc.p8)
-  if [[ -n "${ASC_ISSUER_ID_FILE:-}" ]]; then
-    asc_secrets+=(-v "$ASC_ISSUER_ID_FILE:/secrets/asc-issuer-id:ro" -e ASC_ISSUER_ID_FILE=/secrets/asc-issuer-id)
-  else
-    asc_secrets+=(-e ASC_ISSUER_ID)   # by name: the value never appears in the process list
+  if [[ $need_asc == 1 ]]; then
+    asc_secrets=(--mount "$(bind "$ASC_KEY_P8_FILE" /secrets/asc.p8 ro)" -e ASC_KEY_ID -e ASC_KEY_P8_FILE=/secrets/asc.p8)
+    if [[ -n "${ASC_ISSUER_ID_FILE:-}" ]]; then
+      asc_secrets+=(--mount "$(bind "$ASC_ISSUER_ID_FILE" /secrets/asc-issuer-id ro)" -e ASC_ISSUER_ID_FILE=/secrets/asc-issuer-id)
+    else
+      asc_secrets+=(-e ASC_ISSUER_ID)   # by name: the value never appears in the process list
+    fi
   fi
-  dist_secret=(-v "$XLESS_DIST_KEY_FILE:/secrets/dist-key.pem:ro" -e XLESS_DIST_KEY_FILE=/secrets/dist-key.pem)
+  if [[ $need_key == 1 && "$PLATFORM" == macos ]]; then
+    dist_secret=(--mount "$(bind "$XLESS_DEVID_KEY_FILE" /secrets/devid-key.pem ro)" -e XLESS_DEVID_KEY_FILE=/secrets/devid-key.pem)
+  elif [[ $need_key == 1 ]]; then
+    dist_secret=(--mount "$(bind "$XLESS_DIST_KEY_FILE" /secrets/dist-key.pem ro)" -e XLESS_DIST_KEY_FILE=/secrets/dist-key.pem)
+  fi
 fi
+
+# xcode: pin (docker only; XLESS_IMAGE / XLESS_SIGN_IMAGE win): IMAGE-xcode<pin>, made by `make images`. The plain
+# default images are versions.env's Xcode's, so they serve that pin when no suffixed image exists.
+default_xcode="$(sed -n 's/^XCODE_VERSION=//p' "$(dirname "$0")/../versions.env" 2>/dev/null || true)"
+image_exists() { "${docker_cli[@]}" image inspect "$1" >/dev/null 2>&1; }
+pin_missing=()
+apply_pin() {   # VAR: the image named by $VAR, for the pinned Xcode
+  local v="$1" name="${!1}" want
+  [[ -n "$XCODE_PIN" ]] || return 0
+  want="$name-xcode$XCODE_TAG"
+  if image_exists "$want"; then printf -v "$v" '%s' "$want"; return 0; fi
+  if [[ -n "$default_xcode" && "$XCODE_TAG" == "$(canonical_xcode "$default_xcode")" ]] && image_exists "$name"; then return 0; fi
+  pin_missing+=("$want")
+}
+check_pin() {   # after apply_pin: refuse missing images with the command that builds them
+  [[ -n "$XCODE_PIN" && $use_docker == 1 ]] || return 0
+  [[ ${#pin_missing[@]} -eq 0 ]] || die "$pin_file pins xcode: \"$XCODE_PIN\", but these images are missing: ${pin_missing[*]}; build them from Xcode $XCODE_TAG: make images XCODE=<path to Xcode $XCODE_TAG's .app or .xip> ARCHS=$arch"
+  echo "==> xcode: \"$XCODE_PIN\" (pinned): $*" >&2
+}
 
 if [[ -z "$OVERLAY" ]]; then
   # A project directory: one `xless ship`. Secrets are mounted, and xless scrubs them from the environment of the tools
@@ -165,8 +339,11 @@ if [[ -z "$OVERLAY" ]]; then
   echo "==> TestFlight: build number $XLESS_BUILD_NUMBER" >&2
   set +e
   if [[ $use_docker == 1 ]]; then
-    run "${docker_run[@]}" -v "$PROJECT:/work" -w /work "${asc_secrets[@]}" "${dist_secret[@]}" -e XLESS_BUILD_NUMBER \
-      "${XLESS_IMAGE:-xless:local-$arch}" xless ship --platform ios "$@"
+    image="${XLESS_IMAGE:-xless:local-$arch}"
+    [[ -n "${XLESS_IMAGE:-}" ]] || apply_pin image
+    check_pin "$image"
+    run "${docker_run[@]}" --mount "$(bind "$PROJECT" /work)" -w /work "${asc_secrets[@]}" "${dist_secret[@]}" -e XLESS_BUILD_NUMBER \
+      "$image" xless ship --platform ios "$@"
   else
     cd "$PROJECT"
     run xless ship --platform ios "$@"
@@ -176,29 +353,34 @@ if [[ -z "$OVERLAY" ]]; then
   finish $code
 fi
 
-# --config: the three steps of the header. --from/--to are placed by this script; other extra args go to both ship steps.
-from=build; to=upload; extra=(); given_build=0
-while [[ $# -gt 0 ]]; do
-  case "$1" in
-    --from|--to) [[ $# -ge 2 ]] || die "$1 needs a stage"; if [[ "$1" == --from ]]; then from="$2"; else to="$2"; fi; shift 2 ;;
-    --from=*) from="${1#--from=}"; shift ;;
-    --to=*) to="${1#--to=}"; shift ;;
-    --build-number|--build-number=*) given_build=1; extra+=("$1"); shift ;;
-    *) extra+=("$1"); shift ;;
-  esac
-done
-stages=(prepare build assets finalize sign package upload)
-index() { local i; for i in "${!stages[@]}"; do [[ "${stages[$i]}" != "$1" ]] || { echo "$i"; return 0; }; done
-  die "unknown stage '$1' (use one of: ${stages[*]})"; }
-fi_="$(index "$from")"; ti="$(index "$to")"
-[[ $fi_ -le $ti ]] || die "--to $to comes before --from $from"
-
+# --config: the three steps. Images, caches and the step 1 command per overlay type.
+if [[ $RN == 1 ]]; then next_build=(xless next-build); else next_build=(xless tauri next-build); fi
 if [[ $use_docker == 1 ]]; then
-  image="${XLESS_IMAGE:-xless-tauri:local-$arch}"
-  cache="$HOME/.cache/xless"
-  [[ "${XLESS_TESTFLIGHT_DRY_RUN:-0}" == 1 ]] || mkdir -p "$cache/work" "$cache/downloads"
-  app=(-v "$SOURCE:/source:ro" -v "$(dirname "$OVERLAY"):/config:ro")
-  xl=(--config "/config/$(basename "$OVERLAY")" --source /source)
+  app=(--mount "$(bind "$SOURCE_MOUNT" /source ro)" --mount "$(bind "$(dirname "$OVERLAY")" /config ro)")
+  xl=(--config "/config/$(basename "$OVERLAY")" --source "/source$SOURCE_SUB")
+  if [[ $RN == 1 ]]; then
+    image="${XLESS_IMAGE:-xless-rn:local-$arch}"
+    key_image="${XLESS_SIGN_IMAGE:-xless-base:local-$arch}"
+    # One work volume per overlay file: its name, and a hash of its path (two overlays never share a work copy).
+    ov_name="$(basename "$OVERLAY")"; ov_name="${ov_name%.*}"; ov_name="$(printf '%s' "$ov_name" | tr -c 'A-Za-z0-9_.-' '-')"
+    ov_hash="$( { command -v sha256sum >/dev/null && printf '%s' "$OVERLAY" | sha256sum || printf '%s' "$OVERLAY" | shasum -a 256; } | cut -c1-8)"
+    rn_work="${XLESS_RN_WORK_VOLUME:-xless-rn-work-$ov_name-$ov_hash}"
+    build_caches=(-v "$rn_work:/cache/work" -v xless-corepack:/cache/corepack -v xless-bundle:/cache/bundle
+                  -v xless-cocoapods-home:/root/.cocoapods -v xless-cocoapods-cache:/root/Library/Caches/CocoaPods
+                  -e "XLESS_WORK_VOLUME=$rn_work")
+    [[ -z "${XLESS_RN_CLEAN:-}" ]] || build_caches+=(-e XLESS_RN_CLEAN)
+    # the base image sets no work root: the work copy is where step 2 left it
+    sign_caches=(-v "$rn_work:/cache/work" -e XLESS_WORK_ROOT=/cache/work -e "XLESS_WORK_VOLUME=$rn_work")
+    echo "==> React Native: work volume $rn_work" >&2
+  else
+    image="${XLESS_IMAGE:-xless-tauri:local-$arch}"
+    key_image="$image"
+    cache="$HOME/.cache/xless"
+    [[ "${XLESS_TESTFLIGHT_DRY_RUN:-0}" == 1 ]] || mkdir -p "$cache/work" "$cache/downloads"
+    build_caches=(--mount "$(bind "$cache/work" /cache/work)" --mount "$(bind "$cache/downloads" /cache/downloads)" -e XLESS_CACHE=/cache
+                  -v xless-rustup:/cache/rustup -v xless-cargo:/cache/cargo)
+    sign_caches=(--mount "$(bind "$cache/work" /cache/work)")
+  fi
 else
   # native: --source only when XLESS_SOURCE overrides the overlay's own `source:`
   xl=(--config "$OVERLAY"); [[ -z "${XLESS_SOURCE:-}" ]] || xl+=(--source "$SOURCE")
@@ -206,54 +388,107 @@ else
   scrub=(env); for v in ASC_KEY_ID ASC_ISSUER_ID ASC_KEY_P8 XLESS_DIST_KEY XLESS_DEVID_KEY; do scrub+=(-u "$v" -u "${v}_FILE"); done
 fi
 bn=(); [[ -z "${XLESS_BUILD_NUMBER:-}" ]] || bn=(-e XLESS_BUILD_NUMBER)
+if [[ $use_docker == 1 ]]; then
+  [[ -n "${XLESS_IMAGE:-}" ]] || apply_pin image
+  # A simulator build runs step 2 only: the App Store Connect image is never used, so it is neither selected nor required.
+  if [[ $RN == 1 && $SIM == 0 ]]; then [[ -n "${XLESS_SIGN_IMAGE:-}" ]] || apply_pin key_image; elif [[ $RN == 0 ]]; then key_image="$image"; fi
+  if [[ $RN == 1 && $SIM == 0 ]]; then check_pin "build $image, App Store Connect steps $key_image"; else check_pin "$image"; fi
+fi
+
+# React Native: step 2 (xless-rn) and steps 1 and 3 (xless-base) must run the same xless, or step 3 could misread what
+# step 2 wrote. The images are compared by the digest of their xless binary (not for a simulator build: step 2 only).
+if [[ $use_docker == 1 && $RN == 1 && $SIM == 0 && "${XLESS_TESTFLIGHT_DRY_RUN:-0}" != 1 ]]; then
+  digest() { "${docker_run[@]}" --entrypoint sha256sum "$1" /usr/local/bin/xless 2>/dev/null | cut -c1-64; }
+  d2="$(digest "$image")" || true; d13="$(digest "$key_image")" || true
+  [[ -n "$d2" ]] || die "cannot read xless from $image (is the image built? make base-local sdk-local tauri-local rn-local)"
+  [[ -n "$d13" ]] || die "cannot read xless from $key_image (is the image built? make base-local)"
+  [[ "$d2" == "$d13" ]] || die "$image and $key_image hold different xless builds (${d2:0:12} vs ${d13:0:12}); rebuild both from the same commit (make base-local sdk-local tauri-local rn-local), or set XLESS_IMAGE / XLESS_SIGN_IMAGE to matching images"
+fi
 
 # Step 1: the build number, only for a run that starts (later stages read the one recorded in the work copy).
-if [[ -z "${XLESS_BUILD_NUMBER:-}" && $given_build == 0 && $fi_ -le 1 ]]; then
+if [[ $step1 == 1 ]]; then
   echo "==> TestFlight: step 1/3, next build number (App Store Connect, read-only)" >&2
-  if [[ $use_docker == 1 ]]; then cmd=("${docker_run[@]}" "${app[@]}" "${asc_secrets[@]}" "$image" xless tauri next-build "${xl[@]}")
-  else cmd=(xless tauri next-build "${xl[@]}"); fi
+  if [[ $use_docker == 1 ]]; then cmd=("${docker_run[@]}" "${app[@]}" "${asc_secrets[@]}" "$key_image" "${next_build[@]}" "${xl[@]}")
+  else cmd=("${next_build[@]}" "${xl[@]}"); fi
   if [[ "${XLESS_TESTFLIGHT_DRY_RUN:-0}" == 1 ]]; then
     run "${cmd[@]}"; XLESS_BUILD_NUMBER="<next-build>"
   else
     set +e; out="$("${cmd[@]}")"; code=$?; set -e
     [[ $code -eq 0 ]] || finish $code
     XLESS_BUILD_NUMBER="$(printf '%s\n' "$out" | tail -1)"
-    [[ "$XLESS_BUILD_NUMBER" =~ ^[0-9]+(\.[0-9]+)*$ ]] || die "xless tauri next-build printed '$XLESS_BUILD_NUMBER', not a build number"
+    [[ "$XLESS_BUILD_NUMBER" =~ ^[0-9]+(\.[0-9]+)*$ ]] || die "${next_build[*]} printed '$XLESS_BUILD_NUMBER', not a build number"
   fi
   export XLESS_BUILD_NUMBER
   bn=(-e XLESS_BUILD_NUMBER)
 fi
 if [[ -n "${XLESS_BUILD_NUMBER:-}" ]]; then echo "==> TestFlight: build number $XLESS_BUILD_NUMBER" >&2
 elif [[ $given_build == 1 ]]; then echo "==> TestFlight: build number from --build-number" >&2
+elif [[ "$PLATFORM" == macos ]]; then echo "==> DMG: build number chosen from the clock when the run starts" >&2
+elif [[ $SIM == 1 ]]; then echo "==> Simulator: build number chosen from the clock when the run starts" >&2
 else echo "==> TestFlight: build number recorded in the work copy" >&2; fi
 
 # Step 2: the build, with no secret in reach.
 if [[ $fi_ -le 3 ]]; then
   bto="$to"; [[ $ti -le 3 ]] || bto=finalize
-  echo "==> TestFlight: step 2/3, $from to $bto (no secrets)" >&2
+  dest=(); [[ $SIM == 0 ]] || dest=(--destination simulator)
+  if [[ $SIM == 1 ]]; then echo "==> Simulator: $from to $bto (no secrets)" >&2; else echo "==> TestFlight: step 2/3, $from to $bto (no secrets)" >&2; fi
+  log2=/dev/null
+  if [[ $SIM == 1 && "${XLESS_TESTFLIGHT_DRY_RUN:-0}" != 1 ]]; then log2="$(mktemp)"; trap 'rm -f "$log2"' EXIT; fi
+  step2() {
+    if [[ $use_docker == 1 ]]; then
+      run "${docker_run[@]}" "${app[@]}" "${build_caches[@]}" -e "XLESS_SOURCE_ORIGIN=$SOURCE" ${bn[@]+"${bn[@]}"} \
+        "$image" xless ship --platform "$PLATFORM" "${xl[@]}" ${dest[@]+"${dest[@]}"} --from "$from" --to "$bto" ${extra[@]+"${extra[@]}"}
+    else
+      run "${scrub[@]}" xless ship --platform "$PLATFORM" "${xl[@]}" ${dest[@]+"${dest[@]}"} --from "$from" --to "$bto" ${extra[@]+"${extra[@]}"}
+    fi
+  }
   set +e
-  if [[ $use_docker == 1 ]]; then
-    run "${docker_run[@]}" "${app[@]}" -v "$cache/work:/cache/work" -v "$cache/downloads:/cache/downloads" -e XLESS_CACHE=/cache \
-      -v xless-rustup:/cache/rustup -v xless-cargo:/cache/cargo -e "XLESS_SOURCE_ORIGIN=$SOURCE" ${bn[@]+"${bn[@]}"} \
-      "$image" xless ship --platform ios "${xl[@]}" --from "$from" --to "$bto" ${extra[@]+"${extra[@]}"}
-  else
-    run "${scrub[@]}" xless ship --platform ios "${xl[@]}" --from "$from" --to "$bto" ${extra[@]+"${extra[@]}"}
-  fi
-  code=$?
+  if [[ $SIM == 1 ]]; then step2 | tee "$log2"; code=${PIPESTATUS[0]}; else step2; code=$?; fi
   set -e
+  if [[ $SIM == 1 ]]; then
+    [[ $code -eq 0 ]] || finish $code
+    if [[ $to == build && "${XLESS_TESTFLIGHT_DRY_RUN:-0}" != 1 ]]; then
+      built="$(grep '\.app$' "$log2" | tail -1 || true)"
+      if [[ $use_docker == 1 ]]; then built="volume:$rn_work:$built"; fi
+      echo "==> Simulator app: $built" >&2
+      echo "==> launch it on this Mac: scripts/sim-launch.sh $built" >&2
+    fi
+    echo "==> Simulator build finished (nothing signed for distribution or uploaded)" >&2
+    exit 0
+  fi
   [[ $code -eq 0 ]] || finish $code
 fi
 
 # Step 3: sign, package, upload with the secrets; no build code runs here.
-if [[ $ti -ge 4 ]]; then
+if [[ $step3 == 1 ]]; then
   sfrom="$from"; [[ $fi_ -ge 4 ]] || sfrom=sign
   echo "==> TestFlight: step 3/3, $sfrom to $to" >&2
+  if [[ "$PLATFORM" == macos && "${XLESS_TESTFLIGHT_DRY_RUN:-0}" != 1 ]]; then
+    # the DMG path is the last line xless prints (a container path with docker): report it as a host path
+    log="$(mktemp)"; trap 'rm -f "$log"' EXIT
+    set +e
+    if [[ $use_docker == 1 ]]; then
+      "${docker_run[@]}" "${app[@]}" "${sign_caches[@]}" "${asc_secrets[@]}" "${dist_secret[@]}" ${bn[@]+"${bn[@]}"} \
+        "$key_image" xless ship --platform macos "${xl[@]}" --from "$sfrom" --to "$to" ${extra[@]+"${extra[@]}"} | tee "$log"
+    else
+      xless ship --platform macos "${xl[@]}" --from "$sfrom" --to "$to" ${extra[@]+"${extra[@]}"} | tee "$log"
+    fi
+    code=${PIPESTATUS[0]}
+    set -e
+    if [[ $code -eq 0 && $to == package ]]; then
+      dmg="$(grep '\.dmg$' "$log" | tail -1 || true)"
+      [[ $use_docker == 0 ]] || dmg="${dmg/#\/cache\/work/$cache/work}"
+      echo "==> DMG: $dmg" >&2
+    fi
+    if [[ $code -eq 0 ]]; then echo "==> DMG build finished" >&2; else echo "==> xless exited with code $code" >&2; fi
+    exit "$code"
+  fi
   set +e
   if [[ $use_docker == 1 ]]; then
-    run "${docker_run[@]}" "${app[@]}" -v "$cache/work:/cache/work" "${asc_secrets[@]}" "${dist_secret[@]}" ${bn[@]+"${bn[@]}"} \
-      "$image" xless ship --platform ios "${xl[@]}" --from "$sfrom" --to "$to" ${extra[@]+"${extra[@]}"}
+    run "${docker_run[@]}" "${app[@]}" "${sign_caches[@]}" "${asc_secrets[@]}" "${dist_secret[@]}" ${bn[@]+"${bn[@]}"} \
+      "$key_image" xless ship --platform "$PLATFORM" "${xl[@]}" --from "$sfrom" --to "$to" ${extra[@]+"${extra[@]}"}
   else
-    run xless ship --platform ios "${xl[@]}" --from "$sfrom" --to "$to" ${extra[@]+"${extra[@]}"}
+    run xless ship --platform "$PLATFORM" "${xl[@]}" --from "$sfrom" --to "$to" ${extra[@]+"${extra[@]}"}
   fi
   code=$?
   set -e

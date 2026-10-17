@@ -7,7 +7,7 @@ launch screen (device retina6_12, safe area, systemBackgroundColor). It also wri
 Tests/IBCorpus/flagsets.json (flag-set overrides per case) and Tests/IBCorpus/Assets.xcassets
 (Logo/Banner images and the Brand color; never passed to ibtool, see docs/research/ib-invocation.md).
 
-Hand-maintained cases (real-tauri-app, xcode-template) are not generated; their storyboards are left as
+Hand-maintained cases (real-tauri-app, xcode-template, real-expo-splash-template) are not generated; their storyboards are left as
 they are, and their flag sets are kept below. Then run scripts/ib-golden.sh to compile the goldens.
 A storyboard or golden directory that belongs to no registered case makes gen.py stop with an error;
 `--prune` deletes such files instead.
@@ -35,7 +35,7 @@ FLAGSETS = {
 }
 ALL = ["universal-16", "iphone-16", "universal-15", "universal-17"]
 U16_17 = ["universal-16", "universal-17"]
-HAND_MAINTAINED = {"real-tauri-app": U16_17, "xcode-template": ALL}
+HAND_MAINTAINED = {"real-tauri-app": U16_17, "xcode-template": ALL, "real-expo-splash-template": ALL}
 
 # Default object IDs (Xcode's LaunchScreen template IDs for the scene, view controller, view and first responder).
 IDS = {
@@ -197,7 +197,10 @@ def label(ids, text="Label", font='type="system" pointSize="17"', align="natural
 def document(ids=None, device=("retina6_12", "portrait"), frame=None, safe_area=True, background=None,
              autoresizing_flags=("widthSizable", "heightSizable"), subviews=(), root_constraints=(),
              traits=True, legacy_guides=False, resources=None, extra_capabilities=(), safe_areas_attr=None,
-             appearance="light", device_children=()):
+             appearance="light", device_children=(), vc_attrs="", root_attrs=("", "", ""), root_extra=""):
+    """`vc_attrs`: attributes before the view controller's id (` storyboardIdentifier="X"`); `root_attrs`: the root
+    view's attributes before contentMode, between contentMode and id, and after id (Xcode's order); `root_extra`:
+    root-view child elements before the background color (e.g. `<accessibility>`)."""
     ids = {**IDS, **(ids or {})}
     safe_areas_attr = safe_area if safe_areas_attr is None else safe_areas_attr
     if frame is None:
@@ -224,7 +227,8 @@ def document(ids=None, device=("retina6_12", "portrait"), frame=None, safe_area=
     caps.add(("documents saved in the Xcode 8 format", "8.0"))
     cap_lines = "".join(f'        <capability name="{n}" minToolsVersion="{v}"/>\n' for n, v in sorted(caps))
     view = tmpl("view.xml").substitute(
-        id=ids["view"], width=fmt(frame[0]), height=fmt(frame[1]),
+        id=ids["view"], width=fmt(frame[0]), height=fmt(frame[1]), lead=root_attrs[0], mid=root_attrs[1], trail=root_attrs[2],
+        extra=indent(root_extra, 24),
         autoresizing=indent(autoresizing(autoresizing_flags), 24) if autoresizing_flags is not None else "",
         subviews=indent("<subviews>\n" + indent("".join(subviews), 4) + "</subviews>\n", 24) if subviews else "",
         safe_area=indent(f'<viewLayoutGuide key="safeArea" id="{ids["safe"]}"/>\n', 24) if safe_area else "",
@@ -252,7 +256,7 @@ def document(ids=None, device=("retina6_12", "portrait"), frame=None, safe_area=
     return tmpl("document.xml").substitute(
         use_traits=' useTraitCollections="YES"' if traits else "",
         use_safe_areas=' useSafeAreas="YES"' if safe_areas_attr else "",
-        vc_id=ids["vc"], device=dev_line, capabilities=cap_lines, scene_id=ids["scene"],
+        vc_id=ids["vc"], vc_attrs=vc_attrs, device=dev_line, capabilities=cap_lines, scene_id=ids["scene"],
         layout_guides=guides, view=view, first_responder_id=ids["fr"], resources=res)
 
 
@@ -505,6 +509,7 @@ def build():
 
     build_targeted()
     build_final_review()
+    build_expo()
 
 
 SYSTEM_COLOR_TABLE = [
@@ -1140,6 +1145,215 @@ def build_final_review():
     case("nesting-32-levels", modern(subviews=[inner]), ALL)
     case("color-white-near-black", document(background=white_spec((1.1e-07, 1), G22)))
     case("color-white-near-white", document(background=white_spec((0.99999999, 1), G22)))
+
+
+# --- Expo splash screens (milestone 3, Task 6b) -------------------------------------------------------
+
+# Accessibility trait attributes of `<accessibilityTraits key="traits">` that ibtool encodes (acc-traits-grid).
+TRAITS = ["button", "link", "image", "selected", "playsSound", "keyboardKey", "staticText", "summaryElement", "notEnabled",
+          "updatesFrequently", "searchField", "startsMediaSession", "adjustable", "allowsDirectInteraction", "causesPageTurn",
+          "header"]
+
+
+def accessibility(traits):
+    """Xcode's `<accessibility>` element; `traits` is the attribute string of `<accessibilityTraits>` (' image="YES"')."""
+    return ('<accessibility key="accessibilityConfiguration">\n'
+            f'    <accessibilityTraits key="traits"{traits}/>\n'
+            '</accessibility>\n')
+
+
+def acc_image(id_, traits, frame=(0, 0, 10, 10)):
+    """A fixed-frame image view with an `<accessibility>` element (Xcode's layout: after the autoresizing mask)."""
+    return image_view({**IDS, "img": id_}, frame=frame).replace(
+        "</imageView>", indent(accessibility(traits), 4) + "</imageView>")
+
+
+def acc_label(id_, traits, frame, font='type="system" pointSize="17"'):
+    return label({**IDS, "lbl": id_}, frame=frame, font=font).replace(
+        '    <nil key="highlightedColor"/>', indent(accessibility(traits), 4) + '    <nil key="highlightedColor"/>')
+
+
+def acc_view(id_, traits, frame, kids=()):
+    v = container(id_, frame, None, list(kids), fixed=True)
+    return v[:v.rindex("</view>")] + indent(accessibility(traits), 4) + "</view>\n"
+
+
+def expo_hex(h):
+    """expo-splash-screen's spelling of a #RRGGBB channel: (n / 255).toPrecision(15), trailing zeros kept."""
+    return ["%#.15g" % (int(h[i:i + 2], 16) / 255) for i in (1, 3, 5)]
+
+
+def expo_named_spec(h):
+    r, g, b = expo_hex(h)
+    return f'alpha="1.000" blue="{b}" green="{g}" red="{r}" customColorSpace="sRGB" colorSpace="custom"'
+
+
+def expo_constraint_id(*parts):
+    """expo-splash-screen's constraint ids: sha1 of the joined (firstItem, firstAttribute, secondItem, secondAttribute)."""
+    import hashlib
+    return hashlib.sha1("-".join(parts).encode()).hexdigest()
+
+
+def expo_splash(color, image="SplashScreenLogo", width=200, mode="scaleAspectFit", full_screen=False):
+    """The storyboard expo-splash-screen's config plugin writes for a configured splash screen (image, background
+    color): Expo's template, re-serialized by xml2js (4-space indent, no comments), with its image view (lowercase
+    `true`/`false`), centerX/centerY constraints (top/leading/trailing/bottom for `enableFullScreenImage`), the
+    `SplashScreenBackground` named color in Expo's number spelling, and the image resource."""
+    img_id, box = "EXPO-SplashScreen", "EXPO-ContainerView"
+    w, h = (414, 736) if full_screen else (width, width)
+    x, y = (0, 0) if full_screen else ((393 - w) / 2, (852 - h) / 2)
+    js = lambda v: str(int(v)) if float(v).is_integer() else repr(float(v))  # JavaScript's Number to string
+    attrs = ["top", "leading", "trailing", "bottom"] if full_screen else ["centerX", "centerY"]
+    cons = "".join(f'                            <constraint firstItem="{img_id}" firstAttribute="{a}" secondItem="{box}" '
+                   f'secondAttribute="{a}" id="{expo_constraint_id(img_id, a, box, a)}"/>\n' for a in attrs)
+    return f"""<?xml version="1.0" encoding="UTF-8"?>
+<document type="com.apple.InterfaceBuilder3.CocoaTouch.Storyboard.XIB" version="3.0" toolsVersion="24093.7" targetRuntime="iOS.CocoaTouch" propertyAccessControl="none" useAutolayout="YES" launchScreen="YES" useTraitCollections="YES" useSafeAreas="YES" colorMatched="YES" initialViewController="EXPO-VIEWCONTROLLER-1">
+    <device id="retina6_12" orientation="portrait" appearance="light"/>
+    <dependencies>
+        <deployment identifier="iOS"/>
+        <plugIn identifier="com.apple.InterfaceBuilder.IBCocoaTouchPlugin" version="24053.1"/>
+        <capability name="Named colors" minToolsVersion="9.0"/>
+        <capability name="Safe area layout guides" minToolsVersion="9.0"/>
+        <capability name="System colors in document resources" minToolsVersion="11.0"/>
+        <capability name="documents saved in the Xcode 8 format" minToolsVersion="8.0"/>
+    </dependencies>
+    <scenes>
+        <scene sceneID="EXPO-SCENE-1">
+            <objects>
+                <viewController storyboardIdentifier="SplashScreenViewController" id="EXPO-VIEWCONTROLLER-1" sceneMemberID="viewController">
+                    <view key="view" userInteractionEnabled="NO" contentMode="scaleToFill" insetsLayoutMarginsFromSafeArea="NO" id="{box}" userLabel="ContainerView">
+                        <rect key="frame" x="0.0" y="0.0" width="393" height="852"/>
+                        <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMaxY="YES"/>
+                        <subviews>
+                            <imageView id="{img_id}" userLabel="{image}" image="{image}" contentMode="{mode}" clipsSubviews="true" userInteractionEnabled="false" translatesAutoresizingMaskIntoConstraints="false">
+                                <rect key="frame" x="{js(x)}" y="{js(y)}" width="{js(w)}" height="{js(h)}"/>
+                            </imageView>
+                        </subviews>
+                        <viewLayoutGuide key="safeArea" id="Rmq-lb-GrQ"/>
+                        <constraints>
+{cons}                        </constraints>
+                        <color key="backgroundColor" name="SplashScreenBackground"/>
+                    </view>
+                </viewController>
+                <placeholder placeholderIdentifier="IBFirstResponder" id="EXPO-PLACEHOLDER-1" userLabel="First Responder" sceneMemberID="firstResponder"/>
+            </objects>
+            <point key="canvasLocation" x="0.0" y="0.0"/>
+        </scene>
+    </scenes>
+    <resources>
+        <image name="{image}" width="{js(w)}" height="{js(h)}"/>
+        <systemColor name="systemBackgroundColor">
+            <color white="1" alpha="1" colorSpace="custom" customColorSpace="genericGamma22GrayColorSpace"/>
+        </systemColor>
+        <namedColor name="SplashScreenBackground">
+            <color {expo_named_spec(color)}/>
+        </namedColor>
+    </resources>
+</document>
+"""
+
+
+def build_expo():
+    """Expo's SplashScreen.storyboard (react-native-ios-contract.md, "HelloRN reference"): the constructs outside the
+    milestone 2a subset, one at a time, then the two shapes Expo generates (docs/research/nib-encoding.md cites each)."""
+    I = IDS
+    V, IMG, LBL = I["view"], I["img"], I["lbl"]
+
+    def centered(**kw):
+        return modern(subviews=[image_view(I, own_constraints=[constraint(cid(1, I), "width", constant=100),
+                                                               constraint(cid(2, I), "height", constant=100)], fixed=False)],
+                      root_constraints=[constraint(cid(3, I), "centerX", first=IMG, second=V, second_attr="centerX"),
+                                        constraint(cid(4, I), "centerY", first=IMG, second=V, second_attr="centerY")],
+                      resources=[("image", "Logo")], **kw)
+
+    # storyboardIdentifier on the view controller: names the view-controller nib and its Info.plist entries
+    for suffix, ident in [("", "SplashScreenViewController"), ("-short", "Splash"), ("-punct", "Launch Screen.v2_x-y+z"),
+                          ("-shared", "UIViewController")]:
+        case(f"vc-storyboard-identifier{suffix}", centered(vc_attrs=f' storyboardIdentifier="{ident}"'), ALL)
+
+    # root view attributes Expo's template sets: userInteractionEnabled, insetsLayoutMarginsFromSafeArea, userLabel
+    case("root-userinteraction-no", centered(root_attrs=(' userInteractionEnabled="NO"', "", "")), ALL)
+    case("root-userinteraction-yes", centered(root_attrs=(' userInteractionEnabled="YES"', "", "")))
+    case("root-insets-no", centered(root_attrs=("", ' insetsLayoutMarginsFromSafeArea="NO"', "")), ALL)
+    case("root-insets-yes", centered(root_attrs=("", ' insetsLayoutMarginsFromSafeArea="YES"', "")))
+    pinned = modern(subviews=[label(I, text="Loading", own_constraints=[], fixed=False, frame=(20, 500, 353, 21))],
+                    root_constraints=[constraint(cid(1, I), "leading", first=LBL, second=I["safe"], second_attr="leading", constant=20),
+                                      constraint(cid(2, I), "centerY", first=LBL, second=V, second_attr="centerY")],
+                    root_attrs=("", ' insetsLayoutMarginsFromSafeArea="NO"', ""))
+    case("root-insets-no-safearea", pinned, ALL)
+    case("root-insets-no-legacy", document(safe_area=False, root_attrs=("", ' insetsLayoutMarginsFromSafeArea="NO"', "")))
+
+    # userLabel (Interface Builder's document-outline name) on every view kind
+    labelled = modern(root_attrs=("", "", ' userLabel="Container View"'), resources=[("image", "Logo")], subviews=[
+        image_view(I).replace(f'id="{IMG}">', f'id="{IMG}" userLabel="Logo Image">'),
+        label(I, frame=(175.5, 500, 42, 21)).replace(f'id="{LBL}">', f'id="{LBL}" userLabel="Caption">'),
+        plain_view(table_id("P", 1), (0, 0, 10, 10)).replace('">\n', '" userLabel="Spacer">\n', 1)])
+    case("view-userlabel-grid", labelled, ALL)
+
+    # lowercase true/false (expo-splash-screen writes them) for the three boolean attributes, on every view kind;
+    # each view is constrained, so translatesAutoresizingMaskIntoConstraints counts
+    variants = [' clipsSubviews="true"', ' clipsSubviews="false"', ' userInteractionEnabled="false"',
+                ' userInteractionEnabled="true"', ' translatesAutoresizingMaskIntoConstraints="false"',
+                ' translatesAutoresizingMaskIntoConstraints="true"']
+    subs = []
+    for k, attr in enumerate(variants):
+        own = lambda n: [constraint(table_id("W", n), "width", constant=10)]
+        tr = "translatesAutoresizingMaskIntoConstraints" in attr
+        iv = image_view({**I, "img": table_id("I", k)}, frame=(10 * k, 0, 10, 10), own_constraints=own(k), fixed=False)
+        iv = iv.replace(' clipsSubviews="YES" userInteractionEnabled="NO"', "")
+        iv = iv.replace(' translatesAutoresizingMaskIntoConstraints="NO"', attr if tr else ' translatesAutoresizingMaskIntoConstraints="NO"')
+        if not tr:
+            iv = iv.replace("<imageView", "<imageView" + attr, 1)
+        lb = label({**I, "lbl": table_id("L", k)}, frame=(10 * k, 100, 42, 21), own_constraints=own(10 + k), fixed=False)
+        lb = lb.replace(' userInteractionEnabled="NO"', "")
+        lb = lb.replace(' translatesAutoresizingMaskIntoConstraints="NO"', attr if tr else ' translatesAutoresizingMaskIntoConstraints="NO"')
+        if not tr:
+            lb = lb.replace("<label", "<label" + attr, 1)
+        pv = plain_view(table_id("V", k), (10 * k, 200, 10, 10), own_constraints=own(20 + k), fixed=False)
+        pv = pv.replace(' translatesAutoresizingMaskIntoConstraints="NO"', attr if tr else ' translatesAutoresizingMaskIntoConstraints="NO"')
+        if not tr:
+            pv = pv.replace("<view", "<view" + attr, 1)
+        subs += [iv, lb, pv]
+    case("bool-lowercase-grid", modern(subviews=subs, resources=[("image", "Logo")]), ALL)
+
+    # accessibility traits: one image view per trait, then no trait, image="NO", Expo's image + notEnabled, every
+    # trait (an int32), every trait but header (int16 32767), header + image, and a repeated value (shared NSNumber)
+    yes = lambda names: "".join(f' {t}="YES"' for t in names)
+    grid = [yes([t]) for t in TRAITS] + ["", ' image="NO"', yes(["image", "notEnabled"]), yes(TRAITS),
+                                         yes(TRAITS[:-1]), yes(["image", "header"]), yes(["image"])]
+    case("acc-traits-grid", modern(subviews=[acc_image(table_id("A", i), t, (0, 10 * i, 10, 10)) for i, t in enumerate(grid)],
+                                   resources=[("image", "Logo")]), ALL)
+    # configurations on every view kind and the root, in objects-list (breadth-first) order: root, I3, A, I2, then
+    # A's subviews I1 and L (ids deliberately unsorted)
+    nested = acc_view("Aaa-vw-001", yes(["header"]), (0, 100, 200, 200), kids=[
+        acc_image("zI1-im-001", yes(["link"]), (0, 0, 10, 10)), acc_label("bL1-lb-001", yes(["staticText", "button"]), (0, 50, 42, 21))])
+    case("acc-kinds-order", modern(root_extra=accessibility(yes(["summaryElement"])), resources=[("image", "Logo")], subviews=[
+        acc_image("mI3-im-003", yes(["selected"]), (0, 0, 10, 10)), nested, acc_image("Ab2-im-002", yes(["playsSound"]), (0, 400, 10, 10))]), ALL)
+    # the traits NSNumber is shared by value with the fonts' numbers (17 = button + playsSound = 17 pt; 1 = button =
+    # the italic trait)
+    case("acc-number-sharing", modern(resources=[("image", "Logo")], subviews=[
+        label({**I, "lbl": table_id("L", 1)}, frame=(0, 0, 42, 21)),
+        label({**I, "lbl": table_id("L", 2)}, frame=(0, 30, 42, 21), font='type="italicSystem" pointSize="12"'),
+        acc_image(table_id("A", 1), yes(["button", "playsSound"]), (0, 60, 10, 10)),
+        acc_image(table_id("A", 2), yes(["button"]), (0, 80, 10, 10))]), ALL)
+
+    # named-color resources in expo-splash-screen's spelling (toPrecision(15), alpha "1.000")
+    hexes = ["#000000", "#FFFFFF", "#3355CC", "#010203", "#808080", "#FEFDFC", "#1A2B3C"]
+    names = [f"Expo{i}" for i in range(len(hexes))]
+    text = modern(background=named_color(names[0]), resources=[("namedColor", nm) for nm in names],
+                  subviews=[plain_view(table_id("T", i), (0, 10 * i, 10, 10), named_color(nm)) for i, nm in enumerate(names[1:])])
+    for nm, hx in zip(names, hexes):
+        text = text.replace(f'<namedColor name="{nm}">\n            <color {BRAND}/>', f'<namedColor name="{nm}">\n            <color {expo_named_spec(hx)}/>', 1)
+    assert BRAND not in text
+    case("color-named-expo-spelling", text, ALL)
+
+    # Expo's template names an image ("SplashScreen") that no <resources><image> lists (only "SplashScreenLogo")
+    case("image-missing-other-resource", modern(subviews=[image_view(I, image="SplashScreen")], resources=[("image", "Logo")]), ALL)
+
+    # the storyboard expo-splash-screen writes for a configured splash screen, and its enableFullScreenImage form
+    # (neutral colours; real-expo-splash-template is the unconfigured template, hand-maintained)
+    case("real-expo-splash-configured", expo_splash("#3355CC"), ALL)
+    case("real-expo-splash-fullscreen", expo_splash("#FFFFFF", mode="scaleAspectFill", full_screen=True), ALL)
 
 
 RICH_FEATURES = ["tint", "alpha", "lines", "enabled", "baseline", "linebreak", "shrink", "comp", "mult", "prio", "symbolic",

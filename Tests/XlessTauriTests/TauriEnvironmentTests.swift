@@ -109,4 +109,17 @@ func helloTauri(bundleID: String = "com.example.hellotauri", _ overlayExtra: Str
 
             """)
     }
+
+    /// Ruling R10: with the image's app Swift toolchain, its clang compiles the iOS C code and drives the cdylib link.
+    @Test func theAppSwiftToolchainsClangCompilesAndLinks() throws {
+        let sdk = try fakeSDK(), (overlay, resolved) = try helloTauri()
+        let swift = SwiftToolchain(version: "6.2.3", root: "/opt/xless/toolchains/swift-6.2.3")
+        let env = try TauriEnvironment.cargo(resolved: resolved, overlay: overlay, sdk: sdk, workRoot: URL(fileURLWithPath: "/W"),
+                                             host: "aarch64-unknown-linux-gnu", swift: swift)
+        #expect(env["CC_aarch64_apple_ios"] == "/opt/xless/toolchains/swift-6.2.3/usr/bin/clang")
+        #expect(env["CXX_aarch64_apple_ios"] == "/opt/xless/toolchains/swift-6.2.3/usr/bin/clang++")
+        let work = FileManager.default.temporaryDirectory.appendingPathComponent("w-\(UUID().uuidString)", isDirectory: true)
+        let text = try String(contentsOf: try TauriEnvironment.writeLinkerWrapper(minOS: "16.0", sdk: sdk, workRoot: work, swift: swift), encoding: .utf8)
+        #expect(text.contains("exec '/opt/xless/toolchains/swift-6.2.3/usr/bin/clang' -target arm64-apple-ios16.0 "))
+    }
 }

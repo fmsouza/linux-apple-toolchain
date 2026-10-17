@@ -1,0 +1,23 @@
+{
+  "entries": [
+    {
+      "name": ".VolumeIcon.icns",
+      "type": "file"
+    },
+    {
+      "name": "Applications",
+      "target": "/Applications",
+      "type": "symlink"
+    },
+    {
+      "name": "HelloTauri.app",
+      "type": "dir"
+    }
+  ],
+  "fileName": "HelloTauri_1.0.0_universal.dmg",
+  "filesystem": "HFS+",
+  "format": "UDZO",
+  "partitionScheme": "GUID",
+  "rootFinderAttributes": "avbstClinmedz",
+  "volumeName": "HelloTauri"
+}
