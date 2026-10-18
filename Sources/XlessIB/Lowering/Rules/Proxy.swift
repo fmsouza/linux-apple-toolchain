@@ -21,11 +21,12 @@ extension ArchiveBuilder {
         return c
     }
 
-    /// The root `NSObject` (#0): the three lists, four keys sharing the empty `NSArray`, and `IBUINibLNEVersionKey` = 1.
+    /// The root `NSObject` (#0): the three lists, four keys sharing the empty `NSArray`, and `IBUINibLNEVersionKey` = 1
+    /// (unless `lneVersionKey` is false: Xcode 26.2's view nibs other than plain views, `XcodeToolsProfile.NibEncoding`).
     /// With accessibility configurations, `UINibAccessibilityConfigurationsKey` is an `NSArray` of them instead
     /// (`acc-kinds-order`; the other three keys still share the empty array, first referenced by the visible windows).
     func nibRoot(topLevel: [ObjectRef], objects list: [ObjectRef], connections: [ObjectRef],
-                 accessibilityConfigurations: [ObjectRef] = []) -> ObjectRef {
+                 accessibilityConfigurations: [ObjectRef] = [], lneVersionKey: Bool = true) -> ObjectRef {
         let root = object("NSObject")
         set(root, "UINibTopLevelObjectsKey", array(topLevel))
         set(root, "UINibObjectsKey", array(list))
@@ -38,7 +39,7 @@ extension ArchiveBuilder {
                 set(root, key, empty)
             }
         }
-        set(root, "IBUINibLNEVersionKey", .int8(1))
+        if lneVersionKey { set(root, "IBUINibLNEVersionKey", .int8(1)) }
         return root
     }
 }

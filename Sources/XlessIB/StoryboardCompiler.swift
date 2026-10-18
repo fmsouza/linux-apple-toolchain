@@ -45,23 +45,24 @@ public struct IBCompileResult: Equatable, Sendable {
     public var warnings: [String]
 }
 
-/// Compiles a launch-screen storyboard into the files of a `.storyboardc`, byte-identical to ibtool 27.0 (27A266a).
-/// Rules: docs/research/nib-encoding.md; one file per class in `Lowering/Rules`.
+/// Compiles a launch-screen storyboard into the files of a `.storyboardc`, byte-identical to the ibtool of `profile`'s
+/// Xcode (27A266a, 17C52: docs/research/xcode-tools-by-version.md). Rules: docs/research/nib-encoding.md; one file per
+/// class in `Lowering/Rules`.
 public enum StoryboardCompiler {
-    public static func compile(url: URL, options: IBCompileOptions) throws -> IBCompileResult {
-        try compile(StoryboardParser.parse(url: url), options: options)
+    public static func compile(url: URL, options: IBCompileOptions, profile: XcodeToolsProfile) throws -> IBCompileResult {
+        try compile(StoryboardParser.parse(url: url), options: options, profile: profile)
     }
 
-    public static func compile(_ doc: IBDocument, options: IBCompileOptions) throws -> IBCompileResult {
+    public static func compile(_ doc: IBDocument, options: IBCompileOptions, profile: XcodeToolsProfile) throws -> IBCompileResult {
         try validate(options)
-        try DocumentRule.check(doc)
+        try DocumentRule.check(doc, profile: profile)
         let scene = try SceneRule.initialScene(doc)
         let vc = scene.viewController
         let vcID = vc.id, viewID = vc.view.id
         try SceneRule.checkIdentifier(vcID, doc: doc, path: vc.rawPath)
         try SceneRule.checkIdentifier(viewID, doc: doc, path: vc.view.rawPath)
 
-        let lowering = ViewNibLowering(doc: doc, options: options)
+        let lowering = ViewNibLowering(doc: doc, options: options, profile: profile)
         let viewNib = try lowering.lower(vc.view)
         let identifier = try ViewControllerRule.storyboardIdentifier(vc, doc: doc)
         let vcNib = try ViewControllerRule.nib(vcID: vcID, viewID: viewID, storyboardIdentifier: identifier)

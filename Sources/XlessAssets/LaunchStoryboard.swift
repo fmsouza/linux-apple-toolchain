@@ -7,7 +7,7 @@ import XlessIB
 enum LaunchStoryboard {
     /// Compiles `storyboard` into `<app>/<name>.storyboardc` (the bundle root, where Xcode links it), sets
     /// `UILaunchStoryboardName` to `<name>` and removes `UILaunchScreen`. Every failure is an `[assets]` error.
-    static func compile(_ storyboard: URL, into app: URL, minimumOS: String) throws {
+    static func compile(_ storyboard: URL, into app: URL, minimumOS: String, profile: XcodeToolsProfile) throws {
         let name = storyboard.deletingPathExtension().lastPathComponent
         guard FileManager.default.fileExists(atPath: storyboard.path) else {
             throw XlessError(.assets, "launch storyboard \(storyboard.path) does not exist", fix: "check `launchStoryboard` in xless.yml (relative to the project)")
@@ -17,7 +17,7 @@ enum LaunchStoryboard {
         let options = IBCompileOptions(targetDevices: try targetDevices(info), minimumDeploymentTarget: minimumOS)
 
         let result: IBCompileResult
-        do { result = try StoryboardCompiler.compile(url: storyboard, options: options) } catch {
+        do { result = try StoryboardCompiler.compile(url: storyboard, options: options, profile: profile) } catch {
             throw assetsError(error, storyboard: storyboard)
         }
         let out = app.appendingPathComponent("\(name).storyboardc", isDirectory: true)

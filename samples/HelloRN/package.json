@@ -27,6 +27,9 @@
       "expo-modules-autolinking": "57.0.9",
       "expo-modules-core": "57.0.10",
       "expo-modules-jsi": "57.0.4"
+    },
+    "patchedDependencies": {
+      "expo-modules-jsi@57.0.4": "patches/expo-modules-jsi@57.0.4.patch"
     }
   }
 }

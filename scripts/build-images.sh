@@ -64,6 +64,9 @@ default=0; [[ "$version" == "$XCODE_VERSION" && "$build" == "$XCODE_BUILD" ]] &&
 # Ruling R10: the app Swift toolchain (make variables for Dockerfile.sdk); refused before anything is built.
 swift_out="$("$repo/scripts/xcode-swift.sh" "$xcode" "$build")" || exit 2
 swift_vars=($swift_out)
+# The asset and storyboard tools: an Xcode whose actool/ibtool/copypng formats are not measured (no XcodeToolsProfile entry)
+# is refused, as the image's shims would refuse it.
+"$repo/scripts/xcode-tools.sh" "$build" || exit 2
 # The TARGET_OS_ macros of the Xcode's own clang, which docker/Dockerfile.sdk checks the image's clang against.
 [[ -f "$repo/docker/toolchain/target-os/$build.txt" ]] \
   || die "docker/toolchain/target-os/$build.txt is missing: measure Xcode $version ($build)'s clang with scripts/target-os-macros.sh '$xcode' > docker/toolchain/target-os/$build.txt"

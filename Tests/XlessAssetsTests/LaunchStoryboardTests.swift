@@ -7,7 +7,8 @@ private let ibCorpus = URL(fileURLWithPath: #filePath).deletingLastPathComponent
 
 /// Runs the iOS `assets` stage on a fake app whose Info.plist has `UIDeviceFamily` = `family` (absent when nil) and a
 /// `UILaunchScreen` dictionary, with `launchStoryboard` pointing at `storyboard`.
-private func runLaunchStoryboard(_ storyboard: URL, family: [Int]?, minimumOS: String) async throws -> URL {
+private func runLaunchStoryboard(_ storyboard: URL, family: [Int]?, minimumOS: String,
+                                 profile: @escaping () throws -> XcodeToolsProfile = testProfile()) async throws -> URL {
     let app = FileManager.default.temporaryDirectory.appendingPathComponent("in-\(UUID())/X.app")
     try FileManager.default.createDirectory(at: app, withIntermediateDirectories: true)
     var info: [String: Any] = ["CFBundleExecutable": "X", "UILaunchScreen": [String: Any]()]
@@ -24,7 +25,7 @@ private func runLaunchStoryboard(_ storyboard: URL, family: [Int]?, minimumOS: S
     launchStoryboard: \(storyboard.path)
     """
     let out = FileManager.default.temporaryDirectory.appendingPathComponent("out-\(UUID())")
-    return try await AssetsStage.run(input: app, outputDir: out, platform: .ios, config: ProjectConfig.parse(yaml: yaml), project: URL(fileURLWithPath: "/"))
+    return try await AssetsStage.run(input: app, outputDir: out, platform: .ios, config: ProjectConfig.parse(yaml: yaml), project: URL(fileURLWithPath: "/"), profile: profile)
 }
 
 private func files(in dir: URL) throws -> [String: Data] {
@@ -37,7 +38,7 @@ func launchStoryboardCompiledIntoBundleRoot(family: [Int], minimumOS: String, fl
     let app = try await runLaunchStoryboard(ibCorpus.appendingPathComponent("real-logo-plus-label.storyboard"), family: family, minimumOS: minimumOS)
     // docs/research/ib-invocation.md: the linked .storyboardc lands at the bundle root.
     let compiled = app.appendingPathComponent("real-logo-plus-label.storyboardc")
-    let golden = ibCorpus.appendingPathComponent("golden/real-logo-plus-label/\(flagset).storyboardc")
+    let golden = ibCorpus.appendingPathComponent("golden/27A266a/real-logo-plus-label/\(flagset).storyboardc")
     let got = try files(in: compiled), want = try files(in: golden)
     #expect(got.keys.sorted() == want.keys.sorted())
     for (name, data) in want { #expect(got[name] == data, "\(name) differs from golden \(flagset)") }
@@ -52,7 +53,7 @@ func launchStoryboardCompiledIntoBundleRoot(family: [Int], minimumOS: String, fl
 @Test func launchStoryboardWithoutDeviceFamilyUsesIPhoneAndIPad() async throws {
     // xtool's Info.plist may lack UIDeviceFamily; the iOS default (and the app icon code's) is [1, 2].
     let app = try await runLaunchStoryboard(ibCorpus.appendingPathComponent("real-logo-plus-label.storyboard"), family: nil, minimumOS: "17.0")
-    let golden = ibCorpus.appendingPathComponent("golden/real-logo-plus-label/universal-17.storyboardc")
+    let golden = ibCorpus.appendingPathComponent("golden/27A266a/real-logo-plus-label/universal-17.storyboardc")
     #expect(try files(in: app.appendingPathComponent("real-logo-plus-label.storyboardc")) == files(in: golden))
 }
 
@@ -108,7 +109,7 @@ func launchStoryboardCompiledIntoBundleRoot(family: [Int], minimumOS: String, fl
     try FileManager.default.createDirectory(at: app, withIntermediateDirectories: true)
     try Plist.write(["CFBundleExecutable": "HelloShipLaunch", "UIDeviceFamily": [1, 2]], to: app.appendingPathComponent("Info.plist"), stage: .assets)
     let out = FileManager.default.temporaryDirectory.appendingPathComponent("out-\(UUID())")
-    let result = try await AssetsStage.run(input: app, outputDir: out, platform: .ios, config: config, project: project)
+    let result = try await AssetsStage.run(input: app, outputDir: out, platform: .ios, config: config, project: project, profile: testProfile())
     let names = try FileManager.default.contentsOfDirectory(atPath: result.appendingPathComponent("LaunchScreen.storyboardc").path)
     #expect(names.contains("Info.plist") && names.filter { $0.hasSuffix(".nib") }.count == 2)
     #expect(try Plist.read(result.appendingPathComponent("Info.plist"), stage: .assets)["UILaunchStoryboardName"] as? String == "LaunchScreen")
@@ -124,4 +125,26 @@ func launchStoryboardCompiledIntoBundleRoot(family: [Int], minimumOS: String, fl
     let other = LaunchStoryboard.assetsError(CocoaError(.fileReadCorruptFile), storyboard: url)
     #expect(other.stage == .assets)
     #expect(other.cause.hasPrefix("launch storyboard /p/Launch.storyboard: "), "\(other.cause)")
+}
+
+/// The assets stage writes the image's Xcode's formats: Xcode 26.2's storyboard and car under a 17C52 image.
+@Test func assetsStageFollowsTheImagesXcode() async throws {
+    let app = try await runLaunchStoryboard(ibCorpus.appendingPathComponent("real-logo-plus-label.storyboard"), family: [1, 2], minimumOS: "16.0",
+                                            profile: testProfile("17C52"))
+    let golden = ibCorpus.appendingPathComponent("golden/17C52/real-logo-plus-label/universal-16.storyboardc")
+    #expect(try files(in: app.appendingPathComponent("real-logo-plus-label.storyboardc")) == files(in: golden))
+    let header = try #require(CARHeaderFields(car: Data(contentsOf: app.appendingPathComponent("Assets.car"))))
+    #expect(header.coreUIVersion == 973)
+    #expect(header.versionString == "Xcode 26.2 (17C52) via AssetCatalogSimulatorAgent")
+}
+
+/// An image whose Xcode has no tools profile: the iOS assets stage refuses (exit 13), never writes 27.0's formats.
+@Test func assetsStageRefusesAnUnprofiledImage() async throws {
+    let e = try await #require(throws: XlessError.self) {
+        _ = try await runLaunchStoryboard(ibCorpus.appendingPathComponent("real-logo-plus-label.storyboard"), family: [1, 2], minimumOS: "16.0",
+                                          profile: testProfile("27A9275"))
+    }
+    #expect(e.stage == .assets)
+    #expect(e.cause == "this image's Xcode build 27A9275 has no measured asset/storyboard tools profile")
+    #expect(e.fix.contains("make images"))
 }

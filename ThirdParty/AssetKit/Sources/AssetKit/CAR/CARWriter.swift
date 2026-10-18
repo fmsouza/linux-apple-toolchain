@@ -11,6 +11,7 @@ import Foundation
 struct CARWriter: Sendable {
     var deploymentTarget: String
     var renditions: [Rendition]
+    var header: CARHeaderValues = .default
 
     func write() throws -> Data {
         let layout = CARLayout(renditions: renditions)
@@ -21,7 +22,7 @@ struct CARWriter: Sendable {
         // KEYFORMAT, EXTENDED_METADATA, BITMAPKEYS. Reordering or omitting
         // a `setVariable` here breaks iOS lookups silently.
 
-        let headerBlockID = bom.addBlock(CARHeaderBlock.data(renditionCount: UInt32(renditions.count)))
+        let headerBlockID = bom.addBlock(CARHeaderBlock.data(renditionCount: UInt32(renditions.count), values: header))
         bom.setVariable("CARHEADER", blockID: headerBlockID)
 
         let renditionEntries: [BOMTree.Entry] = renditions.map { rendition in
@@ -51,7 +52,7 @@ struct CARWriter: Sendable {
         let kfmtBlockID = bom.addBlock(KeyFormatBlock.data())
         bom.setVariable("KEYFORMAT", blockID: kfmtBlockID)
 
-        let extendedMetadataBlockID = bom.addBlock(ExtendedMetadata.data(deploymentTarget: deploymentTarget))
+        let extendedMetadataBlockID = bom.addBlock(ExtendedMetadata.data(deploymentTarget: deploymentTarget, authoringTool: header.authoringTool))
         bom.setVariable("EXTENDED_METADATA", blockID: extendedMetadataBlockID)
 
         if !layout.assets.isEmpty {

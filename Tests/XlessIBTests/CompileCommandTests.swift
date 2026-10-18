@@ -31,7 +31,7 @@ private func variant(_ replace: [(String, String)], in dir: URL) throws -> URL {
     let dir = try scratch(); defer { try? FileManager.default.removeItem(at: dir) }
     let c = CorpusCase(name: "real-logo-plus-label")
     let out = dir.appendingPathComponent("o.storyboardc")
-    let r = try StoryboardCompileRunner.run(input: c.storyboard, out: out, options: .flagset(named: "universal-16", root: corpusRoot), force: false)
+    let r = try StoryboardCompileRunner.run(input: c.storyboard, out: out, options: .flagset(named: "universal-16", root: corpusRoot), profile: .xcode27A266a, force: false)
     #expect(r.warnings.isEmpty)
     #expect(try read(out) == c.goldenFiles(flagset: "universal-16"))
     #expect(!FileManager.default.fileExists(atPath: out.path + ".partial"))
@@ -42,7 +42,7 @@ private func variant(_ replace: [(String, String)], in dir: URL) throws -> URL {
     let input = try variant([("<label ", #"<button id="Bt1-xT-9pQ"/><label "#)], in: dir)
     let out = dir.appendingPathComponent("o.storyboardc")
     let e = try #require(throws: XlessError.self) {
-        try StoryboardCompileRunner.run(input: input, out: out, options: .flagset(named: "universal-16", root: corpusRoot), force: false)
+        try StoryboardCompileRunner.run(input: input, out: out, options: .flagset(named: "universal-16", root: corpusRoot), profile: .xcode27A266a, force: false)
     }
     #expect(e.stage == .ib)
     #expect(e.stage.exitCode == 18)
@@ -60,13 +60,13 @@ private func variant(_ replace: [(String, String)], in dir: URL) throws -> URL {
     try FileManager.default.createDirectory(at: out, withIntermediateDirectories: true)
     try Data("old".utf8).write(to: out.appendingPathComponent("stale"))
 
-    let e = try #require(throws: XlessError.self) { try StoryboardCompileRunner.run(input: c.storyboard, out: out, options: opts, force: false) }
+    let e = try #require(throws: XlessError.self) { try StoryboardCompileRunner.run(input: c.storyboard, out: out, options: opts, profile: .xcode27A266a, force: false) }
     #expect(e.stage == .ib)
     #expect(e.cause.contains("already exists"))
     #expect(e.fix.contains("--force"))
     #expect(try read(out).keys.sorted() == ["stale"])
 
-    _ = try StoryboardCompileRunner.run(input: c.storyboard, out: out, options: opts, force: true)
+    _ = try StoryboardCompileRunner.run(input: c.storyboard, out: out, options: opts, profile: .xcode27A266a, force: true)
     #expect(try read(out) == c.goldenFiles(flagset: "universal-16"))
 }
 
@@ -75,21 +75,21 @@ private func variant(_ replace: [(String, String)], in dir: URL) throws -> URL {
     let input = try variant([(#"toolsVersion="23727""#, #"toolsVersion="25099""#)], in: dir)
     let out = dir.appendingPathComponent("o.storyboardc")
     let e = try #require(throws: XlessError.self) {
-        try StoryboardCompileRunner.run(input: input, out: out, options: .flagset(named: "universal-16", root: corpusRoot), force: false)
+        try StoryboardCompileRunner.run(input: input, out: out, options: .flagset(named: "universal-16", root: corpusRoot), profile: .xcode27A266a, force: false)
     }
     #expect(e.stage == .ib)
     #expect(e.description.hasPrefix("[ib] storyboard was saved by a newer Xcode (toolsVersion 25099) than xless supports (25098)"))
     #expect(!FileManager.default.fileExists(atPath: out.path))
 
     let ok = try variant([(#"toolsVersion="23727""#, #"toolsVersion="25098""#)], in: dir)
-    _ = try StoryboardCompileRunner.run(input: ok, out: out, options: .flagset(named: "universal-16", root: corpusRoot), force: false)
+    _ = try StoryboardCompileRunner.run(input: ok, out: out, options: .flagset(named: "universal-16", root: corpusRoot), profile: .xcode27A266a, force: false)
 }
 
 @Test func compilerItselfRefusesNewerToolsVersion() throws {
     let dir = try scratch(); defer { try? FileManager.default.removeItem(at: dir) }
     let input = try variant([(#"toolsVersion="23727""#, #"toolsVersion="25099""#)], in: dir)
     let e = try #require(throws: XlessError.self) {
-        try StoryboardCompiler.compile(url: input, options: .flagset(named: "universal-16", root: corpusRoot))
+        try StoryboardCompiler.compile(url: input, options: .flagset(named: "universal-16", root: corpusRoot), profile: .xcode27A266a)
     }
     #expect(e.description.hasPrefix("[ib] storyboard was saved by a newer Xcode (toolsVersion 25099) than xless supports (25098)"))
 }
@@ -110,7 +110,7 @@ private func variant(_ replace: [(String, String)], in dir: URL) throws -> URL {
     let c = CorpusCase(name: "real-logo-plus-label")
     let out = dir.appendingPathComponent("nope/o.storyboardc")
     let e = try #require(throws: XlessError.self) {
-        try StoryboardCompileRunner.run(input: c.storyboard, out: out, options: .flagset(named: "universal-16", root: corpusRoot), force: false)
+        try StoryboardCompileRunner.run(input: c.storyboard, out: out, options: .flagset(named: "universal-16", root: corpusRoot), profile: .xcode27A266a, force: false)
     }
     #expect(e.stage == .ib)
     #expect(e.stage.exitCode == 18)
@@ -122,10 +122,10 @@ private func variant(_ replace: [(String, String)], in dir: URL) throws -> URL {
     let c = CorpusCase(name: "real-logo-plus-label")
     let opts = try IBCompileOptions.flagset(named: "universal-16", root: corpusRoot)
     let out = dir.appendingPathComponent("o.storyboardc")
-    try StoryboardCompileRunner.run(input: c.storyboard, out: out, options: opts, force: false)
+    try StoryboardCompileRunner.run(input: c.storyboard, out: out, options: opts, profile: .xcode27A266a, force: false)
     // a file name with a missing subdirectory makes the write fail after the staging directory exists
     let e = try #require(throws: XlessError.self) {
-        try StoryboardCompileRunner.run(input: c.storyboard, out: out, options: opts, force: true,
+        try StoryboardCompileRunner.run(input: c.storyboard, out: out, options: opts, profile: .xcode27A266a, force: true,
                                         compile: { _, _ in IBCompileResult(files: ["Info.plist": Data("x".utf8), "missing/x.nib": Data()], warnings: []) })
     }
     #expect(e.stage == .ib)
@@ -142,7 +142,7 @@ private func variant(_ replace: [(String, String)], in dir: URL) throws -> URL {
     let notStoryboardc = dir.appendingPathComponent("docs", isDirectory: true)
     try FileManager.default.createDirectory(at: notStoryboardc, withIntermediateDirectories: true)
     for out in [file, notStoryboardc] {
-        let e = try #require(throws: XlessError.self) { try StoryboardCompileRunner.run(input: c.storyboard, out: out, options: opts, force: true) }
+        let e = try #require(throws: XlessError.self) { try StoryboardCompileRunner.run(input: c.storyboard, out: out, options: opts, profile: .xcode27A266a, force: true) }
         #expect(e.cause.contains("not a .storyboardc directory"))
     }
     #expect(try Data(contentsOf: file) == Data("precious".utf8))
@@ -155,7 +155,7 @@ private func variant(_ replace: [(String, String)], in dir: URL) throws -> URL {
     var seen: [String] = []
     // The real compiler currently emits no warnings (none of the corpus cases produce any), so inject some.
     try StoryboardCompileRunner.run(input: c.storyboard, out: dir.appendingPathComponent("o.storyboardc"),
-                                    options: .flagset(named: "universal-16", root: corpusRoot), force: false,
+                                    options: .flagset(named: "universal-16", root: corpusRoot), profile: .xcode27A266a, force: false,
                                     compile: { _, _ in IBCompileResult(files: ["Info.plist": Data()], warnings: ["warning: one", "warning: two"]) },
                                     warn: { seen.append($0) })
     #expect(seen == ["warning: one", "warning: two"])
@@ -167,7 +167,7 @@ private func variant(_ replace: [(String, String)], in dir: URL) throws -> URL {
     let out = dir.appendingPathComponent("no/such/dir/L.storyboardc")
     let e = try #require(throws: XlessError.self) {
         try StoryboardCompileRunner.run(input: CorpusCase(name: "real-logo-plus-label").storyboard, out: out,
-                                        options: .flagset(named: "universal-16", root: corpusRoot), force: false)
+                                        options: .flagset(named: "universal-16", root: corpusRoot), profile: .xcode27A266a, force: false)
     }
     #expect(e.stage == .ib)
     #expect(e.cause == "cannot write \(out.path): the directory \(out.deletingLastPathComponent().path) does not exist", "\(e.cause)")

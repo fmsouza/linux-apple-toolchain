@@ -65,7 +65,7 @@ func compiledIOSCar() async throws -> Data {
     try Plist.write(["CFBundleExecutable": "X", "UIDeviceFamily": [1, 2]], to: app.appendingPathComponent("Info.plist"), stage: .assets)
     let yaml = "bundleID: a.b\nteamID: ABCDE12345\nversion: \"1\"\nbuild: 1\nplatforms:\n  ios: { minimumOS: \"17.0\", product: X }\nassets: \(try helloShipLikeCatalog().path)\n"
     let out = FileManager.default.temporaryDirectory.appendingPathComponent("out-\(UUID())")
-    let r = try await AssetsStage.run(input: app, outputDir: out, platform: .ios, config: ProjectConfig.parse(yaml: yaml), project: URL(fileURLWithPath: "/"))
+    let r = try await AssetsStage.run(input: app, outputDir: out, platform: .ios, config: ProjectConfig.parse(yaml: yaml), project: URL(fileURLWithPath: "/"), profile: testProfile())
     return try Data(contentsOf: r.appendingPathComponent("Assets.car"))
 }
 

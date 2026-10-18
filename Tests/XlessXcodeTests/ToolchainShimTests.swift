@@ -240,3 +240,61 @@ private func bundles(app: [String: String], ext: [String: String]) throws -> (ap
     }
     #expect(try EmbeddedBinaryValidation.run([b.appex, "-signing-cert", "", "-info-plist-path", b.appPlist]).exitCode == 0)
 }
+
+// MARK: strip: the indirect symbol table
+
+/// A thin arm64 dylib with a symbol table (name, value) and an indirect symbol table of the given entries.
+private func imageWithSymbols(_ symbols: [(String, UInt64)], indirect: [UInt32]) -> Data {
+    var d = Data()
+    func u32(_ v: UInt32) { withUnsafeBytes(of: v.littleEndian) { d.append(contentsOf: $0) } }
+    func u64(_ v: UInt64) { withUnsafeBytes(of: v.littleEndian) { d.append(contentsOf: $0) } }
+    var strings = Data("\0".utf8), strx: [UInt32] = []
+    for (name, _) in symbols { strx.append(UInt32(strings.count)); strings.append(Data((name + "\0").utf8)) }
+    let symoff = 0x200, indoff = symoff + 16 * symbols.count, stroff = indoff + 4 * indirect.count
+    u32(0xfeedfacf); u32(0x0100000c); u32(0); u32(6); u32(2); u32(24 + 80); u32(0); u32(0)
+    u32(0x2); u32(24); u32(UInt32(symoff)); u32(UInt32(symbols.count)); u32(UInt32(stroff)); u32(UInt32(strings.count))
+    u32(0xb); u32(80)
+    for v in [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, UInt32(indoff), UInt32(indirect.count), 0, 0, 0, 0] as [UInt32] { u32(v) }
+    d.append(Data(count: symoff - d.count))
+    for (i, s) in symbols.enumerated() { u32(strx[i]); d.append(contentsOf: [0x0e, 1, 0, 0]); u64(s.1) }
+    for e in indirect { u32(e) }
+    return d + strings
+}
+
+private func indirectEntries(_ d: Data, count: Int) -> [UInt32] {
+    func u32(_ o: Int) -> UInt32 { (0..<4).reduce(0) { $0 | UInt32(d[d.startIndex + o + $1]) << (8 * UInt32($1)) } }
+    let off = Int(u32(32 + 24 + 56))
+    return (0..<count).map { u32(off + 4 * $0) }
+}
+
+/// `llvm-strip -S` drops local symbols and writes an arbitrary value (0 in an arm64 build, 0x5555 in an amd64 one) for
+/// each indirect symbol table entry that named one; every such entry becomes INDIRECT_SYMBOL_LOCAL, whatever it held.
+@Test(arguments: [UInt32(0), 0x5555, 0x7777_7777]) func strippedIndirectEntriesOfDroppedSymbolsBecomeLocal(garbage: UInt32) throws {
+    let original = imageWithSymbols([("_keep", 0x10), ("GCC_except_table13", 0x20), ("_other", 0x30), ("ltmp1", 0x40)],
+                                    indirect: [1, 0, 0x8000_0000, 3, 2, 0x4000_0000])
+    // The strip kept _keep and _other (now indices 0 and 1); the entries for the other two hold garbage.
+    let stripped = imageWithSymbols([("_keep", 0x10), ("_other", 0x30)], indirect: [garbage, 0, 0x8000_0000, garbage, 1, 0x4000_0000])
+    let out = try #require(try MachO.normalizeStrippedIndirectSymbols(original: original, stripped: stripped))
+    #expect(indirectEntries(out, count: 6) == [0x8000_0000, 0, 0x8000_0000, 0x8000_0000, 1, 0x4000_0000])
+}
+
+@Test func theNormalizedImageDoesNotDependOnTheGarbage() throws {
+    let original = imageWithSymbols([("_keep", 0x10), ("L1", 0x20)], indirect: [1, 0])
+    let arm = imageWithSymbols([("_keep", 0x10)], indirect: [0, 0])
+    let amd = imageWithSymbols([("_keep", 0x10)], indirect: [0x5555, 0])
+    #expect(try MachO.normalizeStrippedIndirectSymbols(original: original, stripped: arm)
+            == MachO.normalizeStrippedIndirectSymbols(original: original, stripped: amd))
+}
+
+@Test func indirectEntriesAreLeftAloneWhenNoSymbolWasDropped() throws {
+    let original = imageWithSymbols([("_a", 1), ("_b", 2)], indirect: [1, 0x8000_0000, 0])
+    #expect(try MachO.normalizeStrippedIndirectSymbols(original: original, stripped: original) == nil)
+    // Not an image: nothing to do.
+    #expect(try MachO.normalizeStrippedIndirectSymbols(original: Data("!<arch>\n".utf8), stripped: Data("!<arch>\n".utf8)) == nil)
+}
+
+@Test func anIndirectTableOutsideItsImageIsRefused() throws {
+    var bad = imageWithSymbols([("_a", 1)], indirect: [0])
+    withUnsafeBytes(of: UInt32(1_000_000).littleEndian) { bad.replaceSubrange((32 + 24 + 60)..<(32 + 24 + 64), with: $0) }   // nindirectsyms
+    #expect(throws: MachOError.self) { try MachO.normalizeStrippedIndirectSymbols(original: bad, stripped: bad) }
+}

@@ -128,11 +128,13 @@ enum DocumentRule {
     /// Optional attributes: absent, or this value.
     static let optional: [String: String] = ["launchScreen": "YES", "useTraitCollections": "YES", "useSafeAreas": "YES"]
 
-    /// The newest `toolsVersion` xless accepts: the one Xcode 27.0 (ibtool bundle-version 25098) writes
-    /// (docs/research/ib-invocation.md). A newer storyboard may use constructs the rules do not know.
+    /// The newest `toolsVersion` xless accepts, whatever the image's Xcode: the one Xcode 27.0 (ibtool bundle-version
+    /// 25098) writes (docs/research/ib-invocation.md). A guard against document formats the rules have never seen, not
+    /// an ibtool limit: ibtool itself does not check `toolsVersion` (docs/research/xcode-tools-by-version.md).
     static let maxToolsVersion = "25098"
 
-    static func check(_ doc: IBDocument) throws {
+    static func check(_ doc: IBDocument, profile: XcodeToolsProfile) throws {
+        try checkCapabilities(doc, profile: profile)
         let a = doc.attributes, line = doc.raw.line
         let known = Set(required.keys).union(optional.keys).union(["toolsVersion", "initialViewController"])
         try LoweringError.checkAttributes(a, known: known, element: "document", line: line)
@@ -151,6 +153,26 @@ enum DocumentRule {
         if v > DottedVersion(maxToolsVersion)! {
             throw XlessError(.ib, "storyboard was saved by a newer Xcode (toolsVersion \(tools)) than xless supports (\(maxToolsVersion))",
                              fix: "re-save the storyboard with Xcode 27.0 or older, or update xless")
+        }
+    }
+
+    /// ibtool refuses a document with a capability newer than itself: `<capability … minToolsVersion="X"/>` with X above
+    /// its `short-bundle-version` gives "This document requires at least Xcode X." and exit 1 (27.0 and 26.2 measured,
+    /// docs/research/xcode-tools-by-version.md). The image's profile is that limit.
+    static func checkCapabilities(_ doc: IBDocument, profile: XcodeToolsProfile) throws {
+        let limit = DottedVersion(profile.ibtoolShortVersion)!
+        for deps in doc.raw.children where deps.name == "dependencies" {
+            for c in deps.children where c.name == "capability" {
+                guard let s = c.attributes["minToolsVersion"] else { continue }
+                guard s.split(separator: ".", omittingEmptySubsequences: false).allSatisfy({ !$0.isEmpty && $0.allSatisfy { $0.isASCII && $0.isNumber } }),
+                      let v = DottedVersion(s) else {
+                    throw LoweringError.unsupported("<capability> minToolsVersion=\"\(s)\"", line: c.line)
+                }
+                if v > limit {
+                    throw XlessError(.ib, "This document requires at least Xcode \(s). This image's ibtool \(profile.ibtoolShortVersion) (Xcode \(profile.xcodeVersion), \(profile.xcodeBuild)) accepts documents up to Xcode \(profile.ibtoolShortVersion).",
+                                     fix: "re-save the storyboard without features newer than Xcode \(profile.ibtoolShortVersion), or pin a newer Xcode (`xcode:`) and build with its image (make images XCODE=…)")
+                }
+            }
         }
     }
 }

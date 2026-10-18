@@ -64,7 +64,8 @@ let package = Package(
         .testTarget(name: "XlessAssetsTests", dependencies: [
             "XlessAssets", "XlessCore", "XlessMachO",
             .product(name: "PNG", package: "swift-png"),
-        ]),
+            .product(name: "Crypto", package: "swift-crypto"),
+        ], exclude: ["Fixtures"]),
         .testTarget(name: "XlessFinalizeTests", dependencies: ["XlessFinalize", "XlessCore", "XlessMachO"]),
         .testTarget(name: "XlessASCTests", dependencies: [
             "XlessASC", "XlessCore",

@@ -67,13 +67,17 @@ public struct XCAssetCompiler: Sendable {
     /// when you need a different rasteriser (no PATH dep, different
     /// performance profile, sandbox restrictions, etc).
     public var svgRasterizer: any SVGRasterizer
+    /// The tool version fields written into the car (`CARHeaderValues.default`: AssetKit's own).
+    public var header: CARHeaderValues
 
     public init(
         deploymentTarget: String,
-        svgRasterizer: any SVGRasterizer = RsvgConvertRasterizer()
+        svgRasterizer: any SVGRasterizer = RsvgConvertRasterizer(),
+        header: CARHeaderValues = .default
     ) {
         self.deploymentTarget = deploymentTarget
         self.svgRasterizer = svgRasterizer
+        self.header = header
     }
 
     public func compile(catalog catalogURL: URL) async throws -> CompileResult {
@@ -112,7 +116,7 @@ public struct XCAssetCompiler: Sendable {
             )
         }
 
-        let writer = CARWriter(deploymentTarget: deploymentTarget, renditions: renditions)
+        let writer = CARWriter(deploymentTarget: deploymentTarget, renditions: renditions, header: header)
         let bytes = try writer.write()
 
         return CompileResult(carData: bytes, appIconBundle: appIconBundle)

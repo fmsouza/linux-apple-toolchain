@@ -5,23 +5,18 @@
 #
 # Compiles ThirdParty/AssetKit/Tests/AssetKitTests/Fixtures/Parity.xcassets (our own PNGs and colorsets: RGBA with and
 # without transparency, RGBA whose alpha is all 255 but one, RGB, gray, gray+alpha, palette; sRGB, display P3, extended
-# and linear colors, a dark appearance) with the pinned Xcode's actool, reads the car with `xcrun assetutil --info`,
-# and writes Fixtures/Parity.expected.json: every rendition's assetutil fields except digests, sizes and name
+# and linear colors, a dark appearance) with the selected Xcode's actool, reads the car with `xcrun assetutil --info`,
+# and writes Fixtures/Parity.expected.<build>.json: every rendition's assetutil fields except digests, sizes and name
 # identifiers, sorted. No actool output bytes are committed, only these fields.
-# Env: DEVELOPER_DIR  the Xcode to use. Default: ~/.cache/xless/Xcode.app/Contents/Developer when that is
-#                     versions.env's XCODE_BUILD, else xcode-select's. Any other build is refused.
+# Usage: DEVELOPER_DIR=<Xcode>/Contents/Developer scripts/assetkit-golden.sh
+# Any Xcode build is accepted (a build without an XcodeToolsProfile is how a profile is born). The output is
+# Fixtures/Parity.expected.<build>.json, the build read from `xcodebuild -version` under DEVELOPER_DIR.
+# Env: DEVELOPER_DIR  the Xcode to use. Default: xcode-select's.
 set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-# shellcheck source=/dev/null
-. "$ROOT/versions.env"
 [[ "$(uname)" == Darwin ]] || { echo "assetkit-golden: needs macOS (uname is $(uname))" >&2; exit 1; }
-CLONE="$HOME/.cache/xless/Xcode.app/Contents/Developer"
-if [[ -z "${DEVELOPER_DIR:-}" && -d "$CLONE" ]] \
-   && DEVELOPER_DIR="$CLONE" xcodebuild -version 2>/dev/null | grep -qx "Build version $XCODE_BUILD"; then
-  export DEVELOPER_DIR="$CLONE"
-fi
 FOUND="$(xcodebuild -version | sed -n 's/^Build version //p')"
-[[ "$FOUND" == "$XCODE_BUILD" ]] || { echo "assetkit-golden: needs Xcode build $XCODE_BUILD, found $FOUND" >&2; exit 1; }
+[[ -n "$FOUND" ]] || { echo "assetkit-golden: cannot read the Xcode build from xcodebuild -version" >&2; exit 1; }
 
 FIX="$ROOT/ThirdParty/AssetKit/Tests/AssetKitTests/Fixtures"
 TMP="$(mktemp -d "${TMPDIR:-/tmp}/assetkit-golden.XXXXXX")"
@@ -32,7 +27,7 @@ xcrun actool --output-format human-readable-text --errors --platform iphoneos --
 VERSION="$(xcrun actool --version --output-format xml1 \
   | /usr/bin/python3 -c 'import plistlib, sys; v = plistlib.loads(sys.stdin.buffer.read())["com.apple.actool.version"]; print(v["short-bundle-version"], "(" + v["bundle-version"] + ")")')"
 xcrun assetutil --info "$TMP/Assets.car" > "$TMP/info.json"
-/usr/bin/python3 - "$TMP/info.json" "$FIX/Parity.expected.json" "$VERSION" "$FOUND" <<'PY'
+/usr/bin/python3 - "$TMP/info.json" "$FIX/Parity.expected.$FOUND.json" "$VERSION" "$FOUND" <<'PY'
 import json, sys
 info, out, version, build = sys.argv[1:]
 skip = {"SHA1Digest", "SizeOnDisk", "NameIdentifier"}

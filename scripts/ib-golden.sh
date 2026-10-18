@@ -1,20 +1,19 @@
 #!/usr/bin/env bash
-# Regenerates the ibtool golden storyboardc directories for Tests/IBCorpus. Run on the Mac with Xcode 27.0 (27A266a).
+# Regenerates the ibtool golden storyboardc directories for Tests/IBCorpus. Run on the Mac with any Xcode (DEVELOPER_DIR=<Xcode>/Contents/Developer).
 # Usage: scripts/ib-golden.sh [--accept-new-ibtool] [case...]
 #   no cases: every Tests/IBCorpus/*.storyboard, using the flag sets from flagsets.json (".cases[case]" or ".default").
 # Mirrors Xcode's CompileStoryboard + LinkStoryboards steps (see docs/research/ib-invocation.md).
-# Refuses to run unless Xcode build is 27A266a, and unless the live ibtool matches golden/IBTOOL_VERSION
-# (pass --accept-new-ibtool to regenerate after a deliberate ibtool change).
+# Goldens go to Tests/IBCorpus/golden/<build>/, the build read from `xcodebuild -version`; a build with no goldens yet
+# is accepted (that is how a profile is born). It refuses to run when the live ibtool differs from that build
+# directory's IBTOOL_VERSION (pass --accept-new-ibtool to regenerate after a deliberate ibtool change).
 # Exits non-zero if ibtool fails or prints any error/warning/notice.
-# IB_GOLDEN_OUT=<dir> writes the goldens there instead of Tests/IBCorpus/golden (scripts/ib-parity.sh uses it to check
-# for drift); the ibtool guard still compares against the committed Tests/IBCorpus/golden/IBTOOL_VERSION.
+# IB_GOLDEN_OUT=<dir> writes the goldens there instead of Tests/IBCorpus/golden/<build> (scripts/ib-parity.sh uses it
+# to check for drift); the ibtool guard still compares against the committed golden/<build>/IBTOOL_VERSION.
 # Test hook: IB_GOLDEN_XCODE_BUILD_OVERRIDE replaces the detected Xcode build (only to exercise the guard).
 set -euo pipefail
 die() { echo "ib-golden: $*" >&2; exit 1; }
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 C="$ROOT/Tests/IBCorpus"; G="$C/golden"; F="${IB_GOLDEN_FLAGSETS:-$C/flagsets.json}"
-O="${IB_GOLDEN_OUT:-$G}"
-REQUIRED_BUILD="27A266a"
 command -v jq >/dev/null || die "jq is required"
 
 accept_new=0; cases=()
@@ -26,20 +25,22 @@ for a in "$@"; do
   esac
 done
 
-# Guard 1: pinned Xcode build.
+# The Xcode build under the caller's DEVELOPER_DIR names the golden directory.
 xcv="$(xcodebuild -version)" || die "xcodebuild -version failed"
 build="$(printf '%s\n' "$xcv" | sed -n 's/^Build version //p')"
 build="${IB_GOLDEN_XCODE_BUILD_OVERRIDE:-$build}"
-[[ $build == "$REQUIRED_BUILD" ]] || die "Xcode build is '$build', goldens require $REQUIRED_BUILD; refusing to run"
+[[ $build =~ ^[A-Za-z0-9]+$ ]] || die "cannot read a sane Xcode build from xcodebuild -version (got '$build')"
+G="$G/$build"
+O="${IB_GOLDEN_OUT:-$G}"
 
-# Guard 2: ibtool identity vs recorded IBTOOL_VERSION.
+# Guard: ibtool identity vs this build's recorded IBTOOL_VERSION.
 ibjson="$(xcrun ibtool --version | plutil -convert json -o - -)" || die "cannot read ibtool --version"
 ibline="$(printf '%s' "$ibjson" | jq -er '."com.apple.ibtool.version" | "ibtool \(.["short-bundle-version"]) (\(.["bundle-version"]))"')" \
   || die "cannot parse ibtool --version"
 live_version="$(printf '%s\n%s\n' "$ibline" "$xcv")"
 if [[ -f $G/IBTOOL_VERSION && $accept_new -eq 0 ]]; then
   [[ "$(cat "$G/IBTOOL_VERSION")" == "$live_version" ]] \
-    || die "live ibtool differs from golden/IBTOOL_VERSION; pass --accept-new-ibtool to regenerate"
+    || die "live ibtool differs from golden/$build/IBTOOL_VERSION; pass --accept-new-ibtool to regenerate"
 fi
 
 # flagsets.json validation.

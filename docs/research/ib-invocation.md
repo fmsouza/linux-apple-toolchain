@@ -85,5 +85,5 @@ both ways gave `diff -r` identical trees.
 
 - `ibtool --version` prints an XML plist (`com.apple.ibtool.version` -> `short-bundle-version` 27.0, `bundle-version` 25098); there is no human-readable first line. `IBTOOL_VERSION` line 1 is `ibtool 27.0 (25098)`, followed by the `xcodebuild -version` lines.
 - ibtool exits 0 on success and non-zero on error, and with `--errors --warnings --notices` it prints nothing for clean input, so `ib-golden.sh` treats any output or a non-zero exit as failure.
-- `ib-golden.sh` refuses to run unless `xcodebuild -version` reports build 27A266a, and unless the live ibtool matches `golden/IBTOOL_VERSION` (override with `--accept-new-ibtool`).
+- `ib-golden.sh` writes `Tests/IBCorpus/golden/<build>/` for the build `xcodebuild -version` reports under the caller's `DEVELOPER_DIR`, and refuses to run when the live ibtool differs from that directory's `IBTOOL_VERSION` (override with `--accept-new-ibtool`).
 - Xcode prints no ibtool warnings for either seed storyboard.

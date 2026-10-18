@@ -129,14 +129,16 @@ RUN printf '#!/bin/sh\nexec /opt/swift-build/swbuild "$@"\n' > /usr/local/bin/sw
 # actool` and `xcrun actool` reach the actool shim, for CocoaPods' Copy Pods Resources phase); PlistBuddy where
 # the build phases call it; xless-ld64, the linker of xless's Swift Build toolset; and in swift-build/ the tools Swift
 # Build must find before the Linux toolchain's (/usr/bin): strip (LLVM 21's llvm-strip) and embeddedBinaryValidationUtility.
+# actool and ibtool answer as the image's Xcode's tools (XcodeToolsProfile, from toolchain-meta.json); an Xcode without a
+# profile makes them exit 70, so the version checks below fail the image build.
 COPY docker/shims/rn/ /opt/xless/shims/
 COPY --from=swifttools /usr/bin/llvm-objcopy /opt/xless/llvm/bin/llvm-objcopy
 RUN mv /opt/xless/shims/PlistBuddy /usr/libexec/PlistBuddy && chmod a+rx /opt/xless/shims/* /opt/xless/shims/swift-build/* /opt/xless/shims/prepare/* /usr/libexec/PlistBuddy \
  && ln -s llvm-objcopy /opt/xless/llvm/bin/llvm-strip && /opt/xless/llvm/bin/llvm-strip --version | grep -qF 'LLVM version 21' \
  && for t in lipo otool; do test -x "/usr/bin/llvm-$t-14" && ln -sf "/usr/bin/llvm-$t-14" "/usr/local/bin/llvm-$t" || exit 1; done \
- && actool --version --output-format xml1 | grep -qF '<string>25098</string>' \
- && [ "$(xcrun --find actool)" = /opt/xless/shims/actool ] && xcrun actool --version --output-format xml1 | grep -qF '<string>25098</string>' \
- && ibtool --version --output-format xml1 | grep -qF '<string>25098</string>' \
+ && actool --version --output-format xml1 | grep -qE '<string>[0-9]+</string>' \
+ && [ "$(xcrun --find actool)" = /opt/xless/shims/actool ] && xcrun actool --version --output-format xml1 | grep -qE '<string>[0-9]+</string>' \
+ && ibtool --version --output-format xml1 | grep -qE '<string>[0-9]+</string>' \
  && xcodebuild -version | grep -qx 'Build version [0-9A-Za-z]*' \
  && lipo -version >/dev/null && otool --version >/dev/null \
  && /usr/libexec/PlistBuddy -c 'Add :K string v' /tmp/pb.plist >/dev/null && /usr/libexec/PlistBuddy -c 'Print :K' /tmp/pb.plist | grep -qx v \

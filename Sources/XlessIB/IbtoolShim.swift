@@ -6,11 +6,10 @@ import XlessCore
 /// docs/research/ib-invocation.md). Compiling goes through `StoryboardCompiler`, so a storyboard outside its subset
 /// fails the build with the compiler's refusal. Linking copies the compiled `.storyboardc` (byte-identical for a
 /// single storyboard, ib-invocation.md). Any flag or value outside that subset is refused with exit 70 and the argv.
+///
+/// The shim answers as the image's Xcode's ibtool (`XcodeToolsProfile`, from `/opt/xless/toolchain-meta.json`, read once
+/// per call): its `--version` and its nib encoding. An image whose Xcode has no profile is refused with exit 70.
 public enum IbtoolShim {
-    /// ibtool 27.0 (Xcode 27.0, 27A266a), as `ibtool --version` answers.
-    public static let bundleVersion = "25098"
-    public static let shortBundleVersion = "27.0"
-
     public struct Unsupported: Error, CustomStringConvertible, Equatable {
         public let argv: [String]
         public let reason: String
@@ -85,9 +84,15 @@ public enum IbtoolShim {
                         options: IBCompileOptions(targetDevices: devices, minimumDeploymentTarget: target))
     }
 
-    public static func run(_ args: [String], cwd: URL = URL(fileURLWithPath: FileManager.default.currentDirectoryPath)) -> Result {
+    /// `profile` gives the image's tools profile (default: from the image's toolchain metadata); it is asked once.
+    public static func run(_ args: [String], cwd: URL = URL(fileURLWithPath: FileManager.default.currentDirectoryPath),
+                           profile loadProfile: () throws -> XcodeToolsProfile = { try XcodeToolsProfile.forImage(stage: .ib) }) -> Result {
         let invocation: Invocation
         do { invocation = try parse(args, cwd: cwd) } catch {
+            return Result(stdout: "", stderr: "\(error)\n", exitCode: 70)
+        }
+        let profile: XcodeToolsProfile
+        do { profile = try loadProfile() } catch {
             return Result(stdout: "", stderr: "\(error)\n", exitCode: 70)
         }
         switch invocation {
@@ -100,9 +105,9 @@ public enum IbtoolShim {
                 \t<key>com.apple.ibtool.version</key>
                 \t<dict>
                 \t\t<key>bundle-version</key>
-                \t\t<string>\(bundleVersion)</string>
+                \t\t<string>\(profile.ibtoolBundleVersion)</string>
                 \t\t<key>short-bundle-version</key>
-                \t\t<string>\(shortBundleVersion)</string>
+                \t\t<string>\(profile.ibtoolShortVersion)</string>
                 \t</dict>
                 </dict>
                 </plist>
@@ -112,10 +117,10 @@ public enum IbtoolShim {
             do {
                 let checked = try StoryboardCompileRunner.options(devices: options.targetDevices, minimumDeploymentTarget: options.minimumDeploymentTarget)
                 try FileManager.default.createDirectory(at: output.deletingLastPathComponent(), withIntermediateDirectories: true)
-                try StoryboardCompileRunner.run(input: input, out: output, options: checked, force: true)
+                try StoryboardCompileRunner.run(input: input, out: output, options: checked, profile: profile, force: true)
                 if let partial {
-                    // ibtool 27.0 wrote `<dict/>` for every storyboard measured (ib-invocation.md seeds, Expo's
-                    // SplashScreen.storyboard); the compiler's subset has nothing that would add keys.
+                    // ibtool 27.0 and 26.2 wrote `<dict/>` for every storyboard measured (ib-invocation.md seeds, Expo's
+                    // SplashScreen.storyboard, the corpus); the compiler's subset has nothing that would add keys.
                     try Data("""
                         <?xml version="1.0" encoding="UTF-8"?>
                         <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">

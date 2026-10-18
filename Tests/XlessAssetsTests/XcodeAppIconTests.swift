@@ -105,7 +105,7 @@ func singleSizeCatalog(icon: Data, filename: String = "i.png") throws -> URL {
     """
     let out = FileManager.default.temporaryDirectory.appendingPathComponent("out-\(UUID())")
     let r = try await AssetsStage.run(input: app, outputDir: out, platform: .ios,
-                                      config: ProjectConfig.parse(yaml: yaml), project: URL(fileURLWithPath: "/"))
+                                      config: ProjectConfig.parse(yaml: yaml), project: URL(fileURLWithPath: "/"), profile: testProfile())
     let files = try FileManager.default.contentsOfDirectory(atPath: r.path).sorted()
     #expect(files == ["AppIcon60x60@2x.png", "AppIcon76x76@2x~ipad.png", "Assets.car", "Info.plist"])
     let info = try Plist.read(r.appendingPathComponent("Info.plist"), stage: .assets)
@@ -154,7 +154,7 @@ private func iosIconRun(catalog cat: URL) async throws -> URL {
     assets: \(cat.path)
     """
     let out = FileManager.default.temporaryDirectory.appendingPathComponent("out-\(UUID())")
-    return try await AssetsStage.run(input: app, outputDir: out, platform: .ios, config: ProjectConfig.parse(yaml: yaml), project: URL(fileURLWithPath: "/"))
+    return try await AssetsStage.run(input: app, outputDir: out, platform: .ios, config: ProjectConfig.parse(yaml: yaml), project: URL(fileURLWithPath: "/"), profile: testProfile())
 }
 
 @Test func iosMultiSizeIconCompilesLikeSingleSizeFromMarketingIcon() async throws {

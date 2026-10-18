@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# Checks the storyboard compiler against ibtool on the Mac (Xcode 27.0, 27A266a). Two checks:
+# Checks the storyboard compiler against ibtool on the Mac (any Xcode: DEVELOPER_DIR=<Xcode>/Contents/Developer). Two checks:
 #  1. Golden drift: regenerates every Tests/IBCorpus golden into a temp dir with scripts/ib-golden.sh (same version
-#     guards, never --accept-new-ibtool) and diffs it against the committed goldens.
+#     guards, never --accept-new-ibtool) and diffs it against the committed goldens of the selected Xcode build (Tests/IBCorpus/golden/<build>).
 #  2. Rendering: builds a tiny simulator app that shows samples/HelloShipLaunch's LaunchScreen.storyboard as its root
 #     view controller, twice with xcodebuild (generic/platform=iOS Simulator, no signing): A keeps ibtool's compiled
 #     storyboard, B gets `xless storyboard compile`'s output dropped into the .app. Both run on a dedicated iOS
@@ -24,18 +24,23 @@ cleanup() {
 }
 trap cleanup EXIT
 
+BUILD="$(xcodebuild -version | sed -n 's/^Build version //p')"; [[ -n $BUILD ]] || die "cannot read the Xcode build from xcodebuild -version"
+
 # 1. Golden drift.
 if ((skip_goldens)); then
   echo "ib-parity: goldens skipped (--skip-goldens)"
 else
-  [[ -f $ROOT/Tests/IBCorpus/golden/IBTOOL_VERSION ]] || die "Tests/IBCorpus/golden/IBTOOL_VERSION is missing"
+  GOLD="$ROOT/Tests/IBCorpus/golden/$BUILD"
+  [[ -f $GOLD/IBTOOL_VERSION ]] || die "Tests/IBCorpus/golden/$BUILD/IBTOOL_VERSION is missing (run scripts/ib-golden.sh)"
   IB_GOLDEN_OUT="$T/golden" "$ROOT/scripts/ib-golden.sh" >"$T/golden.log" || { cat "$T/golden.log"; die "ib-golden.sh failed"; }
-  diff -r "$ROOT/Tests/IBCorpus/golden" "$T/golden" >"$T/golden.diff" || { cat "$T/golden.diff"; die "goldens drifted from ibtool (diff above)"; }
+  diff -r "$GOLD" "$T/golden" >"$T/golden.diff" || { cat "$T/golden.diff"; die "goldens drifted from ibtool (diff above)"; }
   echo "ib-parity: goldens OK ($(grep -c '^ib-golden: ' "$T/golden.log") cases regenerated, no drift)"
 fi
 
 # 2. Rendering on the simulator.
-(cd "$ROOT" && swift build --product xless >/dev/null); X="$(cd "$ROOT" && swift build --show-bin-path)/xless"
+# xless is built with the machine's default toolchain, not the Xcode under test (Xcode 26.2's Swift 6.2.3 cannot read this
+# package's tools version); the Xcode under test is selected with --xcode-build and used for the two xcodebuild runs.
+(cd "$ROOT" && env -u DEVELOPER_DIR swift build --product xless >/dev/null); X="$(cd "$ROOT" && env -u DEVELOPER_DIR swift build --show-bin-path)/xless"
 P="$T/app"; mkdir -p "$P/Sources"
 cp "$SB" "$P/LaunchScreen.storyboard"; cp -R "$SAMPLE/Resources/Assets.xcassets" "$P/Assets.xcassets"
 cat >"$P/Sources/App.swift" <<'SWIFT'
@@ -97,20 +102,24 @@ build() {   # $1: derived data dir; prints the .app path
 A="$(build "$T/dd-ibtool")"; B="$(build "$T/dd-xless")"
 [[ -d $A/LaunchScreen.storyboardc && -d $B/LaunchScreen.storyboardc ]] || die "xcodebuild produced no LaunchScreen.storyboardc"
 rm -rf "$B/LaunchScreen.storyboardc"
-"$X" storyboard compile "$SB" --out "$B/LaunchScreen.storyboardc" "${DEVICES[@]}" --minimum-deployment-target "$MIN_OS"
+"$X" storyboard compile "$SB" --xcode-build "$BUILD" --out "$B/LaunchScreen.storyboardc" "${DEVICES[@]}" --minimum-deployment-target "$MIN_OS"
 if diff -r "$A/LaunchScreen.storyboardc" "$B/LaunchScreen.storyboardc" >"$T/storyboardc.diff"; then
   echo "ib-parity: xless LaunchScreen.storyboardc is byte-identical to Xcode's"
 else
   cat "$T/storyboardc.diff"; die "xless LaunchScreen.storyboardc differs from Xcode's"
 fi
 
-# Dedicated simulator on the newest iOS 27 runtime.
-RUNTIME="$(xcrun simctl list runtimes -j | jq -r '[.runtimes[] | select(.isAvailable and (.identifier | test("SimRuntime\\.iOS-27-")))] | sort_by(.version | split(".") | map(tonumber)) | last | .identifier // empty')"
-[[ -n $RUNTIME ]] || die "no available iOS 27 simulator runtime (install one in Xcode → Settings → Components)"
+# Dedicated simulator on the newest simulator runtime whose iOS major matches this Xcode's iphonesimulator SDK
+# (17C52 -> any iOS 26.x, 27A266a -> any iOS 27.x).
+SDKVER="$(xcrun --sdk iphonesimulator --show-sdk-version)"; MAJOR="${SDKVER%%.*}"
+[[ $MAJOR =~ ^[0-9]+$ ]] || die "cannot read the iphonesimulator SDK version (got '$SDKVER')"
+RUNTIME="$(xcrun simctl list runtimes -j | jq -r --arg m "$MAJOR" '[.runtimes[] | select(.isAvailable and (.identifier | test("SimRuntime\\.iOS-" + $m + "-")))] | sort_by(.version | split(".") | map(tonumber)) | last | .identifier // empty')"
+[[ -n $RUNTIME ]] || die "Xcode $BUILD (iphonesimulator SDK $SDKVER) needs an installed iOS $MAJOR.x simulator runtime, and none is available (install one in Xcode → Settings → Components)"
 DEVTYPE="$(xcrun simctl list runtimes -j | jq -r --arg r "$RUNTIME" '.runtimes[] | select(.identifier == $r) | .supportedDeviceTypes | map(select(.productFamily == "iPhone")) | first | .identifier // empty')"
 [[ -n $DEVTYPE ]] || die "runtime $RUNTIME supports no iPhone device type"
 DEV="$(xcrun simctl create "xless-ib-parity-$$" "$DEVTYPE" "$RUNTIME")"
 xcrun simctl boot "$DEV"; xcrun simctl bootstatus "$DEV" -b >/dev/null
+sleep 20   # a fresh simulator posts system banners (e.g. iOS 26.3's "Ready for Apple Intelligence") that would sit over the first screenshot; let them expire
 xcrun simctl ui "$DEV" appearance light
 xcrun simctl status_bar "$DEV" override --time 9:41 --dataNetwork wifi --wifiMode active --wifiBars 3 \
   --cellularMode active --cellularBars 4 --operatorName "" --batteryState charged --batteryLevel 100

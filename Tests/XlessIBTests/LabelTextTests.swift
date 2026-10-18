@@ -4,7 +4,7 @@ import Foundation
 
 /// The `UIText` strings of the labels in the view nib that xless compiles for a corpus case, in label order.
 private func compiledLabelTexts(_ name: String) throws -> (texts: [String?], dump: String) {
-    let r = try StoryboardCompiler.compile(url: CorpusCase(name: name).storyboard, options: .flagset(named: "universal-16", root: corpusRoot))
+    let r = try StoryboardCompiler.compile(url: CorpusCase(name: name).storyboard, options: .flagset(named: "universal-16", root: corpusRoot), profile: .xcode27A266a)
     let nib = try #require(r.files.first { $0.key.contains("-view-") }?.value)
     let a = try NIBArchiveReader.read(nib)
     func values(_ o: NIBObject) -> [(String, NIBValueData)] {

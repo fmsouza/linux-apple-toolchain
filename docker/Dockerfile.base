@@ -27,9 +27,13 @@ ARG XTOOL_SHA256_AARCH64
 ARG XTOOL_SHA256_X86_64
 ARG RCODESIGN_SHA256_AARCH64
 ARG RCODESIGN_SHA256_X86_64
+# SWIFT_DETERMINISTIC_HASHING: Swift seeds every Dictionary and Set from the process, so the binary property lists that
+# Foundation writes (Info.plist of a bundle, Expo.plist) list their keys in a different order on every run, and a build is
+# not byte-for-byte reproducible, on one host or between an arm64 and an amd64 host (scripts/arch-compare.sh).
 ENV APPIMAGE_EXTRACT_AND_RUN=1 \
     XDG_CONFIG_HOME=/opt/xless/config \
-    XLESS_TOOLCHAIN_META=/opt/xless/toolchain-meta.json
+    XLESS_TOOLCHAIN_META=/opt/xless/toolchain-meta.json \
+    SWIFT_DETERMINISTIC_HASHING=1
 RUN apt-get update \
  && apt-get install -y --no-install-recommends curl ca-certificates zip unzip librsvg2-bin squashfs-tools \
  && rm -rf /var/lib/apt/lists/*

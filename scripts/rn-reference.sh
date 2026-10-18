@@ -12,9 +12,8 @@
 # Env: REF_WORK                 reuse this scratch dir instead of a fresh mktemp one (the work copy is recreated each
 #                               run; derived data and the Bundler path are kept, so rebuilds are incremental)
 #      DEVELOPER_DIR            the Xcode to use. Default: ~/.cache/xless/Xcode.app/Contents/Developer when that is
-#                               versions.env's XCODE_BUILD, else xcode-select's. Any other build is refused.
-#      REF_ALLOW_XCODE_BUILD    escape hatch for experiments only: accept this other Xcode build (it is recorded in
-#                               the outputs, which then must not be committed as the reference)
+#                               versions.env's XCODE_BUILD, else xcode-select's. A build with no XcodeToolsProfile entry
+#                               (scripts/xcode-tools.sh) is refused: its output would be no reference for xless's tools.
 #
 # The source tree is never touched: its tracked files, plus untracked files that are not ignored (so an uncommitted
 # sample can be referenced), are copied into <tmp>/work and everything runs there. Gems go to <tmp>/bundle.
@@ -43,15 +42,12 @@ if [[ -z "${DEVELOPER_DIR:-}" && -d "$CLONE" ]] \
   export DEVELOPER_DIR="$CLONE"
 fi
 XCODE_FOUND="$(xcodebuild -version | sed -n 's/^Build version //p')"
+[[ -n "$XCODE_FOUND" ]] || { echo "rn-reference: no Xcode (set DEVELOPER_DIR, or put the pinned one at $CLONE)" >&2; exit 1; }
+# Any Xcode whose actool/ibtool/copypng formats xless has measured (an XcodeToolsProfile entry) is a valid reference for
+# its own SDK; an unmeasured one is refused, as `make images` refuses it.
+"$ROOT/scripts/xcode-tools.sh" "$XCODE_FOUND" || exit 1
 if [[ "$XCODE_FOUND" != "$XCODE_BUILD" ]]; then
-  if [[ -n "$XCODE_FOUND" && "$XCODE_FOUND" == "${REF_ALLOW_XCODE_BUILD:-}" ]]; then
-    echo "rn-reference: WARNING: Xcode build $XCODE_FOUND, not $XCODE_BUILD (accepted by REF_ALLOW_XCODE_BUILD;" \
-         "the outputs are not a valid reference for the pinned SDK)" >&2
-  else
-    echo "rn-reference: needs Xcode build $XCODE_BUILD (set DEVELOPER_DIR, or put it at $CLONE);" \
-         "found: $(xcodebuild -version | tr '\n' ' ')" >&2
-    exit 1
-  fi
+  echo "==> note: Xcode build $XCODE_FOUND, not versions.env's default $XCODE_BUILD: a reference for that Xcode's SDK only" >&2
 fi
 echo "==> Xcode $XCODE_FOUND at ${DEVELOPER_DIR:-$(xcode-select -p)}"
 
@@ -82,8 +78,16 @@ cd "$WORK"
 corepack pnpm install --frozen-lockfile
 corepack pnpm exec expo prebuild --platform ios --no-install
 cd ios
-bundle install
-bundle exec pod install
+# Native gems and CocoaPods' prepare scripts compile with the bare `clang`/`cc`, which without a sysroot link against the
+# Command Line Tools' SDK; the pinned Xcode's linker may not read that one (Xcode 26.2 on a newer macOS). Give those two
+# steps a clang that names the pinned Xcode's own macOS SDK (a PATH shim; SDKROOT itself must not reach CocoaPods).
+mkdir -p "$TMP/cc-shim"
+MACSDK="$(/usr/bin/xcrun --sdk macosx --show-sdk-path)"
+for c in clang cc; do
+  printf '#!/bin/sh\nexec /usr/bin/xcrun clang -isysroot "%s" "$@"\n' "$MACSDK" > "$TMP/cc-shim/$c"; chmod +x "$TMP/cc-shim/$c"
+done
+PATH="$TMP/cc-shim:$PATH" bundle install
+PATH="$TMP/cc-shim:$PATH" bundle exec pod install
 
 WORKSPACE="$(ls -d "$WORK"/ios/*.xcworkspace | head -1)"
 PROJECT="${WORKSPACE%.xcworkspace}.xcodeproj"

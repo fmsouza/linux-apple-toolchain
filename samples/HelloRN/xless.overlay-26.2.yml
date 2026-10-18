@@ -1,0 +1,31 @@
+# The same overlay pinned to Xcode 26.2 (see xless.overlay.yml for the commented reference of every key).
+# xless overlay for samples/HelloRN (type: react-native): what `xless ship --config <this file> --platform ios` needs
+# beyond the app repository. Relative paths resolve against this file's directory. Reference: docs/react-native.md.
+type: react-native
+source: .                       # the app repository (or pass --source)
+app:
+  dir: .                        # the app inside the source (a monorepo: e.g. apps/client)
+# env:                          # variables for the app's own tooling: prepare.run, Expo prebuild, CocoaPods, build phases
+#   FEATURE_X: enabled
+scheme: HelloRN                 # the shared Xcode scheme Expo generates (named like the app target)
+configuration: Release
+bundleIDs:                      # Xcode target → bundle ID: the app target and every extension it embeds
+  HelloRN: com.example.hellorn
+  HelloExtension: com.example.hellorn.HelloExtension
+teamID: ABCDE12345
+# version: 1.0.0                # default: app.json expo.version, else package.json version
+build: dated                    # <version>.<YYYYMMDDNN>, next free one from App Store Connect (or XLESS_BUILD_NUMBER)
+# prepare:
+#   run:                        # commands run in the work copy after the JS install, before expo prebuild
+#     - bash tools/gen.sh
+# allowMissingCommands: []      # a build phase that runs a missing command fails the build unless named here
+xcode: "26.2"                   # pinned to Xcode 26.2 (17C52): built from the images `make images XCODE=…26.2…` made, and
+                                # compared with a reference made by that Xcode (scripts/test-rn-linux.sh, XLESS_RN_OVERLAY).
+# identifiers:                  # for an app built under a team that does not own its app group / keychain group:
+#   replace:                    # literal text in every string value, longest match first, one pass (keys: whole
+#     com.other.app: com.example.hellorn   # identifiers with a '.', matched where an identifier ends): in every
+#                               # bundle's entitlements (sign, after $(AppIdentifierPrefix) becomes <teamID>.) and the
+#                               # app's and its extensions' Info.plists, URL schemes included (finalize).
+# entitlements:                 # sign stage: top-level keys dropped from every bundle's entitlements, e.g. a capability
+#   remove: [com.apple.developer.declared-age-range]   # the signing team cannot have
+usesNonExemptEncryption: false

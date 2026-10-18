@@ -1,6 +1,6 @@
 // Differential comparison of the storyboard compiler with ibtool (research tool; not part of `swift test`).
 //
-// Usage: swift run IBDifferential <dir>
+// Usage: swift run IBDifferential <dir> [<xcode build>]   (the build whose ibtool made the outputs; default 27A266a)
 // For every <dir>/<name>.storyboard that has an ibtool output <dir>/<name>.storyboardc (compiled with the
 // universal-16 flag set by scripts/ib-corpus/differential.py), compiles the storyboard with XlessIB and prints one
 // line per case: "<name> IDENTICAL", "<name> REFUSED <reason>" or "<name> MISMATCH <file>: <first differing dump
@@ -12,8 +12,8 @@ import XlessCore
 import XlessIB
 
 let args = CommandLine.arguments.dropFirst()
-guard args.count == 1, let dir = args.first else {
-    FileHandle.standardError.write(Data("usage: IBDifferential <dir>\n".utf8))
+guard (1...2).contains(args.count), let dir = args.first, let profile = XcodeToolsProfile.all[args.dropFirst().first ?? "27A266a"] else {
+    FileHandle.standardError.write(Data("usage: IBDifferential <dir> [<xcode build: \(XcodeToolsProfile.all.keys.sorted().joined(separator: ", "))>]\n".utf8))
     exit(2)
 }
 let root = URL(fileURLWithPath: dir)
@@ -33,7 +33,7 @@ do {
 @MainActor func compare(_ name: String, storyboard: URL, golden: URL) throws -> String {
     let result: IBCompileResult
     do {
-        result = try StoryboardCompiler.compile(url: storyboard, options: options)
+        result = try StoryboardCompiler.compile(url: storyboard, options: options, profile: profile)
     } catch let e as XlessError where e.stage == .ib {
         return "\(name) REFUSED \(e.cause)"
     }

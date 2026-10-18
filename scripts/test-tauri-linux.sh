@@ -13,7 +13,8 @@
 # /cache/work/.assets-check (xless-work volume); the host copies them out and `xless tauri compare --assets-only`
 # (host build) reads them and the reference's recorded catalogs with `xcrun assetutil --info` (Opaque, colour space,
 # pixel size, … per rendition; docs/research/parity-known-gaps.md, "Asset catalog comparison"). Elsewhere it is skipped.
-# Variables: XLESS_IMAGE (default xless-tauri:local-<arch>), DOCKER_CONTEXT (default colima-xless if it exists).
+# Variables: ARCH (arm64 or amd64; default the host's: ARCH=amd64 on an arm64 Mac runs the amd64 chain under emulation),
+#   XLESS_IMAGE (default xless-tauri:local-<arch>), DOCKER_CONTEXT (default colima-xless if it exists).
 # The repository is mounted read-only; the work copy lives in the xless-work volume, Rust toolchains in xless-rustup and
 # xless-cargo (the first run downloads them and builds the Rust code, which takes a few minutes; later runs are faster).
 set -euo pipefail
@@ -21,6 +22,12 @@ root="$(cd "$(dirname "$0")/.." && pwd)"
 ctx="${DOCKER_CONTEXT:-}"
 if [[ -z "$ctx" ]] && docker context ls --format '{{.Name}}' 2>/dev/null | grep -qx 'colima-xless'; then ctx=colima-xless; fi
 case "$(uname -m)" in arm64|aarch64) arch=arm64 ;; *) arch=amd64 ;; esac
+vsuf=""; plat=()   # ARCH=amd64|arm64 runs the image of that architecture (under emulation when it is not the host's)
+if [[ -n "${ARCH:-}" ]]; then
+  [[ "$ARCH" == arm64 || "$ARCH" == amd64 ]] || { echo "test-tauri-linux: ARCH must be arm64 or amd64" >&2; exit 2; }
+  [[ "$ARCH" == "$arch" ]] || vsuf="-$ARCH"   # another architecture's work copy and Rust toolchains stay apart from the host's
+  arch="$ARCH"; plat=(--platform "linux/$ARCH")
+fi
 image="${XLESS_IMAGE:-xless-tauri:local-$arch}"
 platform=ios
 while [[ $# -gt 0 ]]; do
@@ -36,7 +43,7 @@ args=(docker)
 
 # The in-container script reads the same XLESS_BUILD_NUMBER from the environment, never contacting App Store Connect. The overlay
 # is `build: dated`, so the override is a dated build of the sample's version (1.0.0).
-"${args[@]}" run --rm -i -v "$root":/repo:ro -v xless-work:/cache/work -v xless-rustup:/cache/rustup -v xless-cargo:/cache/cargo \
+"${args[@]}" run --rm -i ${plat[@]+"${plat[@]}"} -v "$root":/repo:ro -v "xless-work$vsuf":/cache/work -v "xless-rustup$vsuf":/cache/rustup -v "xless-cargo$vsuf":/cache/cargo \
   -e XLESS_BUILD_NUMBER="$([[ $platform == macos ]] && echo 1.0.0.202601010000 || echo 1.0.0.2026010101)" -e PLATFORM="$platform" \
   "$image" bash -s <<'IN'
 set -euo pipefail
@@ -80,7 +87,7 @@ if [[ "$platform" == ios ]]; then
     cars="$(mktemp -d "${TMPDIR:-/tmp}/hellotauri-cars.XXXXXX")"
     alpine="$(sed -n 's/^ALPINE_IMAGE=//p' "$root/versions.env")"   # pinned by digest
     [[ -n "$alpine" ]] || { echo "versions.env has no ALPINE_IMAGE" >&2; exit 2; }
-    "${args[@]}" run --rm -v xless-work:/cache/work:ro "$alpine" tar -C /cache/work/.assets-check -cf - . | tar -C "$cars" -xf -
+    "${args[@]}" run --rm -v "xless-work$vsuf":/cache/work:ro "$alpine" tar -C /cache/work/.assets-check -cf - . | tar -C "$cars" -xf -
     (cd "$root" && env -u DEVELOPER_DIR swift build --product xless -q)
     x="$(cd "$root" && env -u DEVELOPER_DIR swift build --show-bin-path)/xless"
     echo "==> comparing the finalized app's asset catalogs with the reference (assetutil)"

@@ -65,7 +65,8 @@ enum StageRunner {
             // Tauri on macOS: nothing to compile (the icon is bundle.icon's .icns, copied by the build); React Native:
             // Swift Build compiled the asset catalogs and storyboards (actool/ibtool shims). Copy through.
             if ctx.tauriMac != nil || ctx.isReactNative { return try Files.atomicOutput(ctx.paths.assets) { try Files.copyBundle(input, intoFreshDir: $0) } }
-            return try await AssetsStage.run(input: input, outputDir: ctx.paths.assets, platform: ctx.platform, config: ctx.config, project: ctx.project)
+            return try await AssetsStage.run(input: input, outputDir: ctx.paths.assets, platform: ctx.platform, config: ctx.config, project: ctx.project,
+                                             profile: { try XcodeToolsProfile.forImage(stage: .assets) })
         }
     }
 

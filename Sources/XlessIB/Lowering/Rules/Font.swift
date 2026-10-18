@@ -30,44 +30,52 @@ struct FontEncoding: Hashable, CustomStringConvertible {
         return pointSize
     }
 
-    func encode(_ b: ArchiveBuilder) throws -> ObjectRef {
-        try b.unique("UIFont|\(self)") {
-            let f = b.object("UIFont", fallback: "NSFont")
-            switch kind {
-            case .system(let s):
-                let name = b.string(s.name)
-                b.set(f, "UIFontName", name)
-                b.set(f, "UIFontDescriptor", try descriptor(b, entries: s.descriptorEntries(b, pointSize: pointSize), options: 2147517444,
-                                                            mutable: s.mutableAttributes, identity: "system|\(s)|\(pointSize)"))
-                b.set(f, "UIFontPointSize", .double(pointSize))
-                Self.setScaling(f, b)
-                b.set(f, "UIFontTraits", try ArchiveBuilder.int(s.traits))
-                b.set(f, "UISystemFont", .bool(true))
-                b.set(f, "NSName", name)
-                b.set(f, "NSSize", .double(pointSize))
-            case .textStyle(let t):
-                let name = b.string(t.fontName)
-                b.set(f, "UIFontName", name)
-                b.set(f, "UIIBTextStyle", b.string(t.rawValue))
-                b.set(f, "UIFontPointSize", .double(0))
-                Self.setScaling(f, b)
-                b.set(f, "UIFontTraits", try ArchiveBuilder.int(t.traits))
-                b.set(f, "UISystemFont", .bool(true))
-                b.set(f, "NSName", name)
-                b.set(f, "NSSize", .double(t.size))
-            case .custom(let n):
-                let name = b.string(n)
-                b.set(f, "UIFontName", name)
-                let entries = [(b.string("NSFontNameAttribute"), name), (b.string("NSFontSizeAttribute"), try b.number(pointSize))]
-                b.set(f, "UIFontDescriptor", try descriptor(b, entries: entries, options: 0, mutable: false, identity: "custom|\(n)|\(pointSize)"))
-                b.set(f, "UIFontPointSize", .double(pointSize))
-                b.set(f, "UIFontTraits", .int8(0))
-                b.set(f, "UISystemFont", .bool(false))
-                b.set(f, "NSName", name)
-                b.set(f, "NSSize", .double(pointSize))
-            }
-            return f
+    /// The `UIFont` in the nib `l` is building. Equal fonts are one object, except custom fonts under an encoding that
+    /// does not unique them (Xcode 26.2: `label-custom-font-grid`), which get their own font, descriptor and dictionary.
+    func encode(_ l: ViewNibLowering) throws -> ObjectRef {
+        let b = l.b
+        if case .custom = kind, !l.encoding.uniquesCustomFonts { return try make(l, identity: "\(self)|#\(b.objectCount)") }
+        return try b.unique("UIFont|\(self)") { try make(l, identity: "\(self)") }
+    }
+
+    private func make(_ l: ViewNibLowering, identity fontIdentity: String) throws -> ObjectRef {
+        let b = l.b
+        let f = b.object("UIFont", fallback: "NSFont")
+        switch kind {
+        case .system(let s):
+            let name = b.string(s.name)
+            b.set(f, "UIFontName", name)
+            if s == .italic { l.italicSizes.insert(pointSize) }
+            b.set(f, "UIFontDescriptor", try descriptor(b, entries: s.descriptorEntries(b, pointSize: pointSize, italicTraits: l.encoding.italicTraits),
+                                                        options: 2147517444, mutable: s.mutableAttributes, identity: "system|\(s)|\(pointSize)"))
+            b.set(f, "UIFontPointSize", .double(pointSize))
+            Self.setScaling(f, b)
+            b.set(f, "UIFontTraits", try ArchiveBuilder.int(s.traits))
+            b.set(f, "UISystemFont", .bool(true))
+            b.set(f, "NSName", name)
+            b.set(f, "NSSize", .double(pointSize))
+        case .textStyle(let t):
+            let name = b.string(t.fontName)
+            b.set(f, "UIFontName", name)
+            b.set(f, "UIIBTextStyle", b.string(t.rawValue))
+            b.set(f, "UIFontPointSize", .double(0))
+            Self.setScaling(f, b)
+            b.set(f, "UIFontTraits", try ArchiveBuilder.int(t.traits))
+            b.set(f, "UISystemFont", .bool(true))
+            b.set(f, "NSName", name)
+            b.set(f, "NSSize", .double(t.size))
+        case .custom(let n):
+            let name = b.string(n)
+            b.set(f, "UIFontName", name)
+            let entries = [(b.string("NSFontNameAttribute"), name), (b.string("NSFontSizeAttribute"), try b.number(pointSize))]
+            b.set(f, "UIFontDescriptor", try descriptor(b, entries: entries, options: 0, mutable: false, identity: "custom|\(fontIdentity)"))
+            b.set(f, "UIFontPointSize", .double(pointSize))
+            b.set(f, "UIFontTraits", .int8(0))
+            b.set(f, "UISystemFont", .bool(false))
+            b.set(f, "NSName", name)
+            b.set(f, "NSSize", .double(pointSize))
         }
+        return f
     }
 
     private static func setScaling(_ f: ObjectRef, _ b: ArchiveBuilder) {
@@ -139,11 +147,16 @@ enum SystemFont: String, Hashable {
 
     /// The descriptor attributes, in key order: regular weights {Usage, Size}; bold {Usage: CTFontEmphasizedUsage,
     /// UsageOverride: CTFontBoldUsage, Size}; italic {Traits: {SymbolicTrait: intval 1}, Usage: CTFontObliqueUsage, Size}.
-    func descriptorEntries(_ b: ArchiveBuilder, pointSize: Double) throws -> [(ObjectRef, ObjectRef)] {
+    /// The italic traits dictionary is shared as `italicTraits` says (Xcode 26.2: per optical-size band, `label-font-grid`).
+    func descriptorEntries(_ b: ArchiveBuilder, pointSize: Double, italicTraits: XcodeToolsProfile.ItalicTraits) throws -> [(ObjectRef, ObjectRef)] {
         var entries: [(ObjectRef, ObjectRef)] = []
         if self == .italic {
+            let band: String = switch italicTraits {
+            case .shared: ""
+            case let .opticalSizeBands(low, high, _): pointSize <= low ? "|low" : pointSize >= high ? "|high" : "|\(pointSize)"
+            }
             let trait = b.dictionary([(key: b.string("NSCTFontSymbolicTrait"), value: try b.number(1, integer: true))],
-                                     identity: "NSCTFontSymbolicTrait=1")
+                                     identity: "NSCTFontSymbolicTrait=1" + band)
             entries.append((b.string("NSCTFontTraitsAttribute"), trait))
         }
         entries.append((b.string("NSCTFontUIUsageAttribute"), b.string(usage)))

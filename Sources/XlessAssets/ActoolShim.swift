@@ -5,11 +5,10 @@ import XlessCore
 /// (`SWBApplePlatform/AssetCatalogCompiler.swift`; argv and outputs recorded in docs/research/react-native-ios-contract.md,
 /// "Tool shims"). The compile goes through `AssetsStage.compileIOSCatalog`, the same AssetKit path as the `assets`
 /// stage. Any flag or value outside that subset is refused with exit 70 and the argv (`Unsupported`), as `XcrunShim`.
+/// The shim answers as the image's Xcode's actool (`XcodeToolsProfile`, from `/opt/xless/toolchain-meta.json`, read once
+/// per call): its `--version`, the dependency info and the car's version fields. An image whose Xcode has no profile is
+/// refused with exit 70.
 public enum ActoolShim {
-    /// actool 27.0 (Xcode 27.0, 27A266a): what `actool --version` answers; Swift Build only needs it to decode.
-    public static let bundleVersion = "25098"
-    public static let shortBundleVersion = "27.0"
-
     public struct Unsupported: Error, CustomStringConvertible, Equatable {
         public let argv: [String]
         public let reason: String
@@ -127,9 +126,15 @@ public enum ActoolShim {
 
     /// Runs one actool command line. Tool errors (a missing app icon set, an alpha icon, an asset type AssetKit cannot
     /// write) are reported the way actool reports them (exit 1, `<catalog>: error: …` under `/* com.apple.actool.errors */`).
-    public static func run(_ args: [String], cwd: URL = URL(fileURLWithPath: FileManager.default.currentDirectoryPath)) async -> Result {
+    /// `profile` gives the image's tools profile (default: from the image's toolchain metadata); it is asked once.
+    public static func run(_ args: [String], cwd: URL = URL(fileURLWithPath: FileManager.default.currentDirectoryPath),
+                           profile loadProfile: () throws -> XcodeToolsProfile = { try XcodeToolsProfile.forImage(stage: .assets) }) async -> Result {
         let invocation: Invocation
         do { invocation = try parse(args, cwd: cwd) } catch {
+            return Result(stdout: "", stderr: "\(error)\n", exitCode: 70)
+        }
+        let profile: XcodeToolsProfile
+        do { profile = try loadProfile() } catch {
             return Result(stdout: "", stderr: "\(error)\n", exitCode: 70)
         }
         switch invocation {
@@ -139,9 +144,9 @@ public enum ActoolShim {
                 \t<key>com.apple.actool.version</key>
                 \t<dict>
                 \t\t<key>bundle-version</key>
-                \t\t<string>\(bundleVersion)</string>
+                \t\t<string>\(profile.actoolBundleVersion)</string>
                 \t\t<key>short-bundle-version</key>
-                \t\t<string>\(shortBundleVersion)</string>
+                \t\t<string>\(profile.actoolShortVersion)</string>
                 \t</dict>
                 </dict>
                 """), stderr: "", exitCode: 0)
@@ -164,7 +169,7 @@ public enum ActoolShim {
             var report = Report()
             var stderr = ""
             do {
-                try await compile(c, report: &report)
+                try await compile(c, profile: profile, report: &report)
             } catch {
                 // actool's own wording on stdout (a Swift Build error); xless's cause and fix on stderr, as IbtoolShim.
                 let e = (error as? XlessError) ?? XlessError(.assets, "\(error)", fix: "check the asset catalog")
@@ -187,7 +192,7 @@ public enum ActoolShim {
         }
     }
 
-    static func compile(_ c: Compile, report: inout Report) async throws {
+    static func compile(_ c: Compile, profile: XcodeToolsProfile, report: inout Report) async throws {
         let fm = FileManager.default
         if c.generatesSymbols {
             let assets = try AssetSymbols.assets(in: c.catalogs)
@@ -225,7 +230,8 @@ public enum ActoolShim {
             throw XlessError(.assets, "The output directory \"\(c.outputDir.path)\" does not exist.", fix: "create it first (Swift Build does)")
         }
         if c.appIcon != nil || !sets.other.isEmpty {
-            let compiled = try await AssetsStage.compileIOSCatalog(catalog, includeAppIcon: c.appIcon != nil, deploymentTarget: c.deploymentTarget)
+            let compiled = try await AssetsStage.compileIOSCatalog(catalog, includeAppIcon: c.appIcon != nil, deploymentTarget: c.deploymentTarget,
+                                                                       profile: profile)
             if let icon = compiled.icon {
                 for f in icon.files {
                     try write(f.data, to: c.outputDir.appendingPathComponent(f.name))
@@ -248,14 +254,14 @@ public enum ActoolShim {
             report.outputs.insert(url, at: 0)
         }
         if let url = c.dependencyInfo {
-            try write(dependencyInfo(inputs: c.catalogs, outputs: report.outputs), to: url)
+            try write(dependencyInfo(inputs: c.catalogs, outputs: report.outputs, actoolBundleVersion: profile.actoolBundleVersion), to: url)
         }
     }
 
     /// ld64-style dependency info, as actool writes it: a version record, one input record per catalog, one output
     /// record per file written (`builtin-linkAssetCatalog` and llbuild read it).
-    static func dependencyInfo(inputs: [URL], outputs: [URL]) -> Data {
-        var d = Data([0x00]) + Data("actool-\(bundleVersion)".utf8) + Data([0x00])
+    static func dependencyInfo(inputs: [URL], outputs: [URL], actoolBundleVersion: String) -> Data {
+        var d = Data([0x00]) + Data("actool-\(actoolBundleVersion)".utf8) + Data([0x00])
         for i in inputs { d += Data([0x10]) + Data(i.path.utf8) + Data([0x00]) }
         for o in outputs { d += Data([0x40]) + Data(o.path.utf8) + Data([0x00]) }
         return d

@@ -101,6 +101,14 @@ public enum StripShim {
         return aligned == data ? nil : aligned
     }
 
+    /// The post-pass that makes `llvm-strip`'s indirect symbol table independent of the host architecture
+    /// (`MachO.normalizeStrippedIndirectSymbols`): the output with it applied, or nil when nothing changes.
+    public static func normalizeIndirectSymbols(original: Data, stripped: Data, path: String, args: [String]) throws -> Data? {
+        do { return try MachO.normalizeStrippedIndirectSymbols(original: original, stripped: stripped) } catch {
+            throw ToolShimUnsupported(tool: "strip", argv: args, reason: "cannot read the indirect symbol table of llvm-strip's output \(path): \(error)")
+        }
+    }
+
     /// The whole shim: maps `args`, checks the input, runs `llvmStrip` (inherited stdio) and, when it succeeds,
     /// aligns its output in place (permissions kept). Returns `llvm-strip`'s exit status (128 + signal when killed), or
     /// 1 when the input cannot be read; throws `ToolShimUnsupported` for a refusal.
@@ -119,10 +127,12 @@ public enum StripShim {
         guard p.terminationReason == .exit, p.terminationStatus == 0 else {
             return p.terminationReason == .exit ? p.terminationStatus : 128 + p.terminationStatus
         }
-        guard let out = FileManager.default.contents(atPath: mapped.output) else {
+        guard var out = FileManager.default.contents(atPath: mapped.output) else {
             throw ToolShimUnsupported(tool: "strip", argv: args, reason: "llvm-strip wrote no \(mapped.output)")
         }
-        if let aligned = try alignOutput(out, path: mapped.output, args: args) {
+        let normalized = try normalizeIndirectSymbols(original: data, stripped: out, path: mapped.output, args: args)
+        if let normalized { out = normalized }
+        if let aligned = try alignOutput(out, path: mapped.output, args: args) ?? normalized {
             let url = URL(fileURLWithPath: mapped.output)
             let mode = (try? FileManager.default.attributesOfItem(atPath: mapped.output))?[.posixPermissions]
             try aligned.write(to: url, options: .atomic)

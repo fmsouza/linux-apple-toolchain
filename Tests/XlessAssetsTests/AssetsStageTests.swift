@@ -48,9 +48,20 @@ func catalog(icon: Data) throws -> URL {
     """
     let out = FileManager.default.temporaryDirectory.appendingPathComponent("out-\(UUID())")
     let result = try await AssetsStage.run(input: app, outputDir: out, platform: .macos,
-                                           config: ProjectConfig.parse(yaml: yaml), project: URL(fileURLWithPath: "/"))
+                                           config: ProjectConfig.parse(yaml: yaml), project: URL(fileURLWithPath: "/"), profile: testProfile())
     #expect(FileManager.default.fileExists(atPath: result.appendingPathComponent("Contents/Resources/AppIcon.icns").path))
     #expect(try Plist.read(result.appendingPathComponent("Contents/Info.plist"), stage: .assets)["CFBundleIconFile"] as? String == "AppIcon")
+}
+
+/// macOS icons do not depend on the Xcode: the profile is not asked for.
+@Test func macOSDoesNotNeedAToolsProfile() async throws {
+    let app = FileManager.default.temporaryDirectory.appendingPathComponent("in-\(UUID())/X.app")
+    try FileManager.default.createDirectory(at: app.appendingPathComponent("Contents/Resources"), withIntermediateDirectories: true)
+    try Plist.write(["CFBundleExecutable": "X"], to: app.appendingPathComponent("Contents/Info.plist"), stage: .assets)
+    let yaml = "bundleID: a.b\nteamID: ABCDE12345\nversion: \"1\"\nbuild: 1\nplatforms:\n  macos: { minimumOS: \"14.0\", product: X }\nassets: \(try catalog(icon: fakePNG(1024, colorType: 2)).path)\n"
+    let out = FileManager.default.temporaryDirectory.appendingPathComponent("out-\(UUID())")
+    _ = try await AssetsStage.run(input: app, outputDir: out, platform: .macos, config: ProjectConfig.parse(yaml: yaml), project: URL(fileURLWithPath: "/"),
+                                  profile: { Issue.record("the profile was asked for"); return .xcode27A266a })
 }
 
 @Test func noCatalogJustCopies() async throws {
@@ -59,7 +70,7 @@ func catalog(icon: Data) throws -> URL {
     try FileManager.default.createDirectory(at: app, withIntermediateDirectories: true)
     let yaml = "bundleID: a.b\nteamID: ABCDE12345\nversion: \"1\"\nbuild: 1\nplatforms:\n  macos: { minimumOS: \"14.0\", product: Y }\n"
     let out = FileManager.default.temporaryDirectory.appendingPathComponent("out-\(UUID())")
-    let r = try await AssetsStage.run(input: app, outputDir: out, platform: .macos, config: ProjectConfig.parse(yaml: yaml), project: URL(fileURLWithPath: "/"))
+    let r = try await AssetsStage.run(input: app, outputDir: out, platform: .macos, config: ProjectConfig.parse(yaml: yaml), project: URL(fileURLWithPath: "/"), profile: testProfile())
     #expect(r.lastPathComponent == "Y.app")
 }
 
@@ -69,7 +80,7 @@ private func iosAssetsRun(assetsLine: String) async throws {
     try Plist.write(["CFBundleExecutable": "Y"], to: app.appendingPathComponent("Info.plist"), stage: .assets)
     let yaml = "bundleID: a.b\nteamID: ABCDE12345\nversion: \"1\"\nbuild: 1\nplatforms:\n  ios: { minimumOS: \"17.0\", product: Y }\n\(assetsLine)"
     let out = FileManager.default.temporaryDirectory.appendingPathComponent("out-\(UUID())")
-    _ = try await AssetsStage.run(input: app, outputDir: out, platform: .ios, config: ProjectConfig.parse(yaml: yaml), project: URL(fileURLWithPath: "/"))
+    _ = try await AssetsStage.run(input: app, outputDir: out, platform: .ios, config: ProjectConfig.parse(yaml: yaml), project: URL(fileURLWithPath: "/"), profile: testProfile())
 }
 
 @Test func appStoreBuildWithoutAssetsFails() async throws {
@@ -109,7 +120,7 @@ private func iosAssetsRun(assetsLine: String) async throws {
     let yaml = "bundleID: a.b\nteamID: ABCDE12345\nversion: \"1\"\nbuild: 1\nplatforms:\n  ios: { minimumOS: \"17.0\", product: X }\nassets: \(cat.path)\n"
     let out = FileManager.default.temporaryDirectory.appendingPathComponent("out-\(UUID())/assets")
     await #expect(throws: XlessError.self) {
-        _ = try await AssetsStage.run(input: app, outputDir: out, platform: .ios, config: ProjectConfig.parse(yaml: yaml), project: URL(fileURLWithPath: "/"))
+        _ = try await AssetsStage.run(input: app, outputDir: out, platform: .ios, config: ProjectConfig.parse(yaml: yaml), project: URL(fileURLWithPath: "/"), profile: testProfile())
     }
     let left = (try? FileManager.default.contentsOfDirectory(atPath: out.path)) ?? []
     #expect(!left.contains { $0.hasSuffix(".app") })

@@ -6,7 +6,7 @@ import XlessCore
 let corpusRoot = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent().appendingPathComponent("IBCorpus")
 
 func goldenNibs() throws -> [URL] {
-    let golden = corpusRoot.appendingPathComponent("golden")
+    let golden = corpusRoot.appendingPathComponent("golden/27A266a")
     let e = FileManager.default.enumerator(at: golden, includingPropertiesForKeys: nil)!
     return e.compactMap { $0 as? URL }.filter { $0.pathExtension == "nib" }.sorted { $0.path < $1.path }
 }

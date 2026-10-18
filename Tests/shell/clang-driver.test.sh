@@ -52,6 +52,32 @@ out=$(run clang++ -target aarch64-unknown-linux-gnu @r4.resp -c a.cpp); [[ "$out
 [[ "$(run clang-cpp -target aarch64-unknown-linux-gnu a.c | head -1)" == --driver-mode=cpp ]] || fail "clang-cpp mode"
 [[ "$(run clang -cc1 -triple arm64-apple-ios -E a.c)" == "$(printf '%s\n' -cc1 -triple arm64-apple-ios -E a.c)" ]] || fail "-cc1 changed"
 
+# A Linux compile on an amd64 host (cargo build scripts, cc host builds) runs the real driver with exactly its own arguments.
+test_x86_64_linux_unchanged() {
+  local out; out=$(run clang -target x86_64-unknown-linux-gnu -c x.c)
+  [[ "$out" == "$(printf '%s\n' -target x86_64-unknown-linux-gnu -c x.c)" ]] || fail "x86_64 Linux changed: $(tr '\n' ' ' <<<"$out")"
+  [[ "$out" != *-fdefine-target-os-macros* && "$out" != *-D* ]] || fail "x86_64 Linux got a bridge flag"
+}
+# Every recorded table has the x86_64 Linux triple, with no macros.
+test_fixture_has_x86_64_linux() {
+  local f n=0
+  for f in "$root"/docker/toolchain/target-os/*.txt; do
+    [[ "$(basename "$f")" == derived.txt ]] && continue
+    grep -qx 'x86_64-unknown-linux-gnu -' "$f" || fail "$f has no 'x86_64-unknown-linux-gnu -' row"
+    n=$((n + 1))
+  done
+  [[ $n -gt 0 ]] || fail "no target-os tables"
+}
+# The default chain is bridged and checked strictly: no allow-list for undefined macros.
+test_no_allow_undef() {
+  if grep -q TARGET_OS_ALLOW_UNDEF "$root/docker/toolchain/target-os-check" "$root/docker/Dockerfile.sdk"; then
+    fail "TARGET_OS_ALLOW_UNDEF is still in target-os-check or Dockerfile.sdk"
+  fi
+}
+test_x86_64_linux_unchanged
+test_fixture_has_x86_64_linux
+test_no_allow_undef
+
 # docker/toolchain/target-os-check against the Xcode's own clang (Mac only): its table passes, an extra or a missing
 # macro fails, and a macro without a rule cannot be derived.
 if [[ "$(uname)" == Darwin ]] && xcode="$(xcode-select -p 2>/dev/null)" && [[ -x "$xcode/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang" ]]; then

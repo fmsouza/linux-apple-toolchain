@@ -37,10 +37,18 @@ A copy of [xtool-org/AssetKit](https://github.com/xtool-org/AssetKit), the `Asse
    Upstream's colors read in `assetutil` as one component (2e-323) in a "generic" space, and `UIColor(named:)` found
    none.
 
+5. **Tool version fields passed in** (`Sources/AssetKit/CAR/CARHeader.swift`, `CARWriter.swift`, `XCAssetCompiler.swift`).
+   A public `CARHeaderValues` (CoreUI version, storage version, main version string, version string, authoring tool)
+   is an `XCAssetCompiler` parameter; the CARHEADER and EXTENDED_METADATA blocks are written from it. `assetutil --info`
+   reports them as `CoreUIVersion`, `StorageVersion`, `MainVersion`, `AssetStorageVersion` and `Authoring Tool`. The
+   default, `CARHeaderValues.default`, is upstream's values, so AssetKit's own callers are unchanged; xless passes the
+   values of the image's Xcode's actool (`XcodeToolsProfile`). AssetKit stays free of xless code.
+
 Tests: `BOMWriterTests` (free list), `BitmapKeysTests` (descriptors), `AssetutilParseTests` "assetutil validates and
 thins the compiled Assets.car" (macOS: `assetutil --validate-file` and thinning), and `ActoolParityTests` (opacity
-and colors against `Fixtures/Parity.expected.json`: what `assetutil --info` reports for actool 27.0's car of the
-neutral `Fixtures/Parity.xcassets`, recorded by `scripts/assetkit-golden.sh`; macOS also compares AssetKit's car
-field by field). Known gaps against actool: no MultiSized Image rendition for app icons, grayscale PNGs stored as
+and colors against `Fixtures/Parity.expected.<build>.json`, once per recorded Xcode build (27A266a, 17C52): what
+`assetutil --info` reports for that actool's car of the neutral `Fixtures/Parity.xcassets`, recorded by
+`scripts/assetkit-golden.sh`; macOS also compares AssetKit's car field by field; the header test checks patch 5, with
+`assetutil` on macOS). Known gaps against actool: no MultiSized Image rendition for app icons, grayscale PNGs stored as
 ARGB in sRGB (actool: 8-bit gray in "gray gamma 22"; same pixels), images stored LZFSE instead of deepmap2, no
 display-gamut key attribute for colors (docs/research/parity-known-gaps.md).

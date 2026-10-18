@@ -6,8 +6,6 @@
 #     For every Darwin triple of the fixture, each macro's value under `#if` through `<clang> -target <triple> [flag …]`
 #     is the fixture's (a macro the clang leaves undefined is "undef"), and the clang defines no TARGET_OS_ macro the
 #     fixture lacks. For every triple the fixture records without macros (Linux), the clang defines none.
-#     TARGET_OS_ALLOW_UNDEF: names the clang may leave undefined (the default chain's open-source clang, which no driver
-#     bridges; docker/Dockerfile.sdk names them in the build log).
 #   target-os-check darwin <fixture> <clang> [flag …]
 #     check's Darwin half only: flags that reach Darwin compiles only (the record's clangFlags).
 #   target-os-check same <fixture> <wrapper> <driver>
@@ -42,11 +40,6 @@ case "$cmd" in
     for t in $(triples darwin); do
       expected "$t" | sort > "$tmp/want"
       awk '{ print $1 }' "$tmp/want" | values "$t" "$@" | sort > "$tmp/got"
-      for n in ${TARGET_OS_ALLOW_UNDEF:-}; do
-        grep -qx "$n undef" "$tmp/got" || continue
-        grep -v "^$n " "$tmp/want" > "$tmp/w2" || true; mv "$tmp/w2" "$tmp/want"
-        grep -v "^$n " "$tmp/got" > "$tmp/g2" || true; mv "$tmp/g2" "$tmp/got"
-      done
       if ! cmp -s "$tmp/want" "$tmp/got"; then
         echo "$t: TARGET_OS_ values differ from Apple clang's (< Apple, > $*):" >&2; diff "$tmp/want" "$tmp/got" >&2 || true; bad=1
       fi

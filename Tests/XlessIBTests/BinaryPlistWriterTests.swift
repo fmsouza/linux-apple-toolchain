@@ -55,7 +55,7 @@ private func readBinaryPlist(_ d: Data) throws -> BinaryPlistWriter.Value {
 }
 
 private func goldenInfoPlists() throws -> [URL] {
-    let e = FileManager.default.enumerator(at: corpusRoot.appendingPathComponent("golden"), includingPropertiesForKeys: nil)!
+    let e = FileManager.default.enumerator(at: corpusRoot.appendingPathComponent("golden/27A266a"), includingPropertiesForKeys: nil)!
     return e.compactMap { $0 as? URL }.filter { $0.lastPathComponent == "Info.plist" }.sorted { $0.path < $1.path }
 }
 

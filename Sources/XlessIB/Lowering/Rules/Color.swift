@@ -77,8 +77,11 @@ enum ColorRule {
         "xcode11CocoaTouchSystemColor", "cocoaTouchSystemColor",
     ]
 
-    /// Lowers a `<color>` element to its encoding.
-    static func encoding(_ color: IBColor, doc: IBDocument) throws -> ColorEncoding {
+    /// Lowers a `<color>` element to its encoding in the nib `l` is building (system colors follow its encoding).
+    /// `encoded: false` checks the element for a color that is not written (the default tint): a system color then needs
+    /// no measurement under the nib's encoding.
+    static func encoding(_ color: IBColor, lowering l: ViewNibLowering, encoded: Bool = true) throws -> ColorEncoding {
+        let doc = l.doc
         let line = doc.element(at: color.rawPath)?.line
         let a = color.rawAttributes
         try LoweringError.checkAttributes(a, known: knownAttributes, element: "color", line: line)
@@ -99,21 +102,21 @@ enum ColorRule {
         }
         switch color.value {
         case .system(let name):
-            return try system(name, line: line)
+            return try system(name, line: line, lowering: l, encoded: encoded)
         case .other:
             // Xcode 11 era: `xcode11CocoaTouchSystemColor` (with a legacy `cocoaTouchSystemColor` fallback) is the
             // system color (`xcode-template`).
             guard let name = color.rawAttributes["xcode11CocoaTouchSystemColor"] else {
                 throw LoweringError.unsupported("color \(describe(color.rawAttributes))", line: line)
             }
-            return try system(name, line: line)
+            return try system(name, line: line, lowering: l)
         case .named(let name):
             // ibtool fails (exit status 255, no message) on a named text or tint color without a `<namedColor>`
             // resource; as a background it compiles to the placeholder (`color-named-missing`, `label-color-forms`).
             if let key = a["key"], key != "backgroundColor", !doc.resources.contains(where: { if case .namedColor(name, .some) = $0 { true } else { false } }) {
                 throw LoweringError.unsupported("named color \"\(name)\" as \(key) without a <namedColor> resource (ibtool fails on it)", line: line)
             }
-            return try named(name, doc: doc, line: line)
+            return try named(name, lowering: l, line: line)
         case .rgba(let r, let g, let bl, let a, let space, let custom):
             guard space == "custom", custom == "sRGB" else { throw unsupportedSpace(space, custom, line: line) }
             return ColorEncoding(name: .none, components: [r, g, bl], alpha: a, decimalInput: true)
@@ -141,23 +144,33 @@ enum ColorRule {
     /// `color-white-near-white`; `color-white-small-grid` proves 1e-06 and 0.999999).
     static let grayBand = 1e-06
 
-    static func encode(_ color: IBColor, doc: IBDocument, into b: ArchiveBuilder) throws -> ObjectRef {
-        try encoding(color, doc: doc).encode(b)
+    static func encode(_ color: IBColor, lowering l: ViewNibLowering) throws -> ObjectRef {
+        try encoding(color, lowering: l).encode(l.b)
     }
 
-    static func system(_ name: String, line: Int?) throws -> ColorEncoding {
-        guard let (components, alpha) = systemColors[name] else {
+    /// A system color as the image's ibtool writes it into this nib (`XcodeToolsProfile.NibEncoding`): the table below,
+    /// with the encoding's overrides, its components rounded to 10 digits or not; a color the encoding was not measured
+    /// with is refused.
+    static func system(_ name: String, line: Int?, lowering l: ViewNibLowering, encoded: Bool = true) throws -> ColorEncoding {
+        guard var (components, alpha) = systemColors[name] else {
             throw LoweringError.unsupported("system color \"\(name)\" (not in the verified table of docs/research/nib-encoding.md)", line: line)
         }
-        return ColorEncoding(name: .system(name), components: components, alpha: alpha, decimalInput: true)
+        let e = l.encoding, p = l.profile
+        if encoded, let verified = e.verifiedSystemColors, !verified.contains(name) {
+            throw XlessError(.ib, "unsupported: system color \"\(name)\"\(LoweringError.at(line)) in a storyboard of plain views under Xcode \(p.xcodeVersion) (\(p.xcodeBuild)): that ibtool writes such a nib with its own system colors, measured only for \(verified.sorted().joined(separator: ", ")) (see docs/research/xcode-tools-by-version.md)",
+                             fix: "use one of those system colors or an sRGB color, or build with an image of an Xcode that writes it (\(XcodeToolsProfile.all.values.filter { $0.nibPlainViews.verifiedSystemColors == nil }.map(\.xcodeBuild).sorted().joined(separator: ", ")))")
+        }
+        if let rgb = e.systemColorOverrides[name] { components = rgb.map { Double($0) / 255 } }
+        return ColorEncoding(name: .system(name), components: components, alpha: alpha, decimalInput: true, rounded: e.roundsSystemColors)
     }
 
     /// A named (asset catalog) color takes its components from the `<namedColor>` resource; the catalog is never read
     /// (`color-named-exists`, `color-named-missing`).
-    static func named(_ name: String, doc: IBDocument, line: Int?) throws -> ColorEncoding {
+    static func named(_ name: String, lowering l: ViewNibLowering, line: Int?) throws -> ColorEncoding {
+        let doc = l.doc
         for case .namedColor(let n, let resource) in doc.resources where n == name {
             guard let resource else { return .missingNamed(name) }
-            let resolved = try encoding(resource, doc: doc)
+            let resolved = try encoding(resource, lowering: l)
             guard case .none = resolved.name, case .rgba(let r, let g, let bl, let a, _, _) = resource.value else {
                 throw LoweringError.unsupported("named color \"\(name)\" whose resource is not an sRGB color (only sRGB resources are verified)",
                                                 line: doc.element(at: resource.rawPath)?.line)
@@ -184,7 +197,8 @@ enum ColorRule {
     // MARK: System colors
 
     /// ibtool's own values for system colors, light appearance (`color-system-table`; the storyboard's
-    /// `<resources><systemColor>` value is ignored, `color-system-altered-resource`). Components are n/255.
+    /// `<resources><systemColor>` value is ignored, `color-system-altered-resource`). Components are n/255. Xcode 26.2
+    /// writes the same values except in a nib of plain views (`XcodeToolsProfile.NibEncoding.systemColorOverrides`).
     static let systemColors: [String: (components: [Double], alpha: Double)] = {
         func rgb(_ r: Int, _ g: Int, _ b: Int, _ a: Double = 1) -> ([Double], Double) { ([r, g, b].map { Double($0) / 255 }, a) }
         func gray(_ w: Int, _ a: Double = 1) -> ([Double], Double) { ([Double(w) / 255], a) }

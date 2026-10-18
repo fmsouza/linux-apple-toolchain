@@ -4,9 +4,9 @@ import Testing
 
 /// Parity with Apple's actool on our own neutral catalog, `Fixtures/Parity.xcassets`: PNGs with and without
 /// transparency (RGBA, RGBA whose alpha is all 255 but one, RGB, gray, gray+alpha, palette) and colorsets (sRGB,
-/// display P3, extended and linear sRGB, a dark appearance). `Fixtures/Parity.expected.json` holds what
-/// `assetutil --info` reports for actool 27.0's car of that catalog (recorded by `scripts/assetkit-golden.sh`; no
-/// actool output bytes are committed).
+/// display P3, extended and linear sRGB, a dark appearance). `Fixtures/Parity.expected.<build>.json` holds what
+/// `assetutil --info` reports for that Xcode build's actool car of that catalog (recorded by `scripts/assetkit-golden.sh`;
+/// no actool output bytes are committed). Every test runs once per recorded build.
 ///
 /// The byte-level tests run everywhere; the `assetutil` comparison needs macOS.
 @Suite("actool parity")
@@ -42,9 +42,15 @@ struct ActoolParityTests {
         try #require(Bundle.module.url(forResource: "Parity", withExtension: "xcassets", subdirectory: "Fixtures"))
     }
 
-    static func expected() throws -> Expected {
-        let url = try #require(Bundle.module.url(forResource: "Parity.expected", withExtension: "json", subdirectory: "Fixtures"))
-        return try JSONDecoder().decode(Expected.self, from: Data(contentsOf: url))
+    /// The Xcode builds whose actool output is recorded (`Fixtures/Parity.expected.<build>.json`).
+    static let builds = ["17C52", "27A266a"]
+
+    static func expectedURL(_ build: String) throws -> URL {
+        try #require(Bundle.module.url(forResource: "Parity.expected.\(build)", withExtension: "json", subdirectory: "Fixtures"))
+    }
+
+    static func expected(_ build: String) throws -> Expected {
+        try JSONDecoder().decode(Expected.self, from: Data(contentsOf: expectedURL(build)))
     }
 
     static func u32(_ data: Data, _ offset: Int) -> UInt32 {
@@ -55,9 +61,9 @@ struct ActoolParityTests {
         data.subdata(in: offset..<(offset + 8)).withUnsafeBytes { $0.loadUnaligned(as: UInt64.self) }.littleEndian
     }
 
-    @Test("Opacity follows actool: opaque iff every alpha is 255, written as MLEC flags 3 (opaque) or 1")
-    func opacityFlags() throws {
-        let images = try Self.expected().renditions.filter { $0.assetType == "Image" }
+    @Test("Opacity follows actool: opaque iff every alpha is 255, written as MLEC flags 3 (opaque) or 1", arguments: builds)
+    func opacityFlags(_ build: String) throws {
+        let images = try Self.expected(build).renditions.filter { $0.assetType == "Image" }
         #expect(images.count == 8)
         for row in images {
             let png = try Data(contentsOf: Self.fixture().appendingPathComponent("\(row.name).imageset/\(row.name).png"))
@@ -90,9 +96,9 @@ struct ActoolParityTests {
         }
     }
 
-    @Test("Named colors are keyed and encoded as actool writes them")
-    func colors() async throws {
-        let rows = try Self.expected().renditions.filter { $0.assetType == "Color" }
+    @Test("Named colors are keyed and encoded as actool writes them", arguments: builds)
+    func colors(_ build: String) async throws {
+        let rows = try Self.expected(build).renditions.filter { $0.assetType == "Color" }
         #expect(rows.count == 7)
         let loaded = try await CatalogLoader().load(catalog: Self.fixture())
         for row in rows {
@@ -129,8 +135,8 @@ struct ActoolParityTests {
                                   "Colorspace", "BitsPerComponent", "PixelWidth", "PixelHeight", "RenditionName",
                                   "Template Mode", "Color components"]
 
-    @Test("assetutil reads AssetKit's car of the parity catalog as it reads actool's", .enabled(if: ProcessLauncher.isAvailable))
-    func assetutilFields() async throws {
+    @Test("assetutil reads AssetKit's car of the parity catalog as it reads actool's", .enabled(if: ProcessLauncher.isAvailable), arguments: builds)
+    func assetutilFields(_ build: String) async throws {
         let scratch = FileManager.default.temporaryDirectory.appendingPathComponent("xcasset-parity-\(UUID().uuidString)")
         try FileManager.default.createDirectory(at: scratch, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: scratch) }
@@ -141,8 +147,7 @@ struct ActoolParityTests {
         #expect(run.exitCode == 0, "\(String(decoding: run.stderr, as: UTF8.self))")
         let ours = try #require(try JSONSerialization.jsonObject(with: run.stdout) as? [[String: Any]]).dropFirst()
 
-        let expectedURL = try #require(Bundle.module.url(forResource: "Parity.expected", withExtension: "json", subdirectory: "Fixtures"))
-        let root = try #require(try JSONSerialization.jsonObject(with: Data(contentsOf: expectedURL)) as? [String: Any])
+        let root = try #require(try JSONSerialization.jsonObject(with: Data(contentsOf: Self.expectedURL(build))) as? [String: Any])
         let apple = try #require(root["renditions"] as? [[String: Any]])
 
         func identity(_ r: [String: Any]) -> String {
@@ -158,5 +163,50 @@ struct ActoolParityTests {
                 #expect(field(got[f]) == field(want[f]), "\(identity(want)) \(f)")
             }
         }
+    }
+
+    /// Xcode 26.2's actool values (docs/research/xcode-tools-by-version.md), passed in as a caller reproducing it would.
+    static let header = CARHeaderValues(coreuiVersion: 973, storageVersion: 17,
+                                        mainVersionString: "@(#)PROGRAM:CoreUI  PROJECT:CoreUI-973.1",
+                                        versionString: "Xcode 26.2 (17C52) via AssetCatalogSimulatorAgent",
+                                        authoringTool: "@(#)PROGRAM:CoreThemeDefinition  PROJECT:CoreThemeDefinition-653.3  [IIO-2784.3.4]")
+
+    @Test("The car's tool version fields are the caller's; AssetKit's own by default")
+    func headerValues() async throws {
+        let ours = try await XCAssetCompiler(deploymentTarget: "16.0", svgRasterizer: StubSVGRasterizer(), header: Self.header).compile(catalog: Self.fixture())
+        let car = ours.carData
+        let start = try #require(car.range(of: Data("RATC".utf8))).lowerBound
+        #expect(Self.u32(car, start + 4) == 973)
+        #expect(Self.u32(car, start + 8) == 17)
+        func string(_ offset: Int, _ length: Int) -> String {
+            String(decoding: car.subdata(in: (start + offset)..<(start + offset + length)).prefix { $0 != 0 }, as: UTF8.self)
+        }
+        #expect(string(20, 128) == Self.header.mainVersionString)
+        #expect(string(148, 256) == Self.header.versionString)
+        #expect(car.range(of: Data(Self.header.authoringTool.utf8)) != nil)
+
+        let plain = try await XCAssetCompiler(deploymentTarget: "16.0", svgRasterizer: StubSVGRasterizer()).compile(catalog: Self.fixture()).carData
+        let p = try #require(plain.range(of: Data("RATC".utf8))).lowerBound
+        #expect(Self.u32(plain, p + 4) == CARHeaderValues.default.coreuiVersion)
+        #expect(CARHeaderValues.default.coreuiVersion == 970)
+        #expect(plain.range(of: Data(ExtendedMetadata.defaultAuthoringTool.utf8)) != nil)
+    }
+
+    @Test("assetutil reports the caller's tool version fields", .enabled(if: ProcessLauncher.isAvailable))
+    func assetutilHeader() async throws {
+        let scratch = FileManager.default.temporaryDirectory.appendingPathComponent("xcasset-header-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: scratch, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: scratch) }
+        let result = try await XCAssetCompiler(deploymentTarget: "16.0", svgRasterizer: StubSVGRasterizer(), header: Self.header).compile(catalog: Self.fixture())
+        let car = scratch.appendingPathComponent("Assets.car")
+        try result.carData.write(to: car)
+        let run = try ProcessLauncher.run(executable: "/usr/bin/xcrun", arguments: ["assetutil", "--info", car.path])
+        #expect(run.exitCode == 0, "\(String(decoding: run.stderr, as: UTF8.self))")
+        let info = try #require(try JSONSerialization.jsonObject(with: run.stdout) as? [[String: Any]]).first
+        #expect(info?["CoreUIVersion"] as? Int == 973)
+        #expect(info?["StorageVersion"] as? Int == 17)
+        #expect(info?["MainVersion"] as? String == Self.header.mainVersionString)
+        #expect(info?["AssetStorageVersion"] as? String == Self.header.versionString)
+        #expect(info?["Authoring Tool"] as? String == Self.header.authoringTool)
     }
 }

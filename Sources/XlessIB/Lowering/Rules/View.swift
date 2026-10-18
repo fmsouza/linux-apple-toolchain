@@ -48,7 +48,7 @@ enum ViewRule {
         b.set(ref, "UIBounds", ArchiveBuilder.doubles([0, 0, parts.size.width, parts.size.height]))
         b.set(ref, "UICenter", ArchiveBuilder.doubles([parts.center.x, parts.center.y]))
         if !parts.subviews.isEmpty { b.set(ref, "UISubviews", b.array(parts.subviews, mutable: true)) }
-        if let bg = v.colors["backgroundColor"] { b.set(ref, "UIBackgroundColor", try ColorRule.encode(bg, doc: l.doc, into: b)) }
+        if let bg = v.colors["backgroundColor"] { b.set(ref, "UIBackgroundColor", try ColorRule.encode(bg, lowering: l)) }
         b.set(ref, "UIDeepDrawRect", .bool(true))
         if try flag(v, "opaque") != false { b.set(ref, "UIOpaque", .bool(true)) }
         if try flag(v, "userInteractionEnabled") == false { b.set(ref, "UIUserInteractionDisabled", .bool(true)) }
@@ -61,7 +61,7 @@ enum ViewRule {
         // The system `tintColor` as a tint is the default: ibtool writes no key for it (`image-tint-default`,
         // `color-default-forms`; as a background or text color it is encoded like any system color).
         if let tint = v.colors["tintColor"] {
-            let encoding = try ColorRule.encoding(tint, doc: l.doc)
+            let encoding = try ColorRule.encoding(tint, lowering: l, encoded: tint.value != .system("tintColor"))
             if encoding.name != .system("tintColor") { b.set(ref, "UITintColor", encoding.encode(b)) }
         }
         // Only a view that takes part in a constraint gets the key; `fixedFrame="YES"` or no constraint means

@@ -1,5 +1,32 @@
 import Foundation
 
+/// The version fields of an `Assets.car` that name the tool that wrote it: CARHEADER's CoreUI version, storage version,
+/// main version and version strings, and EXTENDED_METADATA's authoring tool. `assetutil --info` reports them as
+/// `CoreUIVersion`, `StorageVersion`, `MainVersion`, `AssetStorageVersion` and `Authoring Tool`. `.default` is the
+/// clean-room writer's own values; a caller reproducing a given actool passes that actool's (vendored patch 5).
+public struct CARHeaderValues: Sendable, Equatable {
+    public var coreuiVersion: UInt32
+    public var storageVersion: UInt32
+    public var mainVersionString: String
+    public var versionString: String
+    public var authoringTool: String
+
+    public init(coreuiVersion: UInt32, storageVersion: UInt32, mainVersionString: String, versionString: String, authoringTool: String) {
+        self.coreuiVersion = coreuiVersion
+        self.storageVersion = storageVersion
+        self.mainVersionString = mainVersionString
+        self.versionString = versionString
+        self.authoringTool = authoringTool
+    }
+
+    public static let `default` = CARHeaderValues(
+        coreuiVersion: 970, storageVersion: 17,
+        mainVersionString: CARHeaderBlock.defaultMainVersionString,
+        versionString: CARHeaderBlock.defaultVersionString,
+        authoringTool: ExtendedMetadata.defaultAuthoringTool
+    )
+}
+
 /// CARHEADER block: 436-byte fixed-size header.
 ///
 /// Field layout, byte offsets, and constants verified by hex-dumping the
@@ -18,6 +45,11 @@ enum CARHeaderBlock {
     /// surprises.
     static let defaultMainVersionString = "@(#)PROGRAM:CoreUI  PROJECT:CoreUI-970.1"
     static let defaultVersionString = "xcasset-compiler clean-room CAR writer (Assets.car v1)"
+
+    static func data(renditionCount: UInt32, values: CARHeaderValues) -> Data {
+        data(coreuiVersion: values.coreuiVersion, storageVersion: values.storageVersion, renditionCount: renditionCount,
+             mainVersionString: values.mainVersionString, versionString: values.versionString)
+    }
 
     static func data(
         coreuiVersion: UInt32 = 970,

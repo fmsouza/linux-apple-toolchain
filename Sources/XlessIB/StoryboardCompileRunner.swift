@@ -23,10 +23,11 @@ public enum StoryboardCompileRunner {
     /// Compiles `input` into the `.storyboardc` directory `out`. The files are staged in a sibling directory and
     /// swapped in only after every write succeeded, so a failure leaves any existing `out` untouched.
     /// Warnings go to `warn`, one call per line (stderr by default).
-    /// `compile` is injectable for tests; the real compiler currently emits no warnings.
+    /// `profile` is the Xcode whose ibtool output is reproduced. `compile` is injectable for tests (default: the
+    /// compiler with `profile`); the real compiler currently emits no warnings.
     @discardableResult
-    public static func run(input: URL, out: URL, options: IBCompileOptions, force: Bool,
-                           compile: (IBDocument, IBCompileOptions) throws -> IBCompileResult = { try StoryboardCompiler.compile($0, options: $1) },
+    public static func run(input: URL, out: URL, options: IBCompileOptions, profile: XcodeToolsProfile, force: Bool,
+                           compile: ((IBDocument, IBCompileOptions) throws -> IBCompileResult)? = nil,
                            warn: (String) -> Void = { FileHandle.standardError.write(Data(($0 + "\n").utf8)) }) throws -> IBCompileResult {
         let fm = FileManager.default
         var isDir: ObjCBool = false
@@ -40,7 +41,8 @@ public enum StoryboardCompileRunner {
         guard fm.fileExists(atPath: parent.path, isDirectory: &isDir), isDir.boolValue else {
             throw XlessError(.ib, "cannot write \(out.path): the directory \(parent.path) does not exist", fix: "create it first, or choose another --out")
         }
-        let result = try compile(StoryboardParser.parse(url: input), options)
+        let doc = try StoryboardParser.parse(url: input)
+        let result = try compile.map { try $0(doc, options) } ?? StoryboardCompiler.compile(doc, options: options, profile: profile)
         try write(result.files, to: out)
         for w in result.warnings { warn(w) }
         return result

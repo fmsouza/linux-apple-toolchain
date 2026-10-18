@@ -116,6 +116,8 @@ make base-push sdk-export sdk-push
 - `make sdk-local` builds the same image locally without pushing. `make test-linux` runs the unit tests in Linux.
 - `make images XCODE=<Xcode.app | Xcode_*.xip> [ARCHS=arm64]` builds the whole local chain (`xless-base`, `xless`, `xless-tauri`, `xless-rn`) from one Xcode and tags it `:local-<arch>-xcode<version>`, for projects that pin that Xcode with `xcode:` ([react-native.md](react-native.md#pinning-the-xcode-sdk)). Its SDK export goes to `dist/sdk-xcode<version>/`. The local targets also take `ARCHS`, `IMAGE_SUFFIX` and `SDK_DIR`.
 
+The amd64 images build and run on an arm64 Mac only with Rosetta in the Docker VM (milestone 4 verified amd64 this way, not yet on a native x86_64 host; see [acceptance-m4.md](acceptance-m4.md)); under QEMU's user-mode emulation gcc and Swift crash at random. `scripts/arch-compare.sh <app-a> <app-b>` compares an app built in the arm64 chain with one built in the amd64 chain (they must be byte-for-byte equal outside the code signature; [react-native.md](react-native.md#linux-parity-test)), and `ARCH=amd64 make test-rn-linux` (`test-tauri-linux`) runs the Linux tests on the amd64 image.
+
 All of these use the active Docker context. To use a separate engine (for example a dedicated Colima VM), set `DOCKER_CONTEXT`; nothing in the repo hardcodes a context.
 
 The Docker VM must be able to see Xcode. Colima: `colima start --mount /Applications:r --mount $HOME:w`. Docker Desktop does not share `/Applications`; make an APFS clone under your home directory (cheap, copy-on-write) and point `XCODE` at it:

@@ -5,13 +5,32 @@ import XlessIB
 import XlessMachO
 
 public enum AssetsStage {
-    public static func run(input: URL, outputDir: URL, platform: Platform, config: ProjectConfig, project: URL) async throws -> URL {
-        try await Files.atomicOutput(outputDir) { partial in
-            try await compile(into: Files.copyBundle(input, intoFreshDir: partial), platform: platform, config: config, project: project)
+    /// `profile` gives the image's tools profile (`XcodeToolsProfile.forImage`); it is asked at most once, and only when
+    /// an iOS catalog or launch storyboard is compiled (macOS icons do not depend on the Xcode).
+    public static func run(input: URL, outputDir: URL, platform: Platform, config: ProjectConfig, project: URL,
+                           profile: @escaping () throws -> XcodeToolsProfile) async throws -> URL {
+        let once = Once(profile)
+        return try await Files.atomicOutput(outputDir) { partial in
+            try await compile(into: Files.copyBundle(input, intoFreshDir: partial), platform: platform, config: config, project: project,
+                              profile: once.value)
         }
     }
 
-    static func compile(into app: URL, platform: Platform, config: ProjectConfig, project: URL) async throws -> URL {
+    /// The profile, asked for the first time it is needed.
+    private final class Once {
+        let make: () throws -> XcodeToolsProfile
+        var loaded: XcodeToolsProfile?
+        init(_ make: @escaping () throws -> XcodeToolsProfile) { self.make = make }
+        func value() throws -> XcodeToolsProfile {
+            if let loaded { return loaded }
+            let p = try make()
+            loaded = p
+            return p
+        }
+    }
+
+    static func compile(into app: URL, platform: Platform, config: ProjectConfig, project: URL,
+                        profile: () throws -> XcodeToolsProfile) async throws -> URL {
         if config.distribution(for: platform) == .appStore,
            config.assets.map({ appIconSet(catalog: project.appendingPathComponent($0)) == nil }) ?? true {
             // App Store Connect rejects icon-less builds only after a full upload (ITMS-90022/90704).
@@ -19,21 +38,23 @@ public enum AssetsStage {
             throw XlessError(.assets, "App Store builds need an app icon, but \(missing)",
                              fix: "add an AppIcon.appiconset with an opaque 1024×1024 PNG to an asset catalog and set `assets:` in xless.yml to it")
         }
-        if let assets = config.assets { try await compileCatalog(assets, into: app, platform: platform, config: config, project: project) }
+        if let assets = config.assets { try await compileCatalog(assets, into: app, platform: platform, config: config, project: project, profile: profile) }
         if platform == .ios, let storyboard = config.launchStoryboard {
-            try LaunchStoryboard.compile(project.appendingPathComponent(storyboard), into: app, minimumOS: try config.platform(.ios).minimumOS)
+            try LaunchStoryboard.compile(project.appendingPathComponent(storyboard), into: app, minimumOS: try config.platform(.ios).minimumOS,
+                                         profile: try profile())
         }
         return app
     }
 
-    static func compileCatalog(_ assets: String, into app: URL, platform: Platform, config: ProjectConfig, project: URL) async throws {
+    static func compileCatalog(_ assets: String, into app: URL, platform: Platform, config: ProjectConfig, project: URL,
+                               profile: () throws -> XcodeToolsProfile) async throws {
         let catalog = project.appendingPathComponent(assets)
         let layout = BundleLayout(platform: platform)
         let plistURL = app.appendingPathComponent(layout.infoPlist)
         var info = try Plist.read(plistURL, stage: .assets)
         switch platform {
         case .ios:
-            let compiled = try await compileIOSCatalog(catalog, deploymentTarget: try config.platform(.ios).minimumOS)
+            let compiled = try await compileIOSCatalog(catalog, deploymentTarget: try config.platform(.ios).minimumOS, profile: try profile())
             try compiled.car.write(to: app.appendingPathComponent("Assets.car"))
             if let icon = compiled.icon {
                 for f in icon.files { try f.data.write(to: app.appendingPathComponent(f.name)) }
@@ -64,8 +85,9 @@ public enum AssetsStage {
     /// The one iOS asset-catalog compile path, shared by the `assets` stage and the `actool` shim (`ActoolShim`).
     /// With `includeAppIcon`, the catalog's app icon set is checked (opaque, ITMS-90717) and compiled in Xcode's
     /// single-size form from its 1024px image (`iosIconSource`); without it, app icon sets are left out of the car, as
-    /// actool does without `--app-icon`. Failures are `[assets]` errors.
-    public static func compileIOSCatalog(_ catalog: URL, includeAppIcon: Bool = true, deploymentTarget: String) async throws -> IOSCatalog {
+    /// actool does without `--app-icon`. The car carries `profile`'s actool version fields. Failures are `[assets]` errors.
+    public static func compileIOSCatalog(_ catalog: URL, includeAppIcon: Bool = true, deploymentTarget: String,
+                                         profile: XcodeToolsProfile) async throws -> IOSCatalog {
         let source: (filename: String, png: Data)?
         if includeAppIcon {
             try checkIconsOpaque(appIconPNGs(catalog: catalog))
@@ -84,12 +106,18 @@ public enum AssetsStage {
                     try fm.removeItem(at: set)
                 }
             }
-            result = try await XCAssetCompiler(deploymentTarget: deploymentTarget).compile(catalog: copy)
+            result = try await XCAssetCompiler(deploymentTarget: deploymentTarget, header: carHeader(profile)).compile(catalog: copy)
         } catch {
             throw XlessError(.assets, "AssetKit failed on \(catalog.path): \(error)", fix: "remove unsupported asset types (PDF, data sets, stickers) or report to xtool-org/AssetKit")
         }
         guard let bundle = result.appIconBundle, let source else { return IOSCatalog(car: result.carData, icon: nil) }
         return IOSCatalog(car: result.carData, icon: (bundle.primaryIconName, try XcodeAppIcon.looseFiles(name: bundle.primaryIconName, icon1024: source.png)))
+    }
+
+    /// The car version fields of `profile`'s actool (AssetKit's `CARHeaderValues`; AssetKit knows nothing of profiles).
+    static func carHeader(_ p: XcodeToolsProfile) -> CARHeaderValues {
+        CARHeaderValues(coreuiVersion: p.carCoreUIVersion, storageVersion: p.carStorageVersion, mainVersionString: p.carMainVersion,
+                        versionString: p.carAssetStorageVersion, authoringTool: p.carAuthoringTool)
     }
 
     /// Copies the catalog into `dir`, adding the missing "scale" to app icon entries (AssetKit requires it).

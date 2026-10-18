@@ -32,8 +32,14 @@
 # On a Mac host, scripts/sim-launch.sh then installs and launches the simulator app on an iOS Simulator and checks that
 # it is still running after 10 s (its screenshot, console and any crash report are kept in ~/.cache/xless/sim/HelloRN);
 # elsewhere that step is skipped. --no-launch skips it on a Mac too.
-# Variables: XLESS_IMAGE (default xless-rn:local-<arch>), DOCKER_CONTEXT (default colima-xless if it exists),
+# Variables: ARCH (arm64 or amd64; default the host's: the image's platform, so ARCH=amd64 on an arm64 Mac runs the amd64 chain
+#   under emulation), XLESS_IMAGE (default xless-rn:local-<arch>), DOCKER_CONTEXT (default colima-xless if it exists),
 #   XLESS_RN_TEST_VOLUME (default xless-rn-test-work): the docker volume holding the work copy and the pnpm store.
+#   XLESS_RN_OVERLAY (default samples/HelloRN/xless.overlay.yml): the overlay, relative to the repository; its work copy is
+#     named after the file. XLESS_RN_REFERENCE (default samples/HelloRN/reference): the Mac reference directory (an absolute
+#     host path; mounted read-only). With the Xcode 26.2 pin: XLESS_IMAGE=xless-rn:local-arm64-xcode26.2
+#     XLESS_RN_OVERLAY=samples/HelloRN/xless.overlay-26.2.yml XLESS_RN_REFERENCE=<`DEVELOPER_DIR=<26.2> make rn-reference`'s OUT>
+#     XLESS_RN_TEST_VOLUME=xless-rn-test-work-26.2 (the reference's directory also needs the allowed-gaps.txt of the default one).
 # The repository is mounted read-only. Caches are the docker volumes scripts/testflight.sh uses: xless-corepack,
 # xless-bundle, xless-cocoapods-home, xless-cocoapods-cache (created on first use).
 set -euo pipefail
@@ -41,8 +47,19 @@ root="$(cd "$(dirname "$0")/.." && pwd)"
 ctx="${DOCKER_CONTEXT:-}"
 if [[ -z "$ctx" ]] && docker context ls --format '{{.Name}}' 2>/dev/null | grep -qx 'colima-xless'; then ctx=colima-xless; fi
 case "$(uname -m)" in arm64|aarch64) arch=arm64 ;; *) arch=amd64 ;; esac
+vsuf=""; plat=()   # ARCH=amd64|arm64 runs the image of that architecture (under emulation when it is not the host's)
+if [[ -n "${ARCH:-}" ]]; then
+  [[ "$ARCH" == arm64 || "$ARCH" == amd64 ]] || { echo "test-rn-linux: ARCH must be arm64 or amd64" >&2; exit 2; }
+  [[ "$ARCH" == "$arch" ]] || vsuf="-$ARCH"   # another architecture's native gems and work copy stay apart from the host's
+  arch="$ARCH"; plat=(--platform "linux/$ARCH")
+fi
 image="${XLESS_IMAGE:-xless-rn:local-$arch}"
-volume="${XLESS_RN_TEST_VOLUME:-xless-rn-test-work}"
+volume="${XLESS_RN_TEST_VOLUME:-xless-rn-test-work$vsuf}"
+overlay="${XLESS_RN_OVERLAY:-samples/HelloRN/xless.overlay.yml}"
+refdir="${XLESS_RN_REFERENCE:-$root/samples/HelloRN/reference}"
+[[ -f "$root/$overlay" ]] || { echo "test-rn-linux: no overlay $root/$overlay" >&2; exit 2; }
+[[ -f "$refdir/reference.json" ]] || { echo "test-rn-linux: no reference.json in $refdir" >&2; exit 2; }
+workname="$(basename "$overlay" .yml)"   # the work copy is named after the overlay file
 keep=0; launch=1
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -59,15 +76,15 @@ alpine="$(sed -n 's/^ALPINE_IMAGE=//p' "$root/versions.env")"   # pinned by dige
 run() {   # RUN-NAME [docker run options...]: one build and compare, in a fresh container
   local name="$1"; shift
   echo "==> HelloRN: $name" >&2
-  "${docker[@]}" run --rm -i "$@" -v "$root":/repo:ro -v "$volume":/cache/work \
-    -v xless-corepack:/cache/corepack -v xless-bundle:/cache/bundle \
+  "${docker[@]}" run --rm -i ${plat[@]+"${plat[@]}"} "$@" -v "$root":/repo:ro -v "$volume":/cache/work -v "$refdir":/ref:ro \
+    -v xless-corepack:/cache/corepack -v "xless-bundle$vsuf":/cache/bundle \
     -v xless-cocoapods-home:/root/.cocoapods -v xless-cocoapods-cache:/root/Library/Caches/CocoaPods \
-    -e XLESS_BUILD_NUMBER=1.0.0.2026101601 -e FRESH="$fresh" "$image" bash -s <<'IN'
+    -e XLESS_BUILD_NUMBER=1.0.0.2026101601 -e FRESH="$fresh" -e OVERLAY="$overlay" -e WORKNAME="$workname" "$image" bash -s <<'IN'
 set -euo pipefail
-o=/repo/samples/HelloRN/xless.overlay.yml
+o=/repo/$OVERLAY
 s=/repo/samples/HelloRN
-r=/repo/samples/HelloRN/reference
-w=/cache/work/xless.overlay        # the work copy is named after the overlay file
+r=/ref
+w=/cache/work/$WORKNAME            # the work copy is named after the overlay file
 if [[ "$FRESH" == 1 ]]; then echo "==> removing the work copy $w (the pnpm store next to it stays)"; rm -rf "$w"; fi
 start=$(date +%s)
 # prepare, build, assets, finalize; ship prints each stage's output directory, finalize's last
@@ -131,13 +148,13 @@ IN
 
 simulator() {   # the simulator build of run 3, offline, in the same work copy
   echo "==> HelloRN: simulator build (offline)" >&2
-  "${docker[@]}" run --rm -i --network none -v "$root":/repo:ro -v "$volume":/cache/work \
-    -v xless-corepack:/cache/corepack -v xless-bundle:/cache/bundle \
+  "${docker[@]}" run --rm -i ${plat[@]+"${plat[@]}"} --network none -v "$root":/repo:ro -v "$volume":/cache/work \
+    -v xless-corepack:/cache/corepack -v "xless-bundle$vsuf":/cache/bundle \
     -v xless-cocoapods-home:/root/.cocoapods -v xless-cocoapods-cache:/root/Library/Caches/CocoaPods \
-    -e XLESS_BUILD_NUMBER=1.0.0.2026101601 "$image" bash -s <<'IN'
+    -e XLESS_BUILD_NUMBER=1.0.0.2026101601 -e OVERLAY="$overlay" -e WORKNAME="$workname" "$image" bash -s <<'IN'
 set -euo pipefail
-o=/repo/samples/HelloRN/xless.overlay.yml
-w=/cache/work/xless.overlay
+o=/repo/$OVERLAY
+w=/cache/work/$WORKNAME
 device_app="$w/.xless/build/ios/app/HelloRN.app"
 before=$(stat -c %Y "$device_app/Info.plist")
 # The device build's records and its derived data must not change either (run 4 then rebuilds the device app offline
@@ -179,12 +196,12 @@ IN
 }
 
 assets() {   # Mac host only: the device build's asset catalogs, read by assetutil, against the reference's
-  local r="$root/samples/HelloRN/reference" cars x stage inner
+  local r="$refdir" cars x stage inner
   cars="$(mktemp -d "${TMPDIR:-/tmp}/hellorn-cars.XXXXXX")"
   (cd "$root" && env -u DEVELOPER_DIR swift build --product xless -q)
   x="$(cd "$root" && env -u DEVELOPER_DIR swift build --show-bin-path)/xless"
   for stage in app final; do
-    inner="/cache/work/xless.overlay/.xless/build/ios/$stage/HelloRN.app"
+    inner="/cache/work/$workname/.xless/build/ios/$stage/HelloRN.app"
     mkdir -p "$cars/$stage"
     "${docker[@]}" run --rm -v "$volume:/cache/work:ro" "$alpine" sh -c "cd '$inner' && tar -cf - \$(find . -name '*.car')" \
       | tar -C "$cars/$stage" -xf -
@@ -201,7 +218,7 @@ run "again, offline (--network none)" --network none
 echo "==> HelloRN: both runs match the Mac reference" >&2
 if [[ "$(uname)" == Darwin ]]; then
   assets
-  echo "==> HelloRN: asset catalogs match the Mac reference (known gaps: samples/HelloRN/reference/allowed-gaps.txt)" >&2
+  echo "==> HelloRN: asset catalogs match the Mac reference (known gaps: $refdir/allowed-gaps.txt)" >&2
 else
   echo "==> HelloRN: asset catalog comparison skipped (needs xcrun assetutil, a Mac host)" >&2
 fi
@@ -210,7 +227,7 @@ run "device build after the simulator build, offline (--network none)" --network
 echo "==> HelloRN: the device build still matches the Mac reference after the simulator build" >&2
 if [[ $launch == 1 && "$(uname)" == Darwin ]]; then
   echo "==> HelloRN: launching the simulator build on an iOS Simulator" >&2
-  "$root/scripts/sim-launch.sh" "volume:$volume:/cache/work/xless.overlay/.xless/build/ios-simulator/app/HelloRN.app"
+  "$root/scripts/sim-launch.sh" "volume:$volume:/cache/work/$workname/.xless/build/ios-simulator/app/HelloRN.app"
 else
   echo "==> HelloRN: simulator launch skipped ($( [[ $launch == 0 ]] && echo "--no-launch" || echo "not a Mac host"))" >&2
 fi

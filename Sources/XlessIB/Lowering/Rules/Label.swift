@@ -160,11 +160,12 @@ enum LabelRule {
     static func encode(_ v: IBView, plan: Plan, into ref: ObjectRef, parts: ViewRule.Parts, lowering l: ViewNibLowering) throws {
         try ViewRule.encode(v, into: ref, parts: parts, lowering: l)
         let b = l.b
-        if let text = plan.text { b.set(ref, "UIText", b.string(text)) } else { b.set(ref, "UIText", .null) }
+        // A label without text: `UIText = nil` (Xcode 27.0), no key (Xcode 26.2, `label-behavior-grid`).
+        if let text = plan.text { b.set(ref, "UIText", b.string(text)) } else if l.encoding.writesNilLabelText { b.set(ref, "UIText", .null) }
         if plan.adjustsForContentSize { b.set(ref, "UIAdjustsFontForContentSizeCategory", .bool(true)) }
-        b.set(ref, "UIFont", try plan.font.encode(b))
+        b.set(ref, "UIFont", try plan.font.encode(l))
         // No text color, or `<nil key="textColor"/>`, is labelColor (`label-plain`, `label-react-native-template`).
-        let color = try plan.textColor.map { try ColorRule.encoding($0, doc: l.doc) } ?? ColorRule.system("labelColor", line: v.line)
+        let color = try plan.textColor.map { try ColorRule.encoding($0, lowering: l) } ?? ColorRule.system("labelColor", line: v.line, lowering: l)
         b.set(ref, "UITextColor", color.encode(b))
         b.set(ref, "UIShadowOffset", ArchiveBuilder.doubles([0, -1]))
         if plan.lines != 1 { b.set(ref, "UINumberOfLines", try ArchiveBuilder.int(plan.lines)) }

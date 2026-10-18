@@ -10,6 +10,11 @@ overrides:
   expo-modules-core: 57.0.10
   expo-modules-jsi: 57.0.4
 
+patchedDependencies:
+  expo-modules-jsi@57.0.4:
+    hash: d16a5631885f2d060015e0d08ba6bff9292dff6b2568c14644ab22f55e309d21
+    path: patches/expo-modules-jsi@57.0.4.patch
+
 importers:
 
   .:
@@ -3496,12 +3501,12 @@ snapshots:
   expo-modules-core@57.0.10(react-native@0.86.2(@babel/core@7.29.7)(@types/react@19.2.18)(react@19.2.3))(react@19.2.3):
     dependencies:
       '@expo/expo-modules-macros-plugin': 0.6.1
-      expo-modules-jsi: 57.0.4(react-native@0.86.2(@babel/core@7.29.7)(@types/react@19.2.18)(react@19.2.3))
+      expo-modules-jsi: 57.0.4(patch_hash=d16a5631885f2d060015e0d08ba6bff9292dff6b2568c14644ab22f55e309d21)(react-native@0.86.2(@babel/core@7.29.7)(@types/react@19.2.18)(react@19.2.3))
       invariant: 2.2.4
       react: 19.2.3
       react-native: 0.86.2(@babel/core@7.29.7)(@types/react@19.2.18)(react@19.2.3)
 
-  expo-modules-jsi@57.0.4(react-native@0.86.2(@babel/core@7.29.7)(@types/react@19.2.18)(react@19.2.3)):
+  expo-modules-jsi@57.0.4(patch_hash=d16a5631885f2d060015e0d08ba6bff9292dff6b2568c14644ab22f55e309d21)(react-native@0.86.2(@babel/core@7.29.7)(@types/react@19.2.18)(react@19.2.3)):
     dependencies:
       react-native: 0.86.2(@babel/core@7.29.7)(@types/react@19.2.18)(react@19.2.3)
 

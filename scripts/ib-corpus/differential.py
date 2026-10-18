@@ -243,7 +243,8 @@ def main():
                 continue
         if has_mixed:
             mixed.add(name)
-    r = subprocess.run(["swift", "run", "-q", "IBDifferential", str(out)], cwd=ROOT, capture_output=True, text=True)
+    build = re.search(r"Build version (\S+)", subprocess.run(["xcodebuild", "-version"], capture_output=True, text=True, check=True).stdout).group(1)
+    r = subprocess.run(["swift", "run", "-q", "IBDifferential", str(out), build], cwd=ROOT, capture_output=True, text=True)
     if r.returncode not in (0, 1):
         sys.exit(f"differential: IBDifferential failed:\n{r.stderr}")
     status, reasons, problems = Counter(), Counter(), []

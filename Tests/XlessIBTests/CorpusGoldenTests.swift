@@ -43,7 +43,16 @@ let refusedCases: [String: String] = [
     "color-white-near-white": #"unsupported: gray color white="0.99999998999999995" within 1e-06 of 0 or 1"#,
 ]
 
-struct GoldenCase: CustomStringConvertible, Sendable { let name: String; let flagset: String; var description: String { "\(name)/\(flagset)" } }
+/// The Xcode builds whose ibtool outputs are committed (`golden/<build>/`), one per `XcodeToolsProfile`.
+let goldenBuilds = ["17C52", "27A266a"]
+
+struct GoldenCase: CustomStringConvertible, Sendable {
+    let name: String
+    let flagset: String
+    var build = "27A266a"
+    var description: String { "\(build)/\(name)/\(flagset)" }
+    var profile: XcodeToolsProfile { XcodeToolsProfile.all[build]! }
+}
 
 func allGoldenCases() throws -> [GoldenCase] {
     let flags = try JSONSerialization.jsonObject(with: Data(contentsOf: corpusRoot.appendingPathComponent("flagsets.json"))) as! [String: Any]
@@ -58,14 +67,21 @@ func enabledGoldenCases() throws -> [GoldenCase] {
     try allGoldenCases().filter { c in refusedCases[c.name] == nil && unsupportedCases[c.name] == nil }
 }
 
+/// `enabledGoldenCases` once per golden build: each is compiled with that build's profile and compared with its goldens.
+func enabledGoldenCasesPerBuild() throws -> [GoldenCase] {
+    try goldenBuilds.flatMap { b in try enabledGoldenCases().map { GoldenCase(name: $0.name, flagset: $0.flagset, build: b) } }
+}
+
 /// A corpus case: its storyboard and its compiled goldens.
 struct CorpusCase {
     let name: String
     var storyboard: URL { corpusRoot.appendingPathComponent("\(name).storyboard") }
-    func goldenDir(flagset: String) -> URL { corpusRoot.appendingPathComponent("golden/\(name)/\(flagset).storyboardc") }
+    func goldenDir(flagset: String, build: String = "27A266a") -> URL {
+        corpusRoot.appendingPathComponent("golden/\(build)/\(name)/\(flagset).storyboardc")
+    }
     /// The golden `.storyboardc` files by relative path (skips `warnings.txt`).
-    func goldenFiles(flagset: String) throws -> [String: Data] {
-        let dir = goldenDir(flagset: flagset)
+    func goldenFiles(flagset: String, build: String = "27A266a") throws -> [String: Data] {
+        let dir = goldenDir(flagset: flagset, build: build)
         var out: [String: Data] = [:]
         for f in try FileManager.default.contentsOfDirectory(atPath: dir.path) where f != "warnings.txt" {
             out[f] = try Data(contentsOf: dir.appendingPathComponent(f))
@@ -73,16 +89,23 @@ struct CorpusCase {
         return out
     }
     /// The ibtool warnings recorded for this case, if any.
-    func goldenWarnings(flagset: String) throws -> [String]? {
-        let url = goldenDir(flagset: flagset).deletingLastPathComponent().appendingPathComponent("warnings.txt")
+    func goldenWarnings(flagset: String, build: String = "27A266a") throws -> [String]? {
+        let url = goldenDir(flagset: flagset, build: build).deletingLastPathComponent().appendingPathComponent("warnings.txt")
         guard FileManager.default.fileExists(atPath: url.path) else { return nil }
         return try String(contentsOf: url, encoding: .utf8).split(separator: "\n").map(String.init)
     }
 }
 
-@Test func goldensAreFromPinnedIbtool() throws {
-    let v = try String(contentsOf: corpusRoot.appendingPathComponent("golden/IBTOOL_VERSION"), encoding: .utf8)
-    #expect(v.contains("27A266a"))
+@Test(arguments: goldenBuilds)
+func goldensAreFromTheirIbtool(_ build: String) throws {
+    let v = try String(contentsOf: corpusRoot.appendingPathComponent("golden/\(build)/IBTOOL_VERSION"), encoding: .utf8)
+    let p = try #require(XcodeToolsProfile.all[build])
+    #expect(v.contains(build))
+    #expect(v.contains("ibtool \(p.ibtoolShortVersion) (\(p.ibtoolBundleVersion))"))
+}
+
+@Test func everyProfileHasGoldens() {
+    #expect(goldenBuilds == XcodeToolsProfile.all.keys.sorted())
 }
 
 @Test func filterListsNameRealCases() throws {
@@ -92,16 +115,16 @@ struct CorpusCase {
     #expect(try enabledGoldenCases().count > 230)
 }
 
-@Test(arguments: try enabledGoldenCases())
+@Test(arguments: try enabledGoldenCasesPerBuild())
 func compilesByteIdentical(_ c: GoldenCase) throws {
     let cc = CorpusCase(name: c.name)
     let doc = try StoryboardParser.parse(url: cc.storyboard)
-    let result = try StoryboardCompiler.compile(doc, options: .flagset(named: c.flagset, root: corpusRoot))
+    let result = try StoryboardCompiler.compile(doc, options: .flagset(named: c.flagset, root: corpusRoot), profile: c.profile)
     let produced = result.files
-    let golden = try cc.goldenFiles(flagset: c.flagset)
+    let golden = try cc.goldenFiles(flagset: c.flagset, build: c.build)
     let expected = golden.keys.sorted()
     #expect(produced.keys.sorted() == expected)
-    #expect(result.warnings == (try cc.goldenWarnings(flagset: c.flagset) ?? []))
+    #expect(result.warnings == (try cc.goldenWarnings(flagset: c.flagset, build: c.build) ?? []))
     for f in expected {
         let want = golden[f]!
         let got = try #require(produced[f])
@@ -117,22 +140,22 @@ func compilesByteIdentical(_ c: GoldenCase) throws {
     }
 }
 
-@Test(arguments: refusedCases.keys.sorted())
-func refusesOpenQuestionCases(_ name: String) throws {
+@Test(arguments: goldenBuilds, refusedCases.keys.sorted())
+func refusesOpenQuestionCases(_ build: String, _ name: String) throws {
     let doc = try StoryboardParser.parse(url: CorpusCase(name: name).storyboard)
     let error = try #require(throws: XlessError.self) {
-        try StoryboardCompiler.compile(doc, options: .flagset(named: "universal-16", root: corpusRoot))
+        try StoryboardCompiler.compile(doc, options: .flagset(named: "universal-16", root: corpusRoot), profile: XcodeToolsProfile.all[build]!)
     }
     #expect(error.stage == .ib)
     #expect(error.cause.hasPrefix(refusedCases[name]!), "\(error)")
     #expect(error.cause.hasSuffix("(see docs/research/nib-encoding.md#open-questions)"), "\(error)")
 }
 
-@Test(arguments: unsupportedCases.keys.sorted())
-func refusesUnsupportedCases(_ name: String) throws {
+@Test(arguments: goldenBuilds, unsupportedCases.keys.sorted())
+func refusesUnsupportedCases(_ build: String, _ name: String) throws {
     let doc = try StoryboardParser.parse(url: CorpusCase(name: name).storyboard)
     let error = try #require(throws: XlessError.self) {
-        try StoryboardCompiler.compile(doc, options: .flagset(named: "universal-16", root: corpusRoot))
+        try StoryboardCompiler.compile(doc, options: .flagset(named: "universal-16", root: corpusRoot), profile: XcodeToolsProfile.all[build]!)
     }
     #expect(error.stage == .ib)
     #expect(error.cause.hasPrefix(unsupportedCases[name]!), "\(error)")

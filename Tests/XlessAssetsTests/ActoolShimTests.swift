@@ -6,6 +6,21 @@ import Foundation
 // Command lines are the ones Swift Build runs (docs/research/react-native-ios-contract.md, "Tool shims"); expected
 // outputs come from actool 27.0 (25098) runs on the same catalogs.
 
+/// The image's toolchain metadata as a test injects it.
+func testMeta(_ build: String) -> ToolchainMeta {
+    ToolchainMeta(xcodeVersion: "2700", xcodeBuild: build, buildMachineOSBuild: "26A100", compiler: ToolchainMeta.clangCompiler, platforms: [:])
+}
+
+/// A profile as the assets stage gets it in an image made from Xcode `build`.
+func testProfile(_ build: String = "27A266a") -> () throws -> XcodeToolsProfile {
+    { try XcodeToolsProfile.forImage(meta: testMeta(build), stage: .assets) }
+}
+
+/// The shim in an image made from Xcode `build` (27A266a unless a test says otherwise).
+private func runShim(_ args: [String], cwd: URL = URL(fileURLWithPath: FileManager.default.currentDirectoryPath), build: String = "27A266a") async -> ActoolShim.Result {
+    await ActoolShim.run(args, cwd: cwd, profile: testProfile(build))
+}
+
 private func tmp(_ name: String) throws -> URL {
     let u = FileManager.default.temporaryDirectory.appendingPathComponent("actool-\(name)-\(UUID())", isDirectory: true)
     try FileManager.default.createDirectory(at: u, withIntermediateDirectories: true)
@@ -48,23 +63,55 @@ private func plist(_ url: URL) throws -> [String: Any] {
     try PropertyListSerialization.propertyList(from: Data(contentsOf: url), format: nil) as! [String: Any]
 }
 
-@Test func versionProbeAnswersAsActool27() async throws {
-    let r = await ActoolShim.run(["--version", "--output-format", "xml1"])
+@Test(arguments: [("27A266a", "25098", "27.0"), ("17C52", "24506", "26.2")])
+func versionProbeAnswersAsTheImagesActool(_ build: String, _ bundle: String, _ short: String) async throws {
+    let r = await runShim(["--version", "--output-format", "xml1"], build: build)
     #expect(r.exitCode == 0)
     let v = try PropertyListSerialization.propertyList(from: Data(r.stdout.utf8), format: nil) as! [String: Any]
-    #expect(v["com.apple.actool.version"] as? [String: String] == ["bundle-version": "25098", "short-bundle-version": "27.0"])
+    #expect(v["com.apple.actool.version"] as? [String: String] == ["bundle-version": bundle, "short-bundle-version": short])
+}
+
+/// An image whose Xcode has no tools profile is refused with exit 70 and `forImage`'s message, for every call.
+@Test func testShimRefusesUnprofiledImage() async throws {
+    let out = try tmp("out"), temp = try tmp("temp")
+    for args in [["--version", "--output-format", "xml1"], compileArgs([try expoLikeCatalog()], out: out, temp: temp, extra: ["--app-icon", "AppIcon"])] {
+        let r = await runShim(args, build: "27A9275")
+        #expect(r.exitCode == 70)
+        #expect(r.stdout.isEmpty)
+        #expect(r.stderr.contains("this image's Xcode build 27A9275 has no measured asset/storyboard tools profile"), "\(r.stderr)")
+        #expect(r.stderr.contains("make images"), "\(r.stderr)")
+    }
+    #expect(try FileManager.default.contentsOfDirectory(atPath: out.path).isEmpty)
+}
+
+/// The car and the dependency info carry the image's actool: CoreUI version and header strings as measured.
+@Test(arguments: ["27A266a", "17C52"])
+func compiledCarCarriesTheImagesActool(_ build: String) async throws {
+    let p = try #require(XcodeToolsProfile.all[build])
+    let out = try tmp("out"), temp = try tmp("temp")
+    let r = await runShim(compileArgs([try expoLikeCatalog()], out: out, temp: temp, extra: ["--app-icon", "AppIcon"]), build: build)
+    #expect(r.exitCode == 0, "\(r)")
+    let car = try Data(contentsOf: out.appendingPathComponent("Assets.car"))
+    let header = try #require(CARHeaderFields(car: car))
+    #expect(header.coreUIVersion == p.carCoreUIVersion)
+    #expect(header.storageVersion == p.carStorageVersion)
+    #expect(header.mainVersion == p.carMainVersion)
+    #expect(header.versionString == p.carAssetStorageVersion)
+    #expect(car.range(of: Data(p.carAuthoringTool.utf8)) != nil)
+    let deps = try Data(contentsOf: temp.appendingPathComponent("assetcatalog_dependencies_thinned"))
+    #expect(deps.starts(with: Data([0]) + Data("actool-\(p.actoolBundleVersion)".utf8) + Data([0])))
 }
 
 @Test func assetTagProbeAnswersNoTagsOrRefusesOnDemandResources() async throws {
     let cat = try expoLikeCatalog()
-    var r = await ActoolShim.run(["--print-asset-tag-combinations", "--output-format", "xml1", cat.path])
+    var r = await runShim(["--print-asset-tag-combinations", "--output-format", "xml1", cat.path])
     #expect(r.exitCode == 0)
     var v = try PropertyListSerialization.propertyList(from: Data(r.stdout.utf8), format: nil) as! [String: Any]
     #expect((v["com.apple.actool.asset-tag-combinations"] as? [Any])?.isEmpty == true)
 
     try Data(#"{"images":[{"filename":"l.png","idiom":"universal","scale":"1x"}],"properties":{"on-demand-resource-tags":["level1"]}}"#.utf8)
         .write(to: cat.appendingPathComponent("SplashScreenLogo.imageset/Contents.json"))
-    r = await ActoolShim.run(["--print-asset-tag-combinations", "--output-format", "xml1", cat.path])
+    r = await runShim(["--print-asset-tag-combinations", "--output-format", "xml1", cat.path])
     #expect(r.exitCode == 1)
     v = try PropertyListSerialization.propertyList(from: Data(r.stdout.utf8), format: nil) as! [String: Any]
     let errors = v["com.apple.actool.errors"] as? [[String: String]]
@@ -82,7 +129,7 @@ private func plist(_ url: URL) throws -> [String: Any] {
     (["--version", "--compile", "/o"], "--version takes only --output-format xml1"),
 ])
 func refusesArgvOutsideTheSwiftBuildSubset(args: [String], reason: String) async {
-    let r = await ActoolShim.run(args, cwd: URL(fileURLWithPath: "/"))
+    let r = await runShim(args, cwd: URL(fileURLWithPath: "/"))
     #expect(r.exitCode == 70)
     #expect(r.stdout.isEmpty)
     #expect(r.stderr.contains(reason))
@@ -92,7 +139,7 @@ func refusesArgvOutsideTheSwiftBuildSubset(args: [String], reason: String) async
 @Test func compileWritesCarIconsPartialPlistAndDependencyInfo() async throws {
     let cat = try expoLikeCatalog()
     let out = try tmp("out"), temp = try tmp("temp")
-    let r = await ActoolShim.run(compileArgs([cat], out: out, temp: temp, extra: ["--app-icon", "AppIcon"]))
+    let r = await runShim(compileArgs([cat], out: out, temp: temp, extra: ["--app-icon", "AppIcon"]))
     #expect(r.exitCode == 0, "\(r)")
     #expect(try FileManager.default.contentsOfDirectory(atPath: out.path).sorted() == ["AppIcon60x60@2x.png", "AppIcon76x76@2x~ipad.png", "Assets.car"])
     // HelloPIF's reference Info.plist icon keys (samples/HelloPIF/reference/reference.json).
@@ -114,7 +161,7 @@ func refusesArgvOutsideTheSwiftBuildSubset(args: [String], reason: String) async
     var outputs: [[String: Data]] = []
     for platform in ["iphoneos", "iphonesimulator"] {
         let out = try tmp("out-\(platform)"), temp = try tmp("temp-\(platform)")
-        let r = await ActoolShim.run(compileArgs([cat], out: out, temp: temp, extra: ["--app-icon", "AppIcon"], platform: platform))
+        let r = await runShim(compileArgs([cat], out: out, temp: temp, extra: ["--app-icon", "AppIcon"], platform: platform))
         #expect(r.exitCode == 0, "\(r)")
         var files: [String: Data] = [:]
         for name in try FileManager.default.contentsOfDirectory(atPath: out.path) { files[name] = try Data(contentsOf: out.appendingPathComponent(name)) }
@@ -127,7 +174,7 @@ func refusesArgvOutsideTheSwiftBuildSubset(args: [String], reason: String) async
 
 @Test func iphoneOnlyNamesTheIconOnlyInThePhoneDictionary() async throws {
     let out = try tmp("out"), temp = try tmp("temp")
-    let r = await ActoolShim.run(compileArgs([try expoLikeCatalog()], out: out, temp: temp, devices: ["iphone"], extra: ["--app-icon", "AppIcon"]))
+    let r = await runShim(compileArgs([try expoLikeCatalog()], out: out, temp: temp, devices: ["iphone"], extra: ["--app-icon", "AppIcon"]))
     #expect(r.exitCode == 0)
     let info = try plist(temp.appendingPathComponent("assetcatalog_generated_info.plist_thinned"))
     #expect(((info["CFBundleIcons~ipad"] as? [String: Any])?["CFBundlePrimaryIcon"] as? [String: Any])?["CFBundleIconName"] == nil)
@@ -138,21 +185,21 @@ func refusesArgvOutsideTheSwiftBuildSubset(args: [String], reason: String) async
 
 @Test func withoutAppIconFlagTheIconIsLeftOutAndEmptyCatalogsWriteNoCar() async throws {
     var out = try tmp("out"), temp = try tmp("temp")
-    var r = await ActoolShim.run(compileArgs([try expoLikeCatalog()], out: out, temp: temp))
+    var r = await runShim(compileArgs([try expoLikeCatalog()], out: out, temp: temp))
     #expect(r.exitCode == 0)
     #expect(try FileManager.default.contentsOfDirectory(atPath: out.path) == ["Assets.car"])
     #expect(try plist(temp.appendingPathComponent("assetcatalog_generated_info.plist_thinned")).isEmpty)
 
     // An app-icon-only catalog without --app-icon, like an empty one, gives no Assets.car (actool: same).
     out = try tmp("out"); temp = try tmp("temp")
-    r = await ActoolShim.run(compileArgs([try singleSizeCatalog(icon: solidPNG(64, r: 1, g: 1, b: 1))], out: out, temp: temp))
+    r = await runShim(compileArgs([try singleSizeCatalog(icon: solidPNG(64, r: 1, g: 1, b: 1))], out: out, temp: temp))
     #expect(r.exitCode == 0)
     #expect(try FileManager.default.contentsOfDirectory(atPath: out.path).isEmpty)
 }
 
 @Test func missingAppIconSetAndAlphaIconsAreToolErrors() async throws {
     let out = try tmp("out"), temp = try tmp("temp")
-    var r = await ActoolShim.run(compileArgs([try expoLikeCatalog(icon: false)], out: out, temp: temp, extra: ["--app-icon", "AppIcon"]))
+    var r = await runShim(compileArgs([try expoLikeCatalog(icon: false)], out: out, temp: temp, extra: ["--app-icon", "AppIcon"]))
     #expect(r.exitCode == 1)
     #expect(r.stdout.hasPrefix("/* com.apple.actool.errors */\n"))
     // actool's wording alone on stdout; xless's fix on stderr.
@@ -161,7 +208,7 @@ func refusesArgvOutsideTheSwiftBuildSubset(args: [String], reason: String) async
     #expect(r.stderr.contains(" — add AppIcon.appiconset"))
 
     let alpha = try singleSizeCatalog(icon: fakePNG(1024, colorType: 6))
-    r = await ActoolShim.run(compileArgs([alpha], out: out, temp: temp, extra: ["--app-icon", "AppIcon"]))
+    r = await runShim(compileArgs([alpha], out: out, temp: temp, extra: ["--app-icon", "AppIcon"]))
     #expect(r.exitCode == 1)
     #expect(r.stdout.contains("\(alpha.path): error: app icon 1024x1024 has an alpha channel (ITMS-90717)\n"))
 }
@@ -176,7 +223,7 @@ func refusesArgvOutsideTheSwiftBuildSubset(args: [String], reason: String) async
     try solidPNG(64, r: 1, g: 2, b: 3).write(to: nested.appendingPathComponent("i.png"))
     for extra in [[], ["--app-icon", "AppIcon"]] {
         let out = try tmp("out"), temp = try tmp("temp")
-        let r = await ActoolShim.run(compileArgs([cat], out: out, temp: temp, extra: extra))
+        let r = await runShim(compileArgs([cat], out: out, temp: temp, extra: extra))
         #expect(r.exitCode == 1)
         #expect(r.stdout.contains("error: app icon set AppIcon.appiconset is inside a folder of the catalog"))
         #expect(try FileManager.default.contentsOfDirectory(atPath: out.path).isEmpty)
@@ -185,7 +232,7 @@ func refusesArgvOutsideTheSwiftBuildSubset(args: [String], reason: String) async
 
 @Test func outputDirectoryMustExistAsForActool() async throws {
     let temp = try tmp("temp")
-    let r = await ActoolShim.run(compileArgs([try expoLikeCatalog()], out: temp.appendingPathComponent("nope"), temp: temp))
+    let r = await runShim(compileArgs([try expoLikeCatalog()], out: temp.appendingPathComponent("nope"), temp: temp))
     #expect(r.exitCode == 1)
     #expect(r.stdout.contains("error: The output directory"))
 }
@@ -193,12 +240,12 @@ func refusesArgvOutsideTheSwiftBuildSubset(args: [String], reason: String) async
 @Test func accentColorIsNamedInThePlistOrWarnedAbout() async throws {
     let cat = try expoLikeCatalog()
     var out = try tmp("out"), temp = try tmp("temp")
-    var r = await ActoolShim.run(compileArgs([cat], out: out, temp: temp, extra: ["--accent-color", "SplashScreenBackground"]))
+    var r = await runShim(compileArgs([cat], out: out, temp: temp, extra: ["--accent-color", "SplashScreenBackground"]))
     #expect(r.exitCode == 0)
     #expect(try plist(temp.appendingPathComponent("assetcatalog_generated_info.plist_thinned"))["NSAccentColorName"] as? String == "SplashScreenBackground")
 
     out = try tmp("out"); temp = try tmp("temp")
-    r = await ActoolShim.run(compileArgs([cat], out: out, temp: temp, extra: ["--accent-color", "AccentColor"]))
+    r = await runShim(compileArgs([cat], out: out, temp: temp, extra: ["--accent-color", "AccentColor"]))
     #expect(r.exitCode == 0)
     #expect(r.stdout.hasPrefix("/* com.apple.actool.notices */\n\(cat.path): warning: Accent color ‘AccentColor’ is not present in any asset catalogs.\n"))
     #expect(try plist(temp.appendingPathComponent("assetcatalog_generated_info.plist_thinned"))["NSAccentColorName"] == nil)
@@ -211,12 +258,12 @@ func refusesArgvOutsideTheSwiftBuildSubset(args: [String], reason: String) async
     try solidPNG(8, r: 9, g: 9, b: 9).write(to: b.appendingPathComponent("Other.imageset/o.png"))
     try Data(#"{"images":[{"filename":"o.png","idiom":"universal","scale":"1x"}],"info":{"author":"xcode","version":1}}"#.utf8).write(to: b.appendingPathComponent("Other.imageset/Contents.json"))
     let out = try tmp("out"), temp = try tmp("temp")
-    var r = await ActoolShim.run(compileArgs([a, b], out: out, temp: temp, extra: ["--app-icon", "AppIcon"]))
+    var r = await runShim(compileArgs([a, b], out: out, temp: temp, extra: ["--app-icon", "AppIcon"]))
     #expect(r.exitCode == 0, "\(r)")
     #expect(FileManager.default.fileExists(atPath: out.appendingPathComponent("Assets.car").path))
 
     try FileManager.default.copyItem(at: a.appendingPathComponent("SplashScreenLogo.imageset"), to: b.appendingPathComponent("SplashScreenLogo.imageset"))
-    r = await ActoolShim.run(compileArgs([a, b], out: out, temp: temp, extra: ["--app-icon", "AppIcon"]))
+    r = await runShim(compileArgs([a, b], out: out, temp: temp, extra: ["--app-icon", "AppIcon"]))
     #expect(r.exitCode == 1)
     #expect(r.stdout.contains("SplashScreenLogo.imageset is in more than one asset catalog"))
 }
@@ -234,7 +281,7 @@ private func symbolsRun(_ cat: URL, target: String) async throws -> (ActoolShim.
                 "--generate-swift-asset-symbols", ds.appendingPathComponent("GeneratedAssetSymbols.swift").path,
                 "--generate-objc-asset-symbols", ds.appendingPathComponent("GeneratedAssetSymbols.h").path,
                 "--generate-asset-symbol-index", ds.appendingPathComponent("GeneratedAssetSymbols-Index.plist").path]
-    return (await ActoolShim.run(args), out, temp)
+    return (await runShim(args), out, temp)
 }
 
 @Test func assetSymbolsBelowIOS17ImportTheUIFrameworksAndBackDeploy() async throws {
@@ -299,4 +346,19 @@ private func symbolsRun(_ cat: URL, target: String) async throws -> (ActoolShim.
         #undef AC_SWIFT_PRIVATE
 
         """)
+}
+
+/// The CARHEADER block of an `Assets.car` (436 bytes from the "RATC" magic: CoreUI version, storage version, timestamp,
+/// rendition count, the 128-byte main version string and the 256-byte version string).
+struct CARHeaderFields {
+    var coreUIVersion: UInt32, storageVersion: UInt32, mainVersion: String, versionString: String
+
+    init?(car: Data) {
+        guard let r = car.range(of: Data("RATC".utf8)), r.lowerBound + 436 <= car.count else { return nil }
+        let b = [UInt8](car[r.lowerBound..<(r.lowerBound + 436)])
+        func u32(_ o: Int) -> UInt32 { UInt32(b[o]) | UInt32(b[o + 1]) << 8 | UInt32(b[o + 2]) << 16 | UInt32(b[o + 3]) << 24 }
+        func string(_ o: Int, _ n: Int) -> String { String(decoding: b[o..<(o + n)].prefix { $0 != 0 }, as: UTF8.self) }
+        coreUIVersion = u32(4); storageVersion = u32(8)
+        mainVersion = string(20, 128); versionString = string(148, 256)
+    }
 }

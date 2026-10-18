@@ -4,7 +4,7 @@ import Testing
 
 /// Value tag 5 is YES and tag 4 is NO (docs/research/nib-encoding.md, "Booleans").
 private func goldenValue(_ caseName: String, className: String, key: String) throws -> NIBValueData? {
-    let dir = corpusRoot.appendingPathComponent("golden/\(caseName)/universal-16.storyboardc")
+    let dir = corpusRoot.appendingPathComponent("golden/27A266a/\(caseName)/universal-16.storyboardc")
     let nib = try #require(try FileManager.default.contentsOfDirectory(at: dir, includingPropertiesForKeys: nil)
         .first { $0.lastPathComponent.contains("-view-") })
     let a = try NIBArchiveReader.read(Data(contentsOf: nib))
@@ -38,7 +38,7 @@ private func goldenValue(_ caseName: String, className: String, key: String) thr
 }
 
 @Test func dumpPrintsYesAsTrue() throws {
-    let dir = corpusRoot.appendingPathComponent("golden/image-catalog-scaleAspectFit/universal-16.storyboardc")
+    let dir = corpusRoot.appendingPathComponent("golden/27A266a/image-catalog-scaleAspectFit/universal-16.storyboardc")
     let nib = try #require(try FileManager.default.contentsOfDirectory(at: dir, includingPropertiesForKeys: nil)
         .first { $0.lastPathComponent.contains("-view-") })
     let dump = NIBDump.render(try NIBArchiveReader.read(Data(contentsOf: nib)))

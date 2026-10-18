@@ -7,12 +7,44 @@ import XlessCore
 final class ViewNibLowering {
     let doc: IBDocument
     let options: IBCompileOptions
+    /// The image's Xcode: whose ibtool output this nib reproduces.
+    let profile: XcodeToolsProfile
+    /// How this view nib is encoded under that Xcode (`profile.nibPlainViews` or `profile.nibOtherViews`, set by `lower`).
+    private(set) var encoding: XcodeToolsProfile.NibEncoding
     let b = ArchiveBuilder()
     private(set) var warnings: [String] = []
+    /// The point sizes of the italic system fonts encoded so far (`FontEncoding`, `checkItalicSizes`).
+    var italicSizes = Set<Double>()
 
-    init(doc: IBDocument, options: IBCompileOptions) {
+    init(doc: IBDocument, options: IBCompileOptions, profile: XcodeToolsProfile) {
         self.doc = doc
         self.options = options
+        self.profile = profile
+        self.encoding = profile.nibOtherViews
+    }
+
+    /// Whether the view nib of `root` is one of plain views: safe-area layout (no legacy top/bottom guides) and no label
+    /// or image view anywhere in the tree. Xcode 26.2 encodes those differently from every other view nib (the LNE key,
+    /// its own system color table; docs/research/xcode-tools-by-version.md, "Compiled nib differences": in its goldens
+    /// the view nibs carrying `IBUINibLNEVersionKey` are exactly these).
+    static func isPlainViews(_ root: IBView, doc: IBDocument) -> Bool {
+        guard doc.useSafeAreas || root.safeArea != nil else { return false }
+        func plain(_ v: IBView) -> Bool { v.kind == .view && v.subviews.allSatisfy(plain) }
+        return plain(root)
+    }
+
+    /// Under a profile that shares the italic traits dictionary per optical-size band, two italic system fonts of
+    /// different sizes need every size to be in a measured band: whether they share it is not known otherwise.
+    func checkItalicSizes() throws {
+        guard case let .opticalSizeBands(low, high, between) = encoding.italicTraits, italicSizes.count > 1 else { return }
+        let sizes = italicSizes.sorted()
+        func pt(_ v: Double) -> String { String(format: "%g", v) }
+        if let unmeasured = sizes.first(where: { !($0 <= low || $0 >= high || between.contains($0)) }) {
+            let list = sizes.map { pt($0) }
+            let shown = list.count == 2 ? "\(list[0]) and \(list[1])" : list.dropLast().joined(separator: ", ") + " and " + list.last!
+            throw XlessError(.ib, "unsupported: italic system fonts of \(shown) pt in one storyboard under Xcode \(profile.xcodeVersion) (\(profile.xcodeBuild)): whether that ibtool shares their traits dictionary is measured only for \(pt(low)) pt or less, \(between.map { pt($0) }.joined(separator: ", ")) pt and \(pt(high)) pt or more, not \(pt(unmeasured)) pt (see docs/research/xcode-tools-by-version.md)",
+                             fix: "use italic sizes of 13 pt or less, 20 pt, or 28 pt or more, or a single italic size")
+        }
     }
 
     /// A lowered subview: its object, its entry in the objects list (`[its constraints…, its subviews…]`) and its
@@ -49,6 +81,7 @@ final class ViewNibLowering {
     }
 
     func lower(_ rootView: IBView) throws -> NIBArchive {
+        encoding = Self.isPlainViews(rootView, doc: doc) ? profile.nibPlainViews : profile.nibOtherViews
         try ViewRule.checkSupported(rootView, isRoot: true, lowering: self)
         try prepareConstraints(rootView)
         let owner = b.proxy("IBFilesOwner"), responder = b.proxy("IBFirstResponder")
@@ -80,10 +113,14 @@ final class ViewNibLowering {
         let accessible = (try AccessibilityRule.value(rootView).map { [(ref: root, traits: $0)] } ?? [])
             + Lowered.accessibilityBreadthFirst(subviews)
         let configurations = try AccessibilityRule.encode(accessible, into: b)
+        try checkItalicSizes()
         let top = [owner, responder, root]
         let nibRoot = b.nibRoot(topLevel: top, objects: top + entry, connections: [b.outlet("view", source: owner, destination: root)],
-                                accessibilityConfigurations: configurations)
-        return try b.finish(root: nibRoot)
+                                accessibilityConfigurations: configurations, lneVersionKey: encoding.writesLNEVersionKey)
+        var archive = try b.finish(root: nibRoot)
+        // The `LNE\0` after the class names comes with the key: Xcode 26.2's view nibs without it end at the class names.
+        if !encoding.writesLNEVersionKey { archive.trailer = Data() }
+        return archive
     }
 
     func lowerSubview(_ v: IBView) throws -> Lowered {

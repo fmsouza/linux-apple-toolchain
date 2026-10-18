@@ -20,6 +20,8 @@ public final class ArchiveBuilder {
     struct Object { var className: String; var values: [(key: String, value: Value)] = [] }
 
     private var objects: [Object] = []
+    /// The number of objects made so far (an identity for objects that are never shared).
+    var objectCount: Int { objects.count }
     private var fallbacks: [String: String] = [:]
     /// Keyed by the identity's UTF-8 bytes: Swift `String` equality is Unicode canonical equivalence, but ibtool keeps
     /// NFC and NFD spellings of the same text apart (`label-text-forms`: "Café" twice, 5 and 6 bytes).

@@ -11,7 +11,7 @@ private func compileVariant(of name: String = "core-safearea", _ replace: [(Stri
         xml = xml.replacingOccurrences(of: a, with: b)
     }
     let doc = try StoryboardParser.parse(Data(xml.utf8))
-    return try StoryboardCompiler.compile(doc, options: .flagset(named: "universal-16", root: corpusRoot))
+    return try StoryboardCompiler.compile(doc, options: .flagset(named: "universal-16", root: corpusRoot), profile: .xcode27A266a)
 }
 
 private func refusal(of name: String = "core-safearea", _ replace: [(String, String)]) throws -> XlessError {
@@ -28,7 +28,7 @@ private func refusal(of name: String = "core-safearea", _ replace: [(String, Str
 
 @Test func compileByURLWritesTheThreeFiles() throws {
     let r = try StoryboardCompiler.compile(url: CorpusCase(name: "xcode-template").storyboard,
-                                           options: IBCompileOptions(targetDevices: ["iphone"], minimumDeploymentTarget: "16.0"))
+                                           options: IBCompileOptions(targetDevices: ["iphone"], minimumDeploymentTarget: "16.0"), profile: .xcode27A266a)
     #expect(r.files.keys.sorted() == ["01J-lp-oVM-view-Ze5-6b-2t3.nib", "Info.plist", "UIViewController-01J-lp-oVM.nib"])
     #expect(r.warnings.isEmpty)
 }
@@ -37,10 +37,10 @@ private func refusal(of name: String = "core-safearea", _ replace: [(String, Str
     let doc = try StoryboardParser.parse(url: CorpusCase(name: "core-safearea").storyboard)
     for (devices, target) in [(["ipad"], "16.0"), (["iphone"], "13.0"), (["iphone"], "28.0"), (["iphone"], "sixteen")] {
         #expect(throws: XlessError.self, "\(devices) \(target)") {
-            try StoryboardCompiler.compile(doc, options: IBCompileOptions(targetDevices: devices, minimumDeploymentTarget: target))
+            try StoryboardCompiler.compile(doc, options: IBCompileOptions(targetDevices: devices, minimumDeploymentTarget: target), profile: .xcode27A266a)
         }
     }
-    _ = try StoryboardCompiler.compile(doc, options: IBCompileOptions(targetDevices: ["iphone"], minimumDeploymentTarget: "27.4"))
+    _ = try StoryboardCompiler.compile(doc, options: IBCompileOptions(targetDevices: ["iphone"], minimumDeploymentTarget: "27.4"), profile: .xcode27A266a)
 }
 
 @Test func refusesUnknownDeviceAsOpenQuestion() throws {
@@ -220,7 +220,7 @@ private let imageTag = #"<imageView clipsSubviews="YES" userInteractionEnabled="
 
 @Test func missingImagesCompileWithoutWarnings() throws {
     let r = try StoryboardCompiler.compile(url: CorpusCase(name: "image-missing").storyboard,
-                                           options: .flagset(named: "universal-16", root: corpusRoot))
+                                           options: .flagset(named: "universal-16", root: corpusRoot), profile: .xcode27A266a)
     #expect(r.warnings.isEmpty)
 }
 
@@ -575,7 +575,7 @@ private let ownWidth = #"<constraint firstAttribute="width" constant="100" id="C
                 let r = try #require(xml.range(of: a))
                 xml.replaceSubrange(r, with: b)
             }
-            try StoryboardCompiler.compile(StoryboardParser.parse(Data(xml.utf8)), options: .flagset(named: "universal-16", root: corpusRoot))
+            try StoryboardCompiler.compile(StoryboardParser.parse(Data(xml.utf8)), options: .flagset(named: "universal-16", root: corpusRoot), profile: .xcode27A266a)
         }
         #expect(e.stage == .ib)
         #expect(e.cause.hasPrefix(expected), "\(e.cause)")

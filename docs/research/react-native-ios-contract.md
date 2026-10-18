@@ -575,8 +575,8 @@ Run `make rn-reference`, which runs `scripts/rn-reference.sh samples/HelloRN sam
 **Xcode.** The reference is recorded with the pinned Xcode 27.0 (27A266a, iPhoneOS SDK 27.0), so `DTPlatformVersion`
 and `DTSDKName` read 27.0/`iphoneos27.0`. The script uses `DEVELOPER_DIR` if it is set. Otherwise it defaults to
 `~/.cache/xless/Xcode.app/Contents/Developer` when that copy is 27A266a, because an `/Applications` Xcode may
-auto-update. Any other build is refused unless `REF_ALLOW_XCODE_BUILD` names it; that variable is an escape hatch for
-experiments, not for committed references.
+auto-update. Any Xcode build with an `XcodeToolsProfile` entry (`scripts/xcode-tools.sh`; 17C52 and 27A266a) is accepted for
+its own SDK (`DEVELOPER_DIR=…`); a build without one is refused.
 
 ## XlessXcode: pbxproj → PIF (Task 5)
 
