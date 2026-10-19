@@ -294,7 +294,7 @@ struct SetupCommand: AsyncParsableCommand {
     }
 }
 
+/// Unbuffered, so the lines stay in order with the steps' own output.
 private func say(_ line: String) {
-    print(line)
-    fflush(stdout)
+    FileHandle.standardOutput.write(Data((line + "\n").utf8))
 }
