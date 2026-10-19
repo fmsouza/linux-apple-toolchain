@@ -11,7 +11,7 @@ to Apple.
 | 1. PR checks run and pass; a bad title is blocked; squash merging only | PASS — see below |
 | 2. A docs-only nightly releases nothing; a manual run produces `v0.1.0` | PARTLY — the release plan is checked; `v0.1.0` is pending the release |
 | 3. The README's install line on fresh Ubuntu 24.04 (arm64 and x86_64) installs `0.1.0`; a tampered tarball is refused | PASS from a local `file://` release; the published `v0.1.0` is pending the release |
-| 4. `xless setup` builds the chain from each `.xip` with no Mac; HelloRN and HelloTauri match the Mac references; an unsupported `.xip` is refused | PASS on arm64 for Xcode 27.0 and 26.2; amd64 (Xcode 27.0) under Rosetta — see the known gaps |
+| 4. `xless setup` builds the chain from each `.xip` with no Mac; HelloRN and HelloTauri match the Mac references; an unsupported `.xip` is refused | PASS within this scope: chains for Xcode 27.0 (arm64, and amd64 under Rosetta) and 26.2 (arm64). HelloRN matches on arm64 for 27.0 and 26.2 and on amd64 for 27.0; HelloTauri on arm64 for 27.0 only; HelloShip built on all three chains. 27.1 is refused. See the known gaps |
 | 5. No Apple binary runs on the user path | PASS — see below |
 | 6. The README, followed verbatim by a reader who has not seen the repository, reaches a built app | PASS — its findings are fixed |
 | 7. A privacy scan of the repository and every release asset is clean | PASS — see below |
@@ -40,34 +40,34 @@ headers, read as files).
 | `Xcode_26.2_Apple_silicon.xip` | 26.2 (17C52) | identical | yes | yes |
 | `Xcode_27.1.xip` | 27.1 (27A9275), not profiled | — | — | no |
 
-The three SHA-256s are in `versions.env` (`XCODE_XIP_SHA256_<build>`). Exports on the Mac took 3 to 4 minutes each.
-The Apple-silicon 26.2 download was vetted this way, but no image chain was built from it.
+The three SHA-256s are in `versions.env` (`XCODE_XIP_SHA256_<build>`). Exports on the Mac took 171 to 234 s each, and
+the export directory peaked at 11.5 to 14.9 GB.
 
 ## Runs in the VM
 
-Disk columns are the growth of the root disk (`~/.cache`) and of Docker's data root during the run: the peak, then
-what stayed. The first chain was built by the README reader (criterion 6); the others followed in this order.
+Disk columns are the growth of the root disk (`~/.cache`) and of Docker's data root during the run, in decimal GB
+(10^9 bytes, as `xless setup`'s check counts): the peak, then what stayed. They were sampled every 10 s with `df`. The first chain was built by the README reader (criterion 6); the others followed in this order.
 
 | Run | Exit | Time | Cache peak / kept | Docker peak / kept |
 |---|---|---|---|---|
-| `xless setup --xcode Xcode_27.xip` (arm64, the README run, fresh machine) | 0 | 12 min 15 s | — / 3.3 GB | — / 29 GB |
+| `xless setup --xcode Xcode_27.xip` (arm64, the README run, fresh machine) | 0 | 12 min 15 s | — / 3.5 GB | — / 31 GB |
 | `xless docker ~/HelloShip --build-number 1 --to finalize` (Xcode 27.0) | 0 | ~6 s | — | — |
 | `xless setup --xcode Xcode_27.1.xip` | 11, the supported list | 2 s | 0 | 0 |
 | `xless setup --xcode /etc/hostname` | 11, the supported list | 0 s | 0 | 0 |
-| HelloRN, `xless docker --config samples/HelloRN/xless.overlay.yml … --to finalize` (Xcode 27.0) | 0 | 2 min 16 s | 0 | 3.1 / 3.0 GB |
-| HelloRN, `scripts/test-rn-linux.sh` (Xcode 27.0) | 0 | 3 min 3 s | 0 | 2.8 GB |
-| HelloTauri, `xless docker --config samples/HelloTauri/xless.overlay.example.yml … --to finalize` (Xcode 27.0) | 0 | 3 min 11 s | 1.3 GB | 2.0 GB |
+| HelloRN, `xless docker --config samples/HelloRN/xless.overlay.yml … --to finalize` (Xcode 27.0) | 0 | 2 min 16 s | 0 | 3.3 / 3.1 GB |
+| HelloRN, `scripts/test-rn-linux.sh` (Xcode 27.0) | 0 | 3 min 3 s | 0 | 2.9 GB |
+| HelloTauri, `xless docker --config samples/HelloTauri/xless.overlay.example.yml … --to finalize` (Xcode 27.0) | 0 | 3 min 11 s | 1.4 GB | 2.1 GB |
 | HelloTauri, `scripts/test-tauri-linux.sh` (Xcode 27.0) | 0 | 2 min 26 s | 0 | 1.3 GB |
-| `xless setup --xcode Xcode_26.2_Universal.xip` (arm64; `xless-base` layers cached) | 0 | 13 min 8 s | 13.8 / 3.1 GB | 26.0 / 26.5 GB |
+| `xless setup --xcode Xcode_26.2_Universal.xip` (arm64; `xless-base` layers cached) | 0 | 13 min 8 s | 14.5 / 3.3 GB | 27.2 / 27.8 GB |
 | HelloShip pinned to `xcode: "26.2"` (the README's 26.2 step) | 0 | 6 s | 0 | 0 |
-| HelloRN, `xless docker --config samples/HelloRN/xless.overlay-26.2.yml …` (Xcode 26.2) | 0 | 1 min 44 s | 0 | 2.1 GB |
-| HelloRN, `scripts/test-rn-linux.sh` with the 26.2 overlay and the 26.2 Mac reference | 0 | 2 min 37 s | 0 | 2.6 GB |
-| `xless setup --xcode Xcode_27.xip --arch amd64` (`XLESS_BIN_AMD64` = the local x86_64 `0.1.0` binary; Rosetta) | 0 | 21 min 4 s | 12.5 / 3.4 GB | 21.8 / 21.9 GB |
-| HelloShip in the amd64 images (Xcode 27.0) | 0 | 1 min 1 s | 0 | 6.8 GB (first run of the amd64 image) |
+| HelloRN, `xless docker --config samples/HelloRN/xless.overlay-26.2.yml …` (Xcode 26.2) | 0 | 1 min 44 s | 0 | 2.2 GB |
+| HelloRN, `scripts/test-rn-linux.sh` with the 26.2 overlay and the 26.2 Mac reference | 0 | 2 min 37 s | 0 | 2.7 GB |
+| `xless setup --xcode Xcode_27.xip --arch amd64` (`XLESS_BIN_AMD64` = the local x86_64 `0.1.0` binary; Rosetta) | 0 | 21 min 4 s | 13.1 / 3.6 GB | 22.9 / 22.9 GB |
+| HelloShip in the amd64 images (Xcode 27.0) | 0 | 1 min 1 s | 0 | 7.2 GB (first run of the amd64 image) |
 | `scripts/arch-compare.sh`, HelloShip arm64 against amd64 | 0, identical | — | — | — |
-| HelloRN, `ARCH=amd64 scripts/test-rn-linux.sh` (Xcode 27.0) | 0 | 7 min 57 s | 0 | 3.6 GB |
+| HelloRN, `ARCH=amd64 scripts/test-rn-linux.sh` (Xcode 27.0) | 0 | 7 min 57 s | 0 | 3.8 GB |
 | `scripts/arch-compare.sh`, HelloRN arm64 against amd64 (build-stage app and finalized app) | 0, identical (47 files each) | — | — | — |
-| Final code: install over the previous `0.1.0`, then `xless setup --xcode Xcode_27.xip` (arm64; export again, images rebuilt around the new `xless`) | 0 | 9 min 43 s | 12.1 / 3.4 GB | 20.0 / 20.4 GB |
+| Final code: install over the previous `0.1.0`, then `xless setup --xcode Xcode_27.xip` (arm64; export again, images rebuilt around the new `xless`) | 0 | 9 min 43 s | 12.7 / 3.6 GB | 21.0 / 21.4 GB |
 | Final code: HelloShip, fresh copy (Xcode 27.0), then `scripts/arch-compare.sh` against the README run's app | 0, identical | 6 s | 0 | 0 |
 
 Between the 26.2 runs and the amd64 runs, the 26.2 images were removed (`docker rmi`, `docker builder prune`,
@@ -104,9 +104,10 @@ A fresh reader with only the README, a shell in the VM and the `.xip` path insta
 Xcode 27.0 and built HelloShip. Its findings, and what changed:
 
 - The disk check asked for 120 GB in both the cache and Docker's data root, and refused a machine that had room: the
-  run used about 3 GB of cache and 29 GB of Docker data. The check now asks, per architecture, for
-  `XLESS_SETUP_CACHE_GB` (16) under the cache, only when the SDK is exported, and `XLESS_SETUP_DOCKER_GB` (40) under
-  Docker's data root. The figures are the measured peaks above, rounded up, plus a margin. The refusal names the
+  run kept about 3.5 GB of cache and 31 GB of Docker data. The check now asks, per architecture, for
+  `XLESS_SETUP_CACHE_GB` (17) under the cache, only when the SDK is exported, and `XLESS_SETUP_DOCKER_GB` (40) under
+  Docker's data root. The figures are the largest measured peaks (14.9 GB of cache, 31 GB of Docker data), plus about
+  2 GB and 9 GB. The stock 19 GB root disk of this VM had 18 GB free, so the README's path still passes the check. The refusal names the
   directory, the free and the needed GB, and the variable that overrides it; `--dry-run` prints the check. README and
   [troubleshooting.md](troubleshooting.md#the-disk-check) say the same.
 - The step estimates were several times too long (75 minutes in all, against 12). They are now the measured times,
@@ -151,8 +152,8 @@ that export ([apple-requirements.md](apple-requirements.md)).
   private identifiers and home paths: no hit. No tracked file is Apple SDK material (`.tbd`, `SDKSettings`,
   `.swiftinterface`, `.swiftmodule`, SDK directories, `.xip`, `.car`).
 - Both release tarballs, extracted (160 files): no private identifier and no home path. The only matches of the
-  list's patterns were in the binaries' ICU data: the name of a unit of light (between candela and lux) that equals
-  one of the listed words, a false positive. No Apple SDK file is in either tarball.
+  list's patterns: one pattern matched a common English word inside ICU's unit-name data in the binaries; a false
+  positive. No Apple SDK file is in either tarball.
 - A first local build compiled its build directory's absolute path into the binary (BoringSSL's assertion paths). The
   scanned tarballs were therefore built from a clone at a neutral path, as CI builds them.
 
@@ -160,7 +161,11 @@ that export ([apple-requirements.md](apple-requirements.md)).
 
 - amd64 was verified under Rosetta on an Apple-silicon Mac, not on a native x86_64 host. On x86_64 hardware, only the
   install and `xless --version` ran (GitHub's runner); no `xless setup` from a `.xip` has run on a native x86_64 host.
-- Xcode 26.2 was set up on arm64 only. The Tauri sample has a reference for Xcode 27.0 only.
+- Xcode 26.2 was set up on arm64 only.
+- HelloTauri was built and compared on arm64 with Xcode 27.0 only: not on amd64, and not with Xcode 26.2 (its
+  reference was recorded with Xcode 27.0).
+- No image chain was built from the Apple-silicon 26.2 download. It is accepted by its checksum after the metadata
+  and x86_64-slice checks above.
 - The asset catalog comparison and the simulator launch need a Mac and did not run in the VM.
 - Colima's own Rosetta flag did not take effect on the VM used here; the Lima configuration had to be edited.
 - Re-running `xless setup` after an upgrade rebuilds the images around the new `xless`; the previous images stay on
