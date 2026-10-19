@@ -29,6 +29,10 @@ public struct SetupStep: Equatable, Sendable {
 public enum SetupPlan {
     public static let images = ["xless-base", "xless", "xless-tauri", "xless-rn"]
 
+    /// Printed before the steps: what the per-step times are.
+    public static let estimateNote = "step times are rough: measured on an 8-core arm64 machine with a fast network; yours depend on your CPU and network"
+
+
     public static func make(source: XcodeSource.Identified, archs: [String], hostArch: String, share: URL, cacheRoot: URL,
                             xlessBinaries: [String: URL], reexport: Bool, existing: (URL) -> Bool) -> [SetupStep] {
         let x = source.xcode
@@ -46,10 +50,11 @@ public enum SetupPlan {
         var wroteMeta = false
         for a in archs {
             let emulated = a != hostArch
-            func est(_ s: String, disk: String = "") -> String { (emulated ? "\(s) natively, 3-5x longer under emulation" : s) + disk }
+            // Measured on an 8-core arm64 Linux machine with a fast network (docs/acceptance-m5.md); `estimateNote` says so.
+            func est(_ s: String, disk: String = "") -> String { (emulated ? "\(s) natively, longer under emulation" : s) + disk }
             var base = [script, "base", "--arch", a, "--suffix", bsuffix]
             if let bin = xlessBinaries[a] { base += ["--xless-bin", bin.path] }
-            steps.append(SetupStep(title: "xless-base:local-\(a)\(bsuffix)", argv: base, estimate: est("~10 min")))
+            steps.append(SetupStep(title: "xless-base:local-\(a)\(bsuffix)", argv: base, estimate: est("~3 min")))
 
             let final = sdkDir.appendingPathComponent(a), partial = sdkDir.appendingPathComponent("\(a).partial")
             let xtoolSDK = final.appendingPathComponent("darwin.xtoolsdk")
@@ -60,7 +65,7 @@ public enum SetupPlan {
                            "-e", "HOME=/tmp", "-w", "/tmp",
                            "-v", "\(source.url.path):\(inContainer):ro", "-v", "\(partial.path):/out",
                            "xless-base:local-\(a)\(bsuffix)", "xtool", "sdk", "build", inContainer, "/out"],
-                    estimate: est(source.kind == .xip ? "~15 min" : "~5 min", disk: "; ~3 GB on disk"),
+                    estimate: est("~2 min", disk: source.kind == .xip ? "; up to ~14 GB in the cache while the .xip is unpacked, ~3 GB stays" : "; ~3 GB on disk"),
                     action: .export(partial: partial, final: final)))
             }
             if !wroteMeta {
@@ -75,9 +80,9 @@ public enum SetupPlan {
                                    argv: [script, "sdk", "--arch", a, "--suffix", bsuffix, "--sdk-dir", sdkDir.path, "--xcode-build", x.build],
                                    estimate: est("~5 min")))
             steps.append(SetupStep(title: "xless-tauri:local-\(a)\(bsuffix)", argv: [script, "tauri", "--arch", a, "--suffix", bsuffix],
-                                   estimate: est("~10 min")))
+                                   estimate: est("~1 min")))
             steps.append(SetupStep(title: "xless-rn:local-\(a)\(bsuffix)", argv: [script, "rn", "--arch", a, "--suffix", bsuffix],
-                                   estimate: est("~30 min")))
+                                   estimate: est("~6 min")))
         }
         for a in archs {
             for i in images {

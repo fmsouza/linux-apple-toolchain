@@ -23,6 +23,7 @@ if [[ "$1" == info ]]; then
     perm) echo "permission denied while trying to connect to the Docker daemon socket at unix:///var/run/docker.sock: Get \"http://%2Fvar%2Frun%2Fdocker.sock/v1.47/info\": dial unix /var/run/docker.sock: connect: permission denied" >&2; exit 1 ;;
     down) echo "Cannot connect to the Docker daemon at unix:///var/run/docker.sock. Is the docker daemon running?" >&2; exit 1 ;;
   esac
+  [[ -z "${DOCKER_ROOT:-}" ]] || echo "$DOCKER_ROOT|[]"
 fi
 exit 0
 D
@@ -32,7 +33,7 @@ run() {   # STUB ARGS…: runs xless setup with a clean environment; stdout → 
   local stub="$1"; shift
   : > "$log"; code=0
   env -i HOME="$t/home" PATH="$t/bin:/usr/bin:/bin" XLESS_SHARE="${share:-$repo}" DOCKER_STUB="$stub" DOCKER_LOG="$log" \
-    "$x" setup "$@" >"$t/out" 2>"$t/err" || code=$?
+    ${extra[@]+"${extra[@]}"} "$x" setup "$@" >"$t/out" 2>"$t/err" || code=$?
 }
 
 # A fake Xcode.app of the default release (a synthetic version.plist, no Apple file).
@@ -61,6 +62,28 @@ run down --xcode "$app" --arch arm64
 grep -q 'start Docker' "$t/err" || fail "the fix does not say to start Docker: $(cat "$t/err")"
 grep -q 'docker group' "$t/err" && fail "cannot connect blamed the docker group: $(cat "$t/err")"
 
+# Not enough room in the cache: exit 11 before any step, naming the path, free and needed GB, and the override variable.
+extra=(XLESS_SETUP_CACHE_GB=999999)
+run ok --xcode "$app" --arch arm64
+[[ $code == 11 ]] || fail "a full cache exits $code, want 11: $(cat "$t/err")"
+grep -qE "GB free under $t/home for the cache .*needs about 999999 GB there" "$t/err" || fail "cache refusal: $(cat "$t/err")"
+grep -q 'set XLESS_SETUP_CACHE_GB' "$t/err" || fail "the cache refusal does not name XLESS_SETUP_CACHE_GB: $(cat "$t/err")"
+grep -q '^run\|^buildx build' "$log" && fail "docker was used past the disk check: $(cat "$log")"
+# Two architectures double the figure.
+extra=(XLESS_SETUP_CACHE_GB=999999)
+run ok --xcode "$app" --arch arm64 --arch amd64
+grep -q 'needs about 1999998 GB (999999 GB per architecture × 2) there' "$t/err" || fail "two-arch cache refusal: $(cat "$t/err")"
+# Docker's data root (checked on Linux only): its own figure and variable.
+if [[ "$(uname)" == Linux ]]; then
+  mkdir -p "$t/dockerroot"
+  extra=(XLESS_SETUP_CACHE_GB=0 XLESS_SETUP_DOCKER_GB=999999 DOCKER_ROOT="$t/dockerroot")
+  run ok --xcode "$app" --arch arm64
+  [[ $code == 11 ]] || fail "a full Docker data root exits $code, want 11: $(cat "$t/err")"
+  grep -q "GB free under $t/dockerroot for Docker's data root" "$t/err" || fail "docker root refusal: $(cat "$t/err")"
+  grep -q 'set XLESS_SETUP_DOCKER_GB' "$t/err" || fail "the docker refusal does not name XLESS_SETUP_DOCKER_GB: $(cat "$t/err")"
+fi
+extra=()
+
 # Not an Xcode at all: exit 11 with the supported releases, before docker is asked anything.
 echo hello > "$t/hostname"
 run ok --xcode "$t/hostname"
@@ -81,6 +104,7 @@ run ok --xcode "$xip" --arch arm64 --dry-run
 grep -q 'xtool sdk build' "$t/out" || fail "the plan does not export the SDK: $(cat "$t/out")"
 grep -q "Xcode copy.xip:/xcode/Xcode copy.xip:ro" "$t/out" || fail "the .xip is not mounted read-only: $(cat "$t/out")"
 grep -q 'docker-images.sh rn' "$t/out" || fail "the plan does not build xless-rn: $(cat "$t/out")"
+grep -q 'disk: the check asks for about .* GB free under .* (XLESS_SETUP_CACHE_GB)' "$t/out" || fail "--dry-run does not print the disk check: $(cat "$t/out")"
 grep -q 'xless-rn:local-arm64-xcode27.0' "$t/out" || fail "the plan does not tag xless-rn: $(cat "$t/out")"
 grep -q '^run' "$log" && fail "--dry-run ran docker: $(cat "$log")"
 grep -q 'next: xless docker' "$t/out" && fail "--dry-run promised the next step"
