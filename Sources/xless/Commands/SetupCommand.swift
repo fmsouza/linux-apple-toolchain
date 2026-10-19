@@ -214,7 +214,7 @@ struct SetupCommand: AsyncParsableCommand {
               let free = (attrs[.systemFreeSize] as? NSNumber)?.int64Value else { return }
         if let cause = SetupDisk.shortfall(freeGB: free / 1_000_000_000, path: dir.path, what: what, need: need) {
             throw XlessError(.sdk, cause, fix: "\(fix); or, if you know this run needs less (e.g. the layers are already built), "
-                             + "set \(need.key) to the GB per architecture to ask for (https://github.com/fmsouza/linux-apple-toolchain/blob/main/docs/troubleshooting.md#xless-setup)")
+                             + "set \(need.key) to the GB per architecture to ask for (https://github.com/fmsouza/xless/blob/main/docs/troubleshooting.md#xless-setup)")
         }
     }
 

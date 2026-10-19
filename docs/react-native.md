@@ -13,8 +13,8 @@ from `xless setup` ([README](../README.md#build-the-images)), build it up to `fi
 account:
 
 ```sh
-git clone https://github.com/fmsouza/linux-apple-toolchain.git
-xless docker --config linux-apple-toolchain/samples/HelloRN/xless.overlay.yml --build-number 1.0.0.2026101601 --to finalize
+git clone https://github.com/fmsouza/xless.git
+xless docker --config xless/samples/HelloRN/xless.overlay.yml --build-number 1.0.0.2026101601 --to finalize
 ```
 
 The first run downloads the JavaScript packages, the gems and the pods, and compiles React Native, which takes a

@@ -142,7 +142,7 @@ private func kinds(_ steps: [SetupStep]) -> [String] {
     #expect(XlessRelease.tarballName(version: "0.1.0", dockerArch: "amd64") == "xless-0.1.0-linux-x86_64.tar.gz")
     #expect(XlessRelease.tarballName(version: "0.1.0", dockerArch: "arm64") == "xless-0.1.0-linux-arm64.tar.gz")
     #expect(XlessRelease.url(version: "0.1.0", file: "SHA256SUMS").absoluteString
-            == "https://github.com/fmsouza/linux-apple-toolchain/releases/download/v0.1.0/SHA256SUMS")
+            == "https://github.com/fmsouza/xless/releases/download/v0.1.0/SHA256SUMS")
 }
 
 private func makeTarball(version: String, arch: String, in dir: URL) throws -> URL {

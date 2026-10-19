@@ -12,8 +12,8 @@ The source repository has a small Tauri app, `samples/HelloTauri`, with an overl
 `xless setup` ([README](../README.md#build-the-images)), build it up to `finalize`, unsigned and with no Apple account:
 
 ```sh
-git clone https://github.com/fmsouza/linux-apple-toolchain.git
-xless docker --config linux-apple-toolchain/samples/HelloTauri/xless.overlay.example.yml --build-number 1.0.0.2026101601 --to finalize
+git clone https://github.com/fmsouza/xless.git
+xless docker --config xless/samples/HelloTauri/xless.overlay.example.yml --build-number 1.0.0.2026101601 --to finalize
 ```
 
 The first build downloads Rust and compiles the app's dependencies, which takes several minutes. The app ends up in

@@ -38,7 +38,7 @@ xless recognises the file by its content, not by its name, and refuses any other
 ## Install
 
 ```sh
-curl -fsSL https://github.com/fmsouza/linux-apple-toolchain/releases/latest/download/install.sh | sh
+curl -fsSL https://github.com/fmsouza/xless/releases/latest/download/install.sh | sh
 ```
 
 This puts `xless` in `~/.local/bin` and its support files in `~/.local/share/xless`, after checking the download

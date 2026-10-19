@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # Applies the repository settings for the PR workflow with `gh api`. Idempotent; run by hand by a repository admin, never by CI.
-#   scripts/github-settings.sh [owner/repo]     (default: fmsouza/linux-apple-toolchain)
+#   scripts/github-settings.sh [owner/repo]     (default: fmsouza/xless)
 set -euo pipefail
-repo="${1:-fmsouza/linux-apple-toolchain}"
+repo="${1:-fmsouza/xless}"
 ruleset_name="main protection"
 
 # Squash merges only; the squash commit is the PR title and body; merged branches are deleted.
