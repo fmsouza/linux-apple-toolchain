@@ -9,7 +9,8 @@
 set -eu
 
 base="${XLESS_RELEASE_BASE:-https://github.com/fmsouza/linux-apple-toolchain/releases}"
-prefix="${XLESS_PREFIX:-${HOME:-}/.local}"
+home="${HOME:-}"
+prefix="${XLESS_PREFIX:-}"
 version="${XLESS_VERSION:-}"
 
 die() { echo "install.sh: $*" >&2; exit 1; }
@@ -22,8 +23,12 @@ while [ $# -gt 0 ]; do
     *) die "unknown argument: $1" ;;
   esac
 done
-[ -n "$prefix" ] || die "no install prefix (set XLESS_PREFIX or --prefix)"
+if [ -z "$prefix" ]; then
+  [ -n "$home" ] || die "HOME is unset: set XLESS_PREFIX or pass --prefix"
+  prefix="$home/.local"
+fi
 case "$prefix" in /*) ;; *) prefix="$(pwd)/$prefix" ;; esac
+while [ "$prefix" != / ] && [ "${prefix%/}" != "$prefix" ]; do prefix="${prefix%/}"; done
 
 os="${XLESS_UNAME_S:-$(uname -s)}"
 [ "$os" = Linux ] || die "unsupported OS $os: xless installs on Linux (x86_64 or arm64); on a Mac use a Linux VM or container"
@@ -46,7 +51,18 @@ sha256_of() {
 
 tmp="$(mktemp -d "${TMPDIR:-/tmp}/xless-install.XXXXXX")"
 stage=""
-cleanup() { rm -rf "$tmp"; [ -z "$stage" ] || rm -rf "$stage"; }
+newbin=""
+swapping=0
+hadold=0
+cleanup() {
+  if [ "$swapping" = 1 ]; then  # interrupted or failed between the share swap and the binary rename: undo the swap
+    if [ -e "$stage/previous" ]; then rm -rf "$prefix/share/xless"; mv "$stage/previous" "$prefix/share/xless"
+    elif [ "$hadold" = 0 ]; then rm -rf "$prefix/share/xless"; fi
+  fi
+  [ -z "$newbin" ] || rm -f "$newbin"
+  rm -rf "$tmp"
+  [ -z "$stage" ] || rm -rf "$stage"
+}
 trap cleanup EXIT
 trap 'exit 1' HUP INT TERM
 
@@ -80,24 +96,23 @@ top="xless-$version-linux-$arch"
 tar -xzf "$tmp/$name" -C "$stage" || die "could not unpack $name"
 if [ ! -f "$stage/$top/bin/xless" ] || [ ! -d "$stage/$top/share/xless" ]; then die "$name does not have the expected layout"; fi
 
-# Swap share/xless first, then the binary (a rename within one directory each, so the binary is never half-written).
-if [ -e "$prefix/share/xless" ]; then mv "$prefix/share/xless" "$stage/previous" || die "could not move the old share/xless aside"; fi
-if ! mv "$stage/$top/share/xless" "$prefix/share/xless"; then
-  [ ! -e "$stage/previous" ] || mv "$stage/previous" "$prefix/share/xless"
-  die "could not install $prefix/share/xless"
-fi
+# 1. Copy the new binary beside the old one (nothing is replaced yet). 2. Swap share/xless. 3. Rename the binary into place.
+# Any failure or signal after step 2 puts the previous share/xless back (see cleanup); `previous` is deleted only on success.
 newbin="$prefix/bin/.xless.new.$$"
-if ! { cp "$stage/$top/bin/xless" "$newbin" && chmod 755 "$newbin" && mv -f "$newbin" "$prefix/bin/xless"; }; then
-  rm -f "$newbin"
-  die "could not install $prefix/bin/xless"
-fi
+if ! { cp "$stage/$top/bin/xless" "$newbin" && chmod 755 "$newbin"; }; then die "could not write $prefix/bin (is it writable, and is the disk full?)"; fi
+if [ -e "$prefix/share/xless" ]; then hadold=1; fi
+swapping=1
+if [ "$hadold" = 1 ]; then mv "$prefix/share/xless" "$stage/previous" || die "could not move the old share/xless aside"; fi
+mv "$stage/$top/share/xless" "$prefix/share/xless" || die "could not install $prefix/share/xless"
+mv -f "$newbin" "$prefix/bin/xless" || die "could not install $prefix/bin/xless"
+swapping=0
 
 echo "xless $version installed to $prefix/bin/xless"
 
 case ":${PATH:-}:" in
   *":$prefix/bin:"*) ;;
   *)
-    case "${SHELL:-}" in */zsh) profile="$HOME/.zshrc" ;; */bash) profile="$HOME/.bashrc" ;; *) profile="$HOME/.profile" ;; esac
+    case "${SHELL:-}" in */zsh) profile="$home/.zshrc" ;; */bash) profile="$home/.bashrc" ;; *) profile="$home/.profile" ;; esac
     echo "$prefix/bin is not on your PATH. Add it to $profile:"
     echo "  export PATH=\"$prefix/bin:\$PATH\""
     ;;

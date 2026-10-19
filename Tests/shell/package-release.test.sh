@@ -49,7 +49,7 @@ diff -q "$repo/versions.env" "$x/$top/share/xless/versions.env" >/dev/null || fa
 for id in swift-crypto yams swift-argument-parser swift-asn1 swift-certificates swift-png h; do
   ls "$x/$top/share/xless/licenses/" | grep -q "^$id" || fail "no licence file for $id"
 done
-for id in swift-runtime musl; do ls "$x/$top/share/xless/licenses/" | grep -q "^$id" || fail "no notice for $id"; done
+for id in swift-LICENSE musl-COPYRIGHT curl-COPYING libxml2 zlib icu-LICENSE boringssl swift-foundation-icu assetkit lzfse; do ls "$x/$top/share/xless/licenses/" | grep -q "^$id" || fail "no notice for $id"; done
 
 # SHA256SUMS lists the tarball in sha256sum's format, and a second arch adds a line instead of replacing it.
 bash "$repo/scripts/package-release.sh" 1.2.3 arm64 "$t/xless" "$t/out" >/dev/null

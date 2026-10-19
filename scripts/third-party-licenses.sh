@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Writes the third-party licence notices a release ships in share/xless/licenses/: one file per package in
 # Package.resolved (the LICENSE, and the NOTICE when there is one, from the SwiftPM checkout), plus the Swift runtime
-# and musl that the static binary links in.
+# and the C/C++ libraries the static binary links in (licenses/vendored/, see its README).
 #   scripts/third-party-licenses.sh <out-dir>
 # XLESS_CHECKOUTS overrides the checkouts directory (default .build/checkouts, filled by `swift build`).
 set -euo pipefail
@@ -27,43 +27,18 @@ for id in $ids; do
   for n in NOTICE NOTICE.txt NOTICE.md; do [[ -f "$dir/$n" ]] && { cp "$dir/$n" "$out/$id.NOTICE.txt"; break; }; done
 done
 
-cat > "$out/swift-runtime.txt" <<'TXT'
-Swift runtime libraries (libswiftCore, Foundation and friends, statically linked into xless)
+# In-repo third-party code: AssetKit (and the LZFSE it embeds), built into xless from ThirdParty/.
+cp "$root/ThirdParty/AssetKit/LICENSE" "$out/assetkit.txt"
+cp "$root/ThirdParty/AssetKit/Sources/CLZFSE/LICENSE" "$out/lzfse.txt"
 
-Copyright (c) Apple Inc. and the Swift project authors.
-Licensed under the Apache License, Version 2.0 with Runtime Library Exception.
-Licence text and the exception: https://github.com/swiftlang/swift/blob/main/LICENSE.txt
-Project: https://www.swift.org
-
-The Runtime Library Exception allows the runtime to be linked into, and distributed as part of, a binary without the
-binary being subject to the Apache License's attribution conditions for source distribution.
-TXT
-
-cat > "$out/musl.txt" <<'TXT'
-musl libc (statically linked into xless by the Swift static Linux SDK)
-
-musl as a whole is licensed under the following standard MIT license:
-
-Copyright (c) 2005-2020 Rich Felker, et al.
-
-Permission is hereby granted, free of charge, to any person obtaining
-a copy of this software and associated documentation files (the
-"Software"), to deal in the Software without restriction, including
-without limitation the rights to use, copy, modify, merge, publish,
-distribute, sublicense, and/or sell copies of the Software, and to
-permit persons to whom the Software is furnished to do so, subject to
-the following conditions:
-
-The above copyright notice and this permission notice shall be
-included in all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
-MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
-IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
-CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
-TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
-SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-
-Authors and contributors are listed at https://git.musl-libc.org/cgit/musl/tree/COPYRIGHT
-TXT
+# Everything the static Swift SDK links in (musl, the Swift runtime and Foundation, libcurl, libxml2, ICU, zlib, the TLS
+# library, ...): verbatim upstream notices vendored in licenses/vendored/, each checked against the sha256 recorded in
+# SOURCES.tsv (name, component, version, source URL, sha256) before it is copied.
+vendored="$root/licenses/vendored"
+while IFS=$'\t' read -r name _component _version _url want; do
+  [[ -z "$name" || "$name" == \#* ]] && continue
+  [[ -f "$vendored/$name" ]] || { echo "third-party-licenses: $vendored/$name is missing" >&2; exit 1; }
+  if command -v sha256sum >/dev/null 2>&1; then got=$(sha256sum "$vendored/$name" | cut -d' ' -f1); else got=$(shasum -a 256 "$vendored/$name" | cut -d' ' -f1); fi
+  [[ "$got" == "$want" ]] || { echo "third-party-licenses: $name does not match SOURCES.tsv (got $got, want $want)" >&2; exit 1; }
+  cp "$vendored/$name" "$out/$name"
+done < "$vendored/SOURCES.tsv"

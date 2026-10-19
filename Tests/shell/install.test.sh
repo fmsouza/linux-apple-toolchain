@@ -107,4 +107,27 @@ run "${base[@]}" XLESS_PREFIX="$t/pe" PATH="$t/pe/bin:$t/tools-down"
 [[ $rc == 0 ]] || fail "daemon-down install exited $rc"
 echo "$out" | grep -qF "https://docs.docker.com/engine/install/" || fail "daemon down: no docker link: $out"
 
+# A failure after the share swap (the binary cannot be renamed into place) rolls everything back.
+p="$t/p4"
+run "${base[@]}" XLESS_PREFIX="$p" XLESS_VERSION=1.2.3 PATH="$p/bin:$t/tools" >/dev/null
+mkdir -p "$t/tools-badmv"; cp -P "$t/tools"/* "$t/tools-badmv/"; rm "$t/tools-badmv/mv"
+real_mv=$(command -v mv)
+printf '#!/bin/sh\nfor a; do last=$a; done\ncase "$last" in */bin/xless) exit 1 ;; esac\nexec %s "$@"\n' "$real_mv" > "$t/tools-badmv/mv"; chmod +x "$t/tools-badmv/mv"
+run "${base[@]}" XLESS_PREFIX="$p" XLESS_VERSION=1.3.0 PATH="$p/bin:$t/tools-badmv"
+[[ $rc == 1 ]] || fail "failed binary rename exited $rc: $out"
+[[ "$(cat "$p/share/xless/VERSION")" == 1.2.3 ]] || fail "share/ not rolled back"
+[[ "$("$p/bin/xless")" == "xless 1.2.3 x86_64" ]] || fail "old binary lost"
+[[ -z "$(ls -A "$p/share" | grep -v '^xless$')" ]] || fail "temp files left in share: $(ls -A "$p/share")"
+[[ -z "$(ls -A "$p/bin" | grep -v '^xless$')" ]] || fail "temp binary left in bin: $(ls -A "$p/bin")"
+# The same on a fresh prefix leaves no share/xless behind.
+run "${base[@]}" XLESS_PREFIX="$t/p5" XLESS_VERSION=1.3.0 PATH="$t/p5/bin:$t/tools-badmv"
+[[ $rc == 1 && ! -e "$t/p5/share/xless" && ! -e "$t/p5/bin/xless" ]] || fail "fresh failed install left files"
+
+# A trailing slash on the prefix still counts as on PATH; HOME unset without a prefix is an error, not a crash.
+run "${base[@]}" XLESS_PREFIX="$t/p6/" PATH="$t/p6/bin:$t/tools"
+[[ $rc == 0 ]] || fail "trailing slash prefix exited $rc"
+echo "$out" | grep -q "export PATH=" && fail "export PATH printed for an on-PATH prefix with a trailing slash"
+rc=0; out=$(env -u HOME -u XLESS_PREFIX XLESS_RELEASE_BASE="file://$rel" XLESS_UNAME_S=Linux PATH="$t/tools" "$sh_bin" "$repo/scripts/install.sh" 2>&1) || rc=$?
+[[ $rc == 1 ]] && echo "$out" | grep -q "HOME is unset" || fail "unset HOME: rc=$rc $out"
+
 echo "install.test.sh: OK"
