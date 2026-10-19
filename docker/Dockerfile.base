@@ -1,4 +1,7 @@
 ARG SWIFT_VERSION
+# XLESS_FROM=prebuilt takes the xless binary from the build context xlessbin (a directory holding a file named xless;
+# scripts/docker-images.sh base --xless-bin) instead of compiling it: no source checkout needed.
+ARG XLESS_FROM=source
 # Runs natively on the build host and cross-compiles with the Static Linux SDK
 # (swift build under Rosetta/QEMU emulation crashes intermittently).
 FROM --platform=$BUILDPLATFORM swift:${SWIFT_VERSION}-jammy AS build
@@ -18,6 +21,14 @@ RUN set -eux; \
     case "$TARGETARCH" in arm64) A=aarch64 ;; amd64) A=x86_64 ;; *) echo "unsupported $TARGETARCH"; exit 1 ;; esac; \
     swift build -c release --product xless --swift-sdk "${A}-swift-linux-musl"; \
     install -m755 "$(swift build -c release --swift-sdk "${A}-swift-linux-musl" --show-bin-path)/xless" /usr/local/bin/xless
+
+FROM scratch AS xless-source
+COPY --from=build /usr/local/bin/xless /xless
+
+FROM scratch AS xless-prebuilt
+COPY --from=xlessbin /xless /xless
+
+FROM xless-${XLESS_FROM} AS xless-bin
 
 FROM swift:${SWIFT_VERSION}-jammy
 ARG TARGETARCH
@@ -49,7 +60,7 @@ RUN set -eux; \
     echo "${RSUM}  /tmp/${RC}.tar.gz" | sha256sum -c -; \
     tar -xzf "/tmp/${RC}.tar.gz" -C /tmp; install -m755 "$(find /tmp/${RC} -name rcodesign -type f | head -1)" /usr/local/bin/rcodesign; \
     rm -rf /tmp/${RC}*
-COPY --from=build /usr/local/bin/xless /usr/local/bin/xless
+COPY --from=xless-bin --chmod=755 /xless /usr/local/bin/xless
 RUN mkdir -p /opt/xless/config && chmod -R a+rwX /opt/xless \
  && xtool --help >/dev/null && rcodesign --version && xless --version
 WORKDIR /work
