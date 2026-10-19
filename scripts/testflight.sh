@@ -308,7 +308,7 @@ if [[ $use_docker == 1 ]]; then
   case "$(uname -m)" in arm64|aarch64) arch=arm64 ;; *) arch=amd64 ;; esac
   docker_cli=(docker)
   [[ -z "$ctx" ]] || docker_cli+=(--context "$ctx")
-  docker_run=("${docker_cli[@]}" run --rm)
+  docker_run=("${docker_cli[@]}" run --rm --pull=never)   # never pull: a missing local image is need_images's message, not a Docker Hub "pull access denied"
   # Secrets by path or by name: values never appear on a command line.
   if [[ $need_asc == 1 ]]; then
     asc_secrets=(--mount "$(bind "$ASC_KEY_P8_FILE" /secrets/asc.p8 ro)" -e ASC_KEY_ID -e ASC_KEY_P8_FILE=/secrets/asc.p8)
@@ -338,6 +338,13 @@ apply_pin() {   # VAR: the image named by $VAR, for the pinned Xcode
   if [[ -n "$default_xcode" && "$XCODE_TAG" == "$(canonical_xcode "$default_xcode")" ]] && image_exists "$name"; then return 0; fi
   pin_missing+=("$want")
 }
+need_images() {   # IMAGE...: a real run needs the images built here (docker run never pulls them)
+  [[ $use_docker == 1 && "${XLESS_TESTFLIGHT_DRY_RUN:-0}" != 1 ]] || return 0
+  local i
+  for i in "$@"; do
+    image_exists "$i" || die "the image $i is not built on this machine (xless images are never pulled from a registry); build it with: xless setup --xcode <Xcode.xip> --arch $arch"
+  done
+}
 check_pin() {   # after apply_pin: refuse missing images with the command that builds them
   [[ -n "$XCODE_PIN" && $use_docker == 1 ]] || return 0
   [[ ${#pin_missing[@]} -eq 0 ]] || die "$pin_file pins xcode: \"$XCODE_PIN\", but these images are missing: ${pin_missing[*]}; build them from Xcode $XCODE_TAG: xless setup --xcode <path to Xcode $XCODE_TAG's .app or .xip> --arch $arch"
@@ -354,6 +361,7 @@ if [[ -z "$OVERLAY" ]]; then
     image="${XLESS_IMAGE:-xless:local-$arch}"
     [[ -n "${XLESS_IMAGE:-}" ]] || apply_pin image
     check_pin "$image"
+    need_images "$image"
     run "${docker_run[@]}" --mount "$(bind "$PROJECT" /work)" -w /work ${asc_secrets[@]+"${asc_secrets[@]}"} ${dist_secret[@]+"${dist_secret[@]}"} -e XLESS_BUILD_NUMBER \
       "$image" xless ship --platform ios "$@"
   else
@@ -406,6 +414,7 @@ if [[ $use_docker == 1 ]]; then
   # A simulator build runs step 2 only: the App Store Connect image is never used, so it is neither selected nor required.
   if [[ $RN == 1 && $SIM == 0 ]]; then [[ -n "${XLESS_SIGN_IMAGE:-}" ]] || apply_pin key_image; elif [[ $RN == 0 ]]; then key_image="$image"; fi
   if [[ $RN == 1 && $SIM == 0 ]]; then check_pin "build $image, App Store Connect steps $key_image"; else check_pin "$image"; fi
+  if [[ $RN == 1 && $SIM == 0 ]]; then need_images "$image" "$key_image"; else need_images "$image"; fi
 fi
 
 # React Native: step 2 (xless-rn) and steps 1 and 3 (xless-base) must run the same xless, or step 3 could misread what

@@ -81,6 +81,39 @@ echo "$out" | grep -qi "sha256\|checksum\|verif" || fail "no checksum message: $
 [[ "$("$p/bin/xless")" == "xless 1.2.3 x86_64" ]] || fail "binary replaced by a tampered tarball"
 release 1.3.0
 
+# An https base: every fetch is https-only with TLS 1.2+, and `latest` is resolved to a version whose files are then fetched from
+# download/v<version>/ (not latest/download/), so a release published in between cannot mix files.
+mkdir -p "$t/tools-log"; cp -P "$t/tools"/* "$t/tools-log/"; rm -f "$t/tools-log/curl"
+real_curl=$(command -v curl)
+cat > "$t/tools-log/curl" <<C
+#!/bin/sh
+echo "\$*" >> "$t/curl.log"
+args=""; skip=0
+for a; do
+  case "\$a" in
+    --proto) skip=1 ;;
+    '=https'|--tlsv1.2) ;;
+    https://rel.test/*) set -- "\$@"; args="\$args file://$rel/\${a#https://rel.test/}" ;;
+    *) args="\$args \$a" ;;
+  esac
+done
+exec $real_curl \$args
+C
+chmod +x "$t/tools-log/curl"
+: > "$t/curl.log"
+run "${base[@]}" XLESS_RELEASE_BASE=https://rel.test XLESS_PREFIX="$t/ph" PATH="$t/ph/bin:$t/tools-log"
+[[ $rc == 0 && "$("$t/ph/bin/xless")" == "xless 1.2.3 x86_64" ]] || fail "https latest install: rc=$rc $out"
+[[ $(grep -c -e "--proto =https --tlsv1.2" "$t/curl.log") -eq $(wc -l < "$t/curl.log") ]] || fail "a fetch lacks --proto =https --tlsv1.2: $(cat "$t/curl.log")"
+grep -q "https://rel.test/latest/download/SHA256SUMS" "$t/curl.log" || fail "latest not resolved through latest/download/SHA256SUMS: $(cat "$t/curl.log")"
+grep -q "latest/download/xless-" "$t/curl.log" && fail "the tarball came from latest/download/: $(cat "$t/curl.log")"
+grep -q "https://rel.test/download/v1.2.3/xless-1.2.3-linux-x86_64.tar.gz" "$t/curl.log" || fail "the tarball is not from download/v1.2.3/: $(cat "$t/curl.log")"
+grep -q "https://rel.test/download/v1.2.3/SHA256SUMS" "$t/curl.log" || fail "SHA256SUMS not re-fetched from download/v1.2.3/: $(cat "$t/curl.log")"
+# Truncated `curl | sh`: the script runs nothing until its last line, so a download cut anywhere installs nothing.
+sed '$d' "$repo/scripts/install.sh" > "$t/cut.sh"
+rc=0; out=$(env "${base[@]}" XLESS_PREFIX="$t/pt" PATH="$t/tools" "$sh_bin" "$t/cut.sh" 2>&1) || rc=$?
+[[ $rc == 0 && ! -e "$t/pt" ]] || fail "a script cut before main ran something: rc=$rc $out"
+tail -n 1 "$repo/scripts/install.sh" | grep -qx 'main "$@"' || fail "install.sh does not end with main \"\$@\""
+
 # Architectures.
 run "${base[@]}" XLESS_UNAME_M=aarch64 XLESS_PREFIX="$t/pa" PATH="$t/pa/bin:$t/tools"
 [[ $rc == 0 && "$("$t/pa/bin/xless")" == "xless 1.2.3 arm64" ]] || fail "aarch64 should install arm64: $out"

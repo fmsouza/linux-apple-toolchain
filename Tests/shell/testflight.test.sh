@@ -449,4 +449,14 @@ code=0; "${pinned[@]}" "$S" --config "$t/pin/bad.yml" >/dev/null 2>"$t/err" || c
 [[ $code -eq 2 ]] && grep -q "is not an Xcode version" "$t/err" || fail "bad pin: exit $code $(cat "$t/err")"
 out=$("${base[@]}" XLESS_USE_DOCKER=0 "$S" --config "$t/pin/rn.yml" 2>/dev/null) || fail "native pinned"
 [[ "$(sed -n 1p <<<"$out")" == "xless next-build --config $t/pin/rn.yml " ]] || fail "native pinned: '$out'"
+# Every docker run is --pull=never, and a real run with a missing local image gets the script's own message (exit 2), not Docker Hub's
+out=$("${pinned[@]}" "$S" "$t/pinproj" 2>/dev/null) || fail "pull=never dry run"
+[[ "$out" == *" run --rm --pull=never "* ]] || fail "docker run without --pull=never: $out"
+: > "$t/images"
+real=(env -i HOME="$t/home" PATH="$t/fd:/usr/bin:/bin" XLESS_TESTFLIGHT_ENV="$t/none.env" XLESS_USE_DOCKER=1
+      ASC_KEY_ID=KEYID ASC_ISSUER_ID_FILE="$t/issuer" ASC_KEY_P8_FILE="$t/key.p8" XLESS_DIST_KEY_FILE="$t/dist.pem" FAKE_IMAGES="$t/images")
+code=0; "${real[@]}" "$S" "$t/proj" >/dev/null 2>"$t/err" || code=$?
+[[ $code -eq 2 ]] && grep -qF "is not built on this machine" "$t/err" && grep -qF "xless setup --xcode <Xcode.xip>" "$t/err" \
+  || fail "missing image on a real run: exit $code $(cat "$t/err")"
+grep -qi "pull access denied" "$t/err" && fail "docker's own pull error reached the user"
 echo PASS
