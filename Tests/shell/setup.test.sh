@@ -1,0 +1,90 @@
+#!/usr/bin/env bash
+# `xless setup`, run against the built xless with a `docker` stub first on PATH (it records every call; nothing is built,
+# nothing is downloaded): the Docker preflight names the cause before any step runs, an unsupported file is refused with
+# the supported releases, and --dry-run prints the plan of a fake .xip registered through a temp versions.env copy.
+#   Tests/shell/setup.test.sh            (builds xless with `swift build`; XLESS_BIN=<path> uses that binary)
+set -euo pipefail
+repo="$(cd "$(dirname "$0")/../.." && pwd)"
+t=$(mktemp -d)
+trap 'rm -rf "$t"' EXIT
+fail() { echo "FAIL: $*"; exit 1; }
+x="${XLESS_BIN:-}"
+if [[ -z "$x" ]]; then
+  (cd "$repo" && env -u DEVELOPER_DIR swift build --product xless -q)
+  x="$(cd "$repo" && env -u DEVELOPER_DIR swift build --show-bin-path)/xless"
+fi
+
+mkdir -p "$t/bin" "$t/home"
+cat > "$t/bin/docker" <<'D'
+#!/usr/bin/env bash
+printf '%s\n' "$*" >> "$DOCKER_LOG"
+if [[ "$1" == info ]]; then
+  case "$DOCKER_STUB" in
+    perm) echo "permission denied while trying to connect to the Docker daemon socket at unix:///var/run/docker.sock: Get \"http://%2Fvar%2Frun%2Fdocker.sock/v1.47/info\": dial unix /var/run/docker.sock: connect: permission denied" >&2; exit 1 ;;
+    down) echo "Cannot connect to the Docker daemon at unix:///var/run/docker.sock. Is the docker daemon running?" >&2; exit 1 ;;
+  esac
+fi
+exit 0
+D
+chmod +x "$t/bin/docker"
+log="$t/docker.log"
+run() {   # STUB ARGS…: runs xless setup with a clean environment; stdout → $t/out, stderr → $t/err, exit code → $code
+  local stub="$1"; shift
+  : > "$log"; code=0
+  env -i HOME="$t/home" PATH="$t/bin:/usr/bin:/bin" XLESS_SHARE="${share:-$repo}" DOCKER_STUB="$stub" DOCKER_LOG="$log" \
+    "$x" setup "$@" >"$t/out" 2>"$t/err" || code=$?
+}
+
+# A fake Xcode.app of the default release (a synthetic version.plist, no Apple file).
+app="$t/Xcode.app"
+mkdir -p "$app/Contents"
+cat > "$app/Contents/version.plist" <<'P'
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict>
+<key>CFBundleShortVersionString</key><string>27.0</string>
+<key>ProductBuildVersion</key><string>27A266a</string>
+</dict></plist>
+P
+
+# The user is not in the docker group: exit 11, the cause and the fix named, nothing run.
+run perm --xcode "$app" --arch arm64
+[[ $code == 11 ]] || fail "permission denied exits $code, want 11: $(cat "$t/err")"
+grep -q '^error: \[sdk\]' "$t/err" || fail "no [sdk] error: $(cat "$t/err")"
+grep -qi 'permission denied' "$t/err" || fail "the cause is not named: $(cat "$t/err")"
+grep -q 'docker group' "$t/err" || fail "the fix does not mention the docker group: $(cat "$t/err")"
+grep -q '^run\|^buildx\|^tag' "$log" && fail "docker was used past the preflight: $(cat "$log")"
+
+# The daemon is not running: exit 11, start Docker.
+run down --xcode "$app" --arch arm64
+[[ $code == 11 ]] || fail "cannot connect exits $code, want 11: $(cat "$t/err")"
+grep -q 'start Docker' "$t/err" || fail "the fix does not say to start Docker: $(cat "$t/err")"
+grep -q 'docker group' "$t/err" && fail "cannot connect blamed the docker group: $(cat "$t/err")"
+
+# Not an Xcode at all: exit 11 with the supported releases, before docker is asked anything.
+echo hello > "$t/hostname"
+run ok --xcode "$t/hostname"
+[[ $code == 11 ]] || fail "an unsupported file exits $code, want 11: $(cat "$t/err")"
+grep -q 'is not a supported Xcode (supported: Xcode 26.2 (17C52), Xcode 27.0 (27A266a))' "$t/err" || fail "supported list: $(cat "$t/err")"
+[[ ! -s "$log" ]] || fail "docker was called for an unsupported Xcode: $(cat "$log")"
+
+# --dry-run: a fake .xip (any name, a path with spaces) registered by its sha256 in a temp copy of versions.env.
+share="$t/share"
+mkdir -p "$share" "$t/my downloads"
+xip="$t/my downloads/Xcode copy.xip"
+head -c 100000 /dev/zero | tr '\0' 'x' > "$xip"
+sum="$( (sha256sum "$xip" 2>/dev/null || shasum -a 256 "$xip") | cut -d' ' -f1)"
+sed "s/^XCODE_XIP_SHA256_27A266a=.*/XCODE_XIP_SHA256_27A266a=\"$sum\"/" "$repo/versions.env" > "$share/versions.env"
+grep -q "$sum" "$share/versions.env" || fail "could not register the fake .xip"
+run ok --xcode "$xip" --arch arm64 --dry-run
+[[ $code == 0 ]] || fail "--dry-run exits $code: $(cat "$t/err")"
+grep -q 'xtool sdk build' "$t/out" || fail "the plan does not export the SDK: $(cat "$t/out")"
+grep -q "Xcode copy.xip:/xcode/Xcode copy.xip:ro" "$t/out" || fail "the .xip is not mounted read-only: $(cat "$t/out")"
+grep -q 'docker-images.sh rn' "$t/out" || fail "the plan does not build xless-rn: $(cat "$t/out")"
+grep -q 'xless-rn:local-arm64-xcode27.0' "$t/out" || fail "the plan does not tag xless-rn: $(cat "$t/out")"
+grep -q '^run' "$log" && fail "--dry-run ran docker: $(cat "$log")"
+grep -q 'next: xless docker' "$t/out" && fail "--dry-run promised the next step"
+# The same .xip under the default (unregistered) table is refused: identification is by content.
+share="$repo" run ok --xcode "$xip" --dry-run
+[[ $code == 11 ]] || fail "an unregistered .xip exits $code, want 11"
+echo "setup.test.sh: ok"

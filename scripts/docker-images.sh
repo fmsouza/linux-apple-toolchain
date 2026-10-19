@@ -8,8 +8,8 @@
 #   (the repository, or the installed share/xless); that directory is the build context.
 #   sdk: --sdk-dir (the exported Darwin SDK) and --xcode-build (its Xcode build; scripts/xcode-swift.sh gives the app
 #        Swift toolchain) are required.
-#   base: --xless-bin <file named xless>, a linux xless of the same arch, goes into the image instead of one compiled from
-#        source (docker/Dockerfile.base XLESS_FROM=prebuilt).
+#   base: --xless-bin <file named xless>, a linux xless of the same arch (its ELF machine is checked against --arch), goes
+#        into the image instead of one compiled from source (docker/Dockerfile.base XLESS_FROM=prebuilt).
 #   rn: XLESS_IMAGE_ID names the image for `xless prepare`'s fingerprint: the commit (with -dirty) in a git checkout, else
 #        v<XLESS_VERSION>, then the first 12 hex of the sha256 of versions.env, then the suffix.
 #   DOCKER: the docker command (default docker); DOCKER_CONTEXT applies as usual.
@@ -43,6 +43,11 @@ fi
 if [[ -n "$xless_bin" ]]; then
   [[ -f "$xless_bin" ]] || die "$xless_bin does not exist"
   [[ "$(basename "$xless_bin")" == xless ]] || die "--xless-bin must be a file named xless (its directory is the build context)"
+  # Its ELF e_machine (offset 18) must be --arch's: 183 aarch64 (arm64), 62 x86-64 (amd64).
+  [[ "$(od -An -t x1 -N 4 "$xless_bin" | tr -d ' \n')" == 7f454c46 ]] || die "$xless_bin is not a Linux (ELF) binary"
+  machine="$(od -An -t u2 -j 18 -N 2 "$xless_bin" | tr -d ' ')"
+  case "$machine" in 183) bin_arch=arm64; bin_name=aarch64 ;; 62) bin_arch=amd64; bin_name=x86-64 ;; *) bin_arch=""; bin_name="ELF machine $machine" ;; esac
+  [[ "$bin_arch" == "$arch" ]] || die "$xless_bin is a $bin_name binary, not $arch: pass the linux-$arch xless"
 fi
 
 root="$(cd "$(dirname "$0")/.." && pwd)"

@@ -16,7 +16,7 @@ let package = Package(
     ],
     targets: [
         .target(name: "XlessCore", dependencies: [.product(name: "Yams", package: "Yams")]),
-        .target(name: "XlessSDK", dependencies: ["XlessCore"]),
+        .target(name: "XlessSDK", dependencies: ["XlessCore", .product(name: "Crypto", package: "swift-crypto")]),
         .target(name: "XlessMachO"),
         .target(name: "XlessBuild", dependencies: ["XlessCore", "XlessMachO"]),
         .target(name: "XlessAssets", dependencies: [
@@ -59,7 +59,7 @@ let package = Package(
         // Not a product: `--product xless` (image builds) skips it; only `swift run IBDifferential` builds it.
         .executableTarget(name: "IBDifferential", dependencies: ["XlessIB", "XlessCore"]),
         .testTarget(name: "XlessCoreTests", dependencies: ["XlessCore"]),
-        .testTarget(name: "XlessSDKTests", dependencies: ["XlessSDK", "XlessCore"]),
+        .testTarget(name: "XlessSDKTests", dependencies: ["XlessSDK", "XlessCore", .product(name: "Crypto", package: "swift-crypto")]),
         .testTarget(name: "XlessBuildTests", dependencies: ["XlessBuild", "XlessCore"]),
         .testTarget(name: "XlessAssetsTests", dependencies: [
             "XlessAssets", "XlessCore", "XlessMachO",
