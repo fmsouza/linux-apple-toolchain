@@ -45,4 +45,19 @@ expect 64 "Error: --to build comes before --from sign" ship "${rn[@]}" --destina
 printf 'type: tauri\nsource: .\n' > "$t/tauri.yml"
 expect 10 "error: [config] --destination simulator builds React Native overlays only" build --config "$t/tauri.yml" --platform ios --destination simulator
 expect 10 "error: [config] --destination simulator builds React Native overlays only" ship --project "$repo/samples/HelloShip" --platform ios --destination simulator
+# xless docker: execs <share>/scripts/testflight.sh with the arguments unchanged, XLESS_USE_DOCKER=1 unless set, XLESS_SHARE set
+"${base[@]}" "$x" docker --help >/dev/null 2>"$t/err" || fail "xless docker --help failed: $(cat "$t/err")"
+mkdir -p "$t/share/scripts"
+cat > "$t/share/scripts/testflight.sh" <<'S'
+#!/usr/bin/env bash
+printf '%s\n' "$@"
+echo "docker=$XLESS_USE_DOCKER share=$XLESS_SHARE"
+exit "${STUB_EXIT:-0}"
+S
+out=$("${base[@]}" XLESS_SHARE="$t/share" "$x" docker samples/HelloShip --build-number 1 --to finalize -- --verbose 2>"$t/err") || fail "xless docker failed: $(cat "$t/err")"
+[[ "$out" == $'samples/HelloShip\n--build-number\n1\n--to\nfinalize\n--\n--verbose\ndocker=1 share='"$t/share" ]] || fail "xless docker passes: $out"
+out=$("${base[@]}" XLESS_SHARE="$t/share" XLESS_USE_DOCKER=0 "$x" docker p 2>/dev/null) || fail "xless docker with XLESS_USE_DOCKER=0 failed"
+[[ "$out" == *"docker=0 "* ]] || fail "XLESS_USE_DOCKER=0 overridden: $out"
+code=0; "${base[@]}" XLESS_SHARE="$t/share" STUB_EXIT=23 "$x" docker p >/dev/null 2>&1 || code=$?
+[[ $code -eq 23 ]] || fail "xless docker exits $code, want testflight.sh's 23"
 echo PASS
