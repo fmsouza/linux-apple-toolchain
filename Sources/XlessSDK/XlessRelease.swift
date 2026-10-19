@@ -5,7 +5,7 @@ import XlessCore
 /// `xless-<version>-linux-<x86_64|arm64>.tar.gz` (top directory `xless-<version>-linux-<arch>/`, binary at `bin/xless`)
 /// with `SHA256SUMS` beside it in the GitHub release `v<version>`.
 public enum XlessRelease {
-    public static let downloadBase = "https://github.com/fmsouza/linux-apple-toolchain/releases/download"
+    public static let downloadBase = "https://github.com/fmsouza/xless/releases/download"
 
     /// Docker's arch name to the release's (uname's): amd64 → x86_64, arm64 → arm64.
     public static func releaseArch(dockerArch: String) -> String { dockerArch == "amd64" ? "x86_64" : dockerArch }

@@ -10,8 +10,8 @@ add and are untested ([tauri.md](tauri.md#shipping), [react-native.md](react-nat
 The installer is in the source repository, not in the release:
 
 ```sh
-git clone https://github.com/fmsouza/linux-apple-toolchain.git
-cd linux-apple-toolchain
+git clone https://github.com/fmsouza/xless.git
+cd xless
 scripts/install-native.sh                  # or: scripts/install-native.sh --prefix /usr/local
 ```
 

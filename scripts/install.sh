@@ -3,13 +3,13 @@
 #   install.sh [--prefix <dir>]
 # XLESS_PREFIX     install prefix (default $HOME/.local): bin/xless and share/xless/
 # XLESS_VERSION    release to install, x.y.z or vx.y.z (default: the latest)
-# XLESS_RELEASE_BASE   where releases live (default https://github.com/fmsouza/linux-apple-toolchain/releases)
+# XLESS_RELEASE_BASE   where releases live (default https://github.com/fmsouza/xless/releases)
 # XLESS_UNAME_M, XLESS_UNAME_S   override `uname -m` / `uname -s` (tests only)
 # The tarball is checked against the release's SHA256SUMS before anything is replaced.
 set -eu
 main() {
 
-  base="${XLESS_RELEASE_BASE:-https://github.com/fmsouza/linux-apple-toolchain/releases}"
+  base="${XLESS_RELEASE_BASE:-https://github.com/fmsouza/xless/releases}"
   home="${HOME:-}"
   prefix="${XLESS_PREFIX:-}"
   version="${XLESS_VERSION:-}"

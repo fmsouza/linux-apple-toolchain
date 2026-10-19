@@ -1,6 +1,6 @@
 # Contributing
 
-xless is developed on GitHub, in [fmsouza/linux-apple-toolchain](https://github.com/fmsouza/linux-apple-toolchain),
+xless is developed on GitHub, in [fmsouza/xless](https://github.com/fmsouza/xless),
 through pull requests. Releases are made from `main` automatically.
 
 ## Branches and pull requests

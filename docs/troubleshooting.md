@@ -17,7 +17,7 @@ their own tables: [tauri.md](tauri.md#troubleshooting), [react-native.md](react-
 To install a given release, set `XLESS_VERSION`; to install somewhere else, set `XLESS_PREFIX` (or pass `--prefix`):
 
 ```sh
-curl -fsSL https://github.com/fmsouza/linux-apple-toolchain/releases/latest/download/install.sh | XLESS_VERSION=v0.1.0 XLESS_PREFIX=$HOME/opt/xless sh
+curl -fsSL https://github.com/fmsouza/xless/releases/latest/download/install.sh | XLESS_VERSION=v0.1.0 XLESS_PREFIX=$HOME/opt/xless sh
 ```
 
 Running the install line again upgrades xless in place.
