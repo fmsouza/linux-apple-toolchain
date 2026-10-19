@@ -20,3 +20,5 @@ ThirdParty/AssetKit/Package.resolved
 .build-linux/
 __pycache__/
 testflight.env
+docs/superpowers/
+docs/acceptance/
