@@ -49,22 +49,25 @@ sha256_of() {
   else die "needs sha256sum or shasum to verify the download"; fi
 }
 
-tmp="$(mktemp -d "${TMPDIR:-/tmp}/xless-install.XXXXXX")"
+tmp=""
 stage=""
 newbin=""
 swapping=0
 hadold=0
 cleanup() {
-  if [ "$swapping" = 1 ]; then  # interrupted or failed between the share swap and the binary rename: undo the swap
+  trap '' HUP INT TERM  # a second signal must not interrupt a rollback
+  # Failed or interrupted between the share swap and the binary rename (the new binary is still beside bin/xless): undo the swap.
+  if [ "$swapping" = 1 ] && [ -n "$newbin" ] && [ -e "$newbin" ]; then
     if [ -e "$stage/previous" ]; then rm -rf "$prefix/share/xless"; mv "$stage/previous" "$prefix/share/xless"
     elif [ "$hadold" = 0 ]; then rm -rf "$prefix/share/xless"; fi
   fi
   [ -z "$newbin" ] || rm -f "$newbin"
-  rm -rf "$tmp"
+  [ -z "$tmp" ] || rm -rf "$tmp"
   [ -z "$stage" ] || rm -rf "$stage"
 }
 trap cleanup EXIT
 trap 'exit 1' HUP INT TERM
+tmp="$(mktemp -d "${TMPDIR:-/tmp}/xless-install.XXXXXX")"
 
 version="${version#v}"
 if [ -n "$version" ] && [ "$version" != latest ]; then

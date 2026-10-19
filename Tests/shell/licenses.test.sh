@@ -28,7 +28,7 @@ for f in "$v"/*; do
 done
 
 # Every statically linked component has a notice (the list is the one recorded in README.md, from the link map).
-for c in swift musl curl libxml2 zlib icu boringssl; do
+for c in swift swift-corelibs-foundation swift-foundation swift-foundation-icu swift-corelibs-libdispatch icu musl musl-fts curl boringssl libxml2 zlib libcxx libcxxabi libunwind compiler-rt libyaml; do
   awk -F'\t' -v c="$c" '$2 == c { f = 1 } END { exit !f }' "$tsv" || fail "no notice for $c"
 done
 
@@ -40,9 +40,15 @@ done
 XLESS_CHECKOUTS="$t/checkouts" bash "$repo/scripts/third-party-licenses.sh" "$t/out" >/dev/null
 for n in $listed; do cmp -s "$v/$n" "$t/out/$n" || fail "$n was not shipped verbatim"; done
 
-mkdir -p "$t/fake/scripts" "$t/fake/licenses"
+mkdir -p "$t/fake/scripts" "$t/fake/licenses" "$t/fake/ThirdParty/AssetKit/Sources/CLZFSE"
 cp "$repo/scripts/third-party-licenses.sh" "$t/fake/scripts/"; cp "$repo/Package.resolved" "$t/fake/"; cp -R "$v" "$t/fake/licenses/vendored"
+cp "$repo/ThirdParty/AssetKit/LICENSE" "$t/fake/ThirdParty/AssetKit/"
+cp "$repo/ThirdParty/AssetKit/Sources/CLZFSE/LICENSE" "$t/fake/ThirdParty/AssetKit/Sources/CLZFSE/"
+# Control: the untampered fake root succeeds, so the failure below can only come from the sha check.
+XLESS_CHECKOUTS="$t/checkouts" bash "$t/fake/scripts/third-party-licenses.sh" "$t/out1" >/dev/null 2>&1 || fail "the untampered fake root should succeed"
 first=$(echo $listed | cut -d' ' -f1)
 echo tampered >> "$t/fake/licenses/vendored/$first"
-XLESS_CHECKOUTS="$t/checkouts" bash "$t/fake/scripts/third-party-licenses.sh" "$t/out2" >/dev/null 2>&1 && fail "a modified notice was shipped"
+rc=0; err=$(XLESS_CHECKOUTS="$t/checkouts" bash "$t/fake/scripts/third-party-licenses.sh" "$t/out2" 2>&1 >/dev/null) || rc=$?
+[[ $rc -ne 0 ]] || fail "a modified notice was shipped"
+[[ "$err" == *"$first does not match SOURCES.tsv"* ]] || fail "wrong failure for a modified notice: $err"
 echo "licenses.test.sh: OK"
