@@ -51,7 +51,7 @@ public enum SetupPlan {
         for a in archs {
             let emulated = a != hostArch
             // Measured on an 8-core arm64 Linux machine with a fast network (docs/acceptance-m5.md); `estimateNote` says so.
-            func est(_ s: String, disk: String = "") -> String { (emulated ? "\(s) natively, longer under emulation" : s) + disk }
+            func est(_ s: String, disk: String = "") -> String { (emulated ? "\(s) natively, 2-3x longer under emulation" : s) + disk }
             var base = [script, "base", "--arch", a, "--suffix", bsuffix]
             if let bin = xlessBinaries[a] { base += ["--xless-bin", bin.path] }
             steps.append(SetupStep(title: "xless-base:local-\(a)\(bsuffix)", argv: base, estimate: est("~3 min")))
