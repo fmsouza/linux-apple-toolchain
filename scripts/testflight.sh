@@ -50,7 +50,7 @@
 #
 # Configuration comes from the environment, and from a local file that is sourced first when it exists:
 #   $XLESS_TESTFLIGHT_ENV, default ~/.config/xless/testflight.env   (keep it out of git; it holds paths and IDs only)
-# Variables (see docs/README.md#one-command-testflight):
+# Variables (see docs/signing-and-testflight.md):
 #   ASC_KEY_ID               App Store Connect API key ID                      (required)
 #   ASC_ISSUER_ID_FILE       file holding the issuer ID   (or ASC_ISSUER_ID)   (required)
 #   ASC_KEY_P8_FILE          the API key .p8 file                              (required)
@@ -201,7 +201,7 @@ else
   pto=upload; prev=""
   for a in "$@"; do
     [[ "$prev" != --to ]] || pto="$a"
-    case "$a" in --to=*) pto="${a#--to=}" ;; esac
+    case "$a" in --to=*) pto="${a#--to=}" ;; --build-number|--build-number=*) given_build=1 ;; esac
     prev="$a"
   done
   pti="$(index "$pto")"
@@ -346,7 +346,8 @@ check_pin() {   # after apply_pin: refuse missing images with the command that b
 if [[ -z "$OVERLAY" ]]; then
   # A project directory: one `xless ship`. Secrets are mounted, and xless scrubs them from the environment of the tools
   # it runs, but the files stay readable to package code (SwiftPM plugins and macros) built in the same container.
-  echo "==> TestFlight: build number $XLESS_BUILD_NUMBER" >&2
+  if [[ $given_build == 1 ]]; then echo "==> TestFlight: build number from --build-number" >&2
+  else echo "==> TestFlight: build number $XLESS_BUILD_NUMBER" >&2; fi
   set +e
   if [[ $use_docker == 1 ]]; then
     image="${XLESS_IMAGE:-xless:local-$arch}"
@@ -360,6 +361,7 @@ if [[ -z "$OVERLAY" ]]; then
   fi
   code=$?
   set -e
+  if [[ $code -eq 0 && $step3 == 0 ]]; then echo "==> TestFlight: stopped after $pto (--to), nothing delivered" >&2; exit 0; fi
   finish $code
 fi
 

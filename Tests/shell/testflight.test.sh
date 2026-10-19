@@ -65,6 +65,11 @@ for to in "--to finalize" "--to=build" "--build-number 1 --to finalize"; do
   [[ "$out" == *"xless ship --platform ios $to"* ]] || fail "'$to' not passed on: $out"
   [[ "$out" != *"/secrets/"* && "$out" != *"ASC_KEY_ID"* ]] || fail "'$to' mounts secrets: $out"
 done
+# it says it stopped, not that it delivered, and names the build number xless will use
+"${nosec[@]}" "$S" "$t/proj" --build-number 1 --to finalize >/dev/null 2>"$t/err" || fail "--to finalize run failed"
+grep -q "stopped after finalize (--to), nothing delivered" "$t/err" || fail "no stop message: $(cat "$t/err")"
+grep -q "delivery finished" "$t/err" && fail "a run stopped at finalize claims a delivery: $(cat "$t/err")"
+grep -q "build number from --build-number" "$t/err" || fail "the --build-number override is not reported: $(cat "$t/err")"
 code=0; "${nosec[@]}" "$S" "$t/proj" --from sign >/dev/null 2>"$t/err" || code=$?
 [[ $code -eq 2 ]] && grep -q ASC_KEY_ID "$t/err" || fail "a project dir run through sign without secrets: exit $code"
 code=0; "${nosec[@]}" "$S" "$t/proj" --to sign >/dev/null 2>"$t/err" || code=$?
