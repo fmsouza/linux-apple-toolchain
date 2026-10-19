@@ -103,3 +103,31 @@ private func fakeApp(_ dir: URL, name: String, build: String) throws -> URL {
     try fakeXipBytes.write(to: f)
     #expect(try XcodeSource.sha256(of: f, chunkSize: 4096) == fakeXipHash)
 }
+
+/// The process's peak resident set size in bytes: getrusage's ru_maxrss (bytes) on Darwin, /proc's VmHWM (kB) on Linux.
+private func peakRSS() -> Int64 {
+    #if canImport(Darwin)
+    var u = rusage()
+    getrusage(RUSAGE_SELF, &u)
+    return Int64(u.ru_maxrss)
+    #else
+    let status = (try? String(contentsOfFile: "/proc/self/status", encoding: .utf8)) ?? ""
+    let line = status.split(separator: "\n").first { $0.hasPrefix("VmHWM:") } ?? ""
+    return (Int64(line.split(separator: " ").dropFirst().first ?? "") ?? 0) * 1024
+    #endif
+}
+
+/// An Xcode .xip is several GB: hashing it must not hold the file in memory (on Darwin, autoreleased chunks pile up
+/// unless they are drained). A sparse 2 GB file (no disk used) is hashed and the peak RSS may grow by 256 MB at most.
+@Test func hashingAMultiGBFileKeepsMemoryFlat() throws {
+    let dir = try tempDir("big")
+    defer { try? FileManager.default.removeItem(at: dir) }
+    let f = dir.appendingPathComponent("sparse.xip")
+    guard FileManager.default.createFile(atPath: f.path, contents: nil),
+          let h = try? FileHandle(forWritingTo: f), (try? h.truncate(atOffset: 2 << 30)) != nil else { return }  // skip: no sparse file
+    try h.close()
+    let before = peakRSS()
+    _ = try XcodeSource.sha256(of: f)
+    let grew = peakRSS() - before
+    #expect(grew < 256 << 20, "hashing 2 GB raised the peak RSS by \(grew >> 20) MB")
+}

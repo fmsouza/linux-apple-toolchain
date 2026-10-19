@@ -47,20 +47,24 @@ public enum XcodeSource {
                           fix: "download the Universal Xcode \(spoken) .xip from https://developer.apple.com/download/all/ (free Apple ID)")
     }
 
-    /// The file's SHA-256 (lowercase hex), read in chunks: an Xcode .xip is several GB.
+    /// The file's SHA-256 (lowercase hex), read in chunks: an Xcode .xip is several GB. read(2) into one reused buffer
+    /// keeps memory flat; FileHandle.read(upToCount:) returns autoreleased Data on Darwin, which piles up to the file's size.
     public static func sha256(of url: URL, chunkSize: Int = 8 << 20) throws -> String {
-        guard let h = try? FileHandle(forReadingFrom: url) else {
-            throw XlessError(.sdk, "cannot read \(url.path)", fix: "check the file's permissions")
+        let fd = open(url.path, O_RDONLY)
+        guard fd >= 0 else {
+            throw XlessError(.sdk, "cannot read \(url.path): \(String(cString: strerror(errno)))", fix: "check the file's permissions")
         }
-        defer { try? h.close() }
+        defer { close(fd) }
         var hasher = SHA256()
+        var buffer = [UInt8](repeating: 0, count: chunkSize)
         while true {
-            let chunk: Data?
-            do { chunk = try h.read(upToCount: chunkSize) } catch {
-                throw XlessError(.sdk, "cannot read \(url.path): \(error)", fix: "check the file and the disk")
+            let n = buffer.withUnsafeMutableBytes { read(fd, $0.baseAddress, chunkSize) }
+            if n < 0 {
+                if errno == EINTR { continue }
+                throw XlessError(.sdk, "cannot read \(url.path): \(String(cString: strerror(errno)))", fix: "check the file and the disk")
             }
-            guard let chunk, !chunk.isEmpty else { break }
-            hasher.update(data: chunk)
+            if n == 0 { break }
+            buffer.withUnsafeBytes { hasher.update(bufferPointer: UnsafeRawBufferPointer(rebasing: $0.prefix(n))) }
         }
         return hasher.finalize().map { String(format: "%02x", $0) }.joined()
     }
