@@ -23,6 +23,9 @@ jobs:
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-24.04
     timeout-minutes: 10
+    permissions:
+      contents: read
+      actions: read   # scripts/ci-passed.sh lists main's pr workflow runs
     outputs:
       version: ${{ steps.next.outputs.version }}
       sha: ${{ steps.next.outputs.sha }}
@@ -32,14 +35,26 @@ jobs:
         with:
           fetch-depth: 0
           fetch-tags: true
+          persist-credentials: false
       - name: Next version
         id: next
         env:
           FIRST_VERSION: ${{ inputs.first_version }}
+          EVENT: ${{ github.event_name }}
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
         run: |
           version=$(scripts/next-version.sh ${FIRST_VERSION:+--first "$FIRST_VERSION"})
+          SHA=$(git rev-parse HEAD)
+          # Only a commit whose main CI (the pr workflow's push run) succeeded is released: a night without that skips,
+          # a manual dispatch fails loudly.
+          if [ -n "$version" ] && ! why=$(scripts/ci-passed.sh "$SHA" 2>&1); then
+            echo "::warning::not releasing v$version from $SHA: $why"
+            if [ "$EVENT" != schedule ]; then exit 1; fi
+            version=""
+          fi
           echo "version=$version" >> "$GITHUB_OUTPUT"
-          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+          echo "sha=$SHA" >> "$GITHUB_OUTPUT"
           prev=$(git tag --merged HEAD --list 'v[0-9]*' --sort=-v:refname | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | head -n 1 || true)
           echo "prev=$prev" >> "$GITHUB_OUTPUT"
           if [ -n "$version" ]; then echo "Releasing v$version from $(git rev-parse HEAD)"; else echo "No releasable change."; fi
@@ -96,6 +111,7 @@ jobs:
         with:
           ref: ${{ needs.plan.outputs.sha }}
           fetch-depth: 0
+          persist-credentials: false
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
           pattern: tarball-*
