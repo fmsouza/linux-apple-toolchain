@@ -56,7 +56,8 @@
 #   ASC_KEY_P8_FILE          the API key .p8 file                              (required)
 #   XLESS_DIST_KEY_FILE      the Apple Distribution private key (PEM)          (required, except with --platform macos)
 #   XLESS_DEVID_KEY_FILE     the Developer ID Application private key (PEM)    (required with --platform macos)
-#     (with --config, "required" means: when a step that uses it runs; see above)
+#     ("required" means: when a step that uses it runs. A project directory needs none of them for a run that stops
+#      before sign (--to prepare|build|assets|finalize); with --config, see the three steps above)
 #   XLESS_IMAGE              docker image; default xless:local-<arch> (with --config: see above)
 #   XLESS_SIGN_IMAGE         React Native only: the image of steps 1 and 3; default xless-base:local-<arch>
 #   DOCKER_CONTEXT           docker context; default colima-xless if it exists, else the current one

@@ -19,7 +19,7 @@ You do not need a Mac, and you do not need to unpack the `.xip`.
 
 1. Open <https://developer.apple.com/download/all/> and sign in with your Apple ID. A free Apple ID is enough.
 2. Search for the Xcode version and download its `.xip`. Where Apple offers a "Universal" and an "Apple silicon"
-   file, take the Universal one.
+   file, take the Universal one: xless is checked against the Universal download.
 
    | Xcode | File to download |
    |---|---|
@@ -28,7 +28,8 @@ You do not need a Mac, and you do not need to unpack the `.xip`.
 
 3. Keep the file where your browser saved it. The commands below assume `~/Downloads`.
 
-xless recognises the file by its content, not by its name, and refuses any other Xcode version.
+xless recognises the file by its content, not by its name, and refuses any other Xcode version
+([what to do then](docs/troubleshooting.md#xless-setup)).
 [docs/apple-requirements.md](docs/apple-requirements.md) lists everything xless uses from Apple, and why.
 
 ## Install

@@ -27,9 +27,10 @@ from Apple ([apple-requirements.md](apple-requirements.md)). Two Xcode releases 
 ```
 
 - **The images.** `xless setup` builds them from the `.xip` ([images.md](images.md) shows each step, for building them
-  by hand). `xless-base` holds xless, xtool and rcodesign; `xless` adds the Darwin SDK and the Swift toolchain that
-  Xcode release ships; `xless-tauri` adds Node, pnpm and Rust; `xless-rn` adds Ruby, Bundler, Swift Build, Hermes and
-  the Xcode tool replacements a React Native build calls. They are tagged `<image>:local-<arch>-xcode<version>` (for
+  by hand). `xless-base` holds xless, xtool and rcodesign; `xless` adds the Darwin SDK and the open-source Swift
+  release whose version matches that Xcode's Swift (6.4 for 27.0, 6.2.3 for 26.2; Apple's own toolchain is never in
+  an image); `xless-tauri` adds Node, pnpm and Rust; `xless-rn` adds Ruby, Bundler, Swift Build, Hermes and the Xcode
+  tool replacements a React Native build calls. They are tagged `<image>:local-<arch>-xcode<version>` (for
   example `xless:local-arm64-xcode26.2`), and also plain `<image>:local-<arch>` for Xcode 27.0, the default.
 - **`xless docker`** runs a build in those images. With a project directory (an `xless.yml` project) it runs
   `xless ship` in one container. With `--config <overlay.yml>` (a Tauri or React Native app) it runs three containers,

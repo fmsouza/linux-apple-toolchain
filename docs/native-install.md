@@ -58,6 +58,6 @@ xless ship --platform ios --to finalize
 Leave out `--to finalize` to sign and upload as well ([signing-and-testflight.md](signing-and-testflight.md)).
 `XLESS_USE_DOCKER=0 xless docker <project-dir>` runs the same script as with the images, natively.
 
-A native install compiles app code with the `swift` on `PATH` (6.4), which is Xcode 27.0's Swift. The images also
-carry the Swift that Xcode 26.2 ships (6.2.3) and this installer does not, so a project that pins an Xcode with
-`xcode:` is refused natively: build it in Docker.
+A native install compiles app code with the open-source `swift` on `PATH` (6.4, the version of Xcode 27.0's
+Swift). The Xcode 26.2 images also carry open-source Swift 6.2.3, the version of Xcode 26.2's Swift, which this
+installer does not install, so a project that pins an Xcode with `xcode:` is refused natively: build it in Docker.

@@ -9,7 +9,7 @@ Linux machine: Apple's programs are macOS programs, and xless uses open-source r
 1. Sign in at <https://developer.apple.com/download/all/> with an Apple ID. A free Apple ID is enough; you accept
    Apple's Xcode licence when you download.
 2. Download the `.xip` of a supported Xcode. Where Apple offers both, take the "Universal" file rather than the
-   "Apple silicon" one: the macOS SDK must hold the x86_64 code a universal macOS app (a Tauri DMG) links against.
+   "Apple silicon" one: xless is checked against the Universal download.
 
    | Xcode | Build | File |
    |---|---|---|

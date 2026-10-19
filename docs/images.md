@@ -50,7 +50,8 @@ The binary must be the Linux `xless` of that architecture (the script checks). F
 binary from that architecture's release tarball.
 
 **2. Export the Darwin SDK.** xtool, which is open source, unpacks the `.xip` inside `xless-base` and writes the SDK.
-The output directory must exist and be empty, so that Docker does not create it as root:
+The output directory must exist and be empty, so that Docker does not create it as root. If an earlier export was
+interrupted, delete what it left first (`rm -rf "$SDK/$A"`):
 
 ```sh
 mkdir -p "$SDK/$A"
@@ -105,8 +106,9 @@ onwards: each image is built on the previous one of the same architecture and su
 
 ## Another architecture
 
-`xless setup --arch amd64` (or `--arch arm64`) builds the other architecture's chain as well. It runs under emulation,
-3 to 5 times slower. Use a Docker that runs the other architecture through Rosetta (an Apple-silicon Mac) or a native
-host when you can: under QEMU's user-mode emulation gcc and Swift have crashed at random. The `xless` binary for the
-other architecture comes from the release tarball (checked against `SHA256SUMS`), or from `XLESS_BIN_ARM64` /
-`XLESS_BIN_AMD64` when set.
+`--arch` replaces the default (this machine's architecture): `xless setup --xcode … --arch amd64` builds only the
+amd64 chain, and `--arch arm64 --arch amd64` builds both. A chain for another architecture than the machine's runs
+under emulation, 3 to 5 times slower. Use a Docker that runs the other architecture through Rosetta (an Apple-silicon
+Mac) or a native host when you can: under QEMU's user-mode emulation gcc and Swift have crashed at random. The `xless`
+binary for the other architecture comes from the release tarball (checked against `SHA256SUMS`), or from
+`XLESS_BIN_ARM64` / `XLESS_BIN_AMD64` when set.
