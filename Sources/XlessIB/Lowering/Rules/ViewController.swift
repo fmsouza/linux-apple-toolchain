@@ -170,7 +170,7 @@ enum DocumentRule {
                 }
                 if v > limit {
                     throw XlessError(.ib, "This document requires at least Xcode \(s). This image's ibtool \(profile.ibtoolShortVersion) (Xcode \(profile.xcodeVersion), \(profile.xcodeBuild)) accepts documents up to Xcode \(profile.ibtoolShortVersion).",
-                                     fix: "re-save the storyboard without features newer than Xcode \(profile.ibtoolShortVersion), or pin a newer Xcode (`xcode:`) and build with its image (make images XCODE=…)")
+                                     fix: "re-save the storyboard without features newer than Xcode \(profile.ibtoolShortVersion), or pin a newer Xcode (`xcode:`) and build with its images (xless setup --xcode <Xcode.xip>)")
                 }
             }
         }

@@ -69,7 +69,7 @@ private func meta(_ build: String) -> ToolchainMeta {
     let e = #expect(throws: XlessError.self) { try XcodeToolsProfile.forImage(meta: meta("27A9275"), stage: .assets) }
     #expect(e?.stage == .assets)
     #expect(e?.cause == "this image's Xcode build 27A9275 has no measured asset/storyboard tools profile")
-    #expect(e?.fix.contains("make images") == true)
+    #expect(e?.fix.contains("xless setup --xcode") == true)
     #expect(e?.fix.contains("17C52, 27A266a") == true)
     #expect(try XcodeToolsProfile.forImage(meta: meta("17C52"), stage: .ib) == XcodeToolsProfile.all["17C52"])
 }
