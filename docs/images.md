@@ -60,7 +60,7 @@ docker run --rm --platform linux/$A --user "$(id -u):$(id -g)" -e HOME=/tmp -w /
   xless-base:local-$A$SUFFIX xtool sdk build /xcode/Xcode.xip /out
 ```
 
-With rootless Docker leave out `--user …`. The result is `$SDK/$A/darwin.xtoolsdk`, about 3 GB.
+With rootless Docker leave out `--user …`. The result is `$SDK/$A/darwin.xtoolsdk`, about 3 GB (xtool unpacks the `.xip` under `$SDK/$A` first: about 14 GB at the peak).
 
 **3. `toolchain-meta.json`.** xless reads the SDK's version files (no program from the SDK runs) and the
 supported-Xcode table in `versions.env`:

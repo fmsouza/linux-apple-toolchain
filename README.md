@@ -9,7 +9,10 @@ images that you build once, on your own machine, from the Xcode download Apple g
 - A Linux machine, x86_64 or arm64.
 - [Docker Engine](https://docs.docker.com/engine/install/) with the buildx plugin, usable without `sudo`
   (your user is in the `docker` group).
-- About 120 GB of free disk space, for the images and their build cache.
+- Free disk space, per Xcode version and architecture: about 16 GB in your home directory's cache (`~/.cache`) while
+  the SDK is taken out of the `.xip` (about 3 GB of it stays), and about 40 GB where Docker keeps its data
+  (`/var/lib/docker` by default) for the images and their build cache, plus a few GB for each app's build caches.
+  `xless setup` checks both before it starts.
 - Xcode 27.0 or 26.2 from Apple, as the `.xip` file Apple distributes. xless takes Apple's SDK out of it; it never runs
   a program from it. See [Get Xcode](#get-xcode).
 
@@ -19,7 +22,7 @@ You do not need a Mac, and you do not need to unpack the `.xip`.
 
 1. Open <https://developer.apple.com/download/all/> and sign in with your Apple ID. A free Apple ID is enough.
 2. Search for the Xcode version and download its `.xip`. Where Apple offers a "Universal" and an "Apple silicon"
-   file, take the Universal one: xless is checked against the Universal download.
+   file, take the Universal one (for 26.2, xless also accepts the Apple silicon file).
 
    | Xcode | File to download |
    |---|---|
@@ -39,8 +42,9 @@ curl -fsSL https://github.com/fmsouza/linux-apple-toolchain/releases/latest/down
 ```
 
 This puts `xless` in `~/.local/bin` and its support files in `~/.local/share/xless`, after checking the download
-against the release's checksums. It needs no `sudo`. If it says that `~/.local/bin` is not on your `PATH`, run the
-`export` line it prints, and add that line to your shell's startup file. Then check:
+against the release's checksums. It needs no `sudo`. If it says that `~/.local/bin` is not on `PATH` in this shell,
+open a new terminal (many Linux systems add `~/.local/bin` at login once it exists) or run the `export` line it
+prints. If a new terminal still cannot find `xless`, add that line to your shell's startup file. Then check:
 
 ```sh
 xless --version
@@ -53,9 +57,13 @@ xless setup --xcode ~/Downloads/Xcode_27.xip
 ```
 
 This builds four Docker images on your machine: `xless-base`, `xless` (with Apple's SDK), `xless-tauri` and
-`xless-rn`. It first checks Docker and your free disk space, then prints each step and how long it usually takes. The
-steps add up to about 75 minutes on a fast machine; a slower one takes longer. You do this once per Xcode version.
-When it finishes it prints the next command to run.
+`xless-rn`. It first checks Docker and your free disk space, then prints each step with a rough time. The whole run
+took about 13 minutes on an 8-core machine with a fast network; it depends on your CPU and network, and can take an
+hour on a slow one. You do this once per Xcode version. When it finishes it prints the next command to run. To see the
+plan and the disk space it asks for without running anything, add `--dry-run`.
+
+`docker images` then lists each image under several tags that name the same image: `:local-<arch>-xcode<version>`,
+`:local-<arch>-xcode<version>-<build>` and, for Xcode 27.0, `:local-<arch>`.
 
 For Xcode 26.2 use `xless setup --xcode ~/Downloads/Xcode_26.2_Universal.xip`. The images never leave your machine:
 they contain Apple's SDK, so do not push them to a public registry.
@@ -75,9 +83,10 @@ If you built the images from Xcode 26.2 only, run this between the two commands,
 echo 'xcode: "26.2"' >> ~/HelloShip/xless.yml
 ```
 
-The build ends with `stopped after finalize (--to), nothing delivered`. The finished app is
-`~/HelloShip/.xless/build/ios/final/HelloShip.app`: an unsigned iOS app for arm64 devices. No Apple account is needed
-for this step.
+Once the images exist, this takes under a minute. The build ends with `stopped after finalize (--to), nothing
+delivered`. The finished app is `~/HelloShip/.xless/build/ios/final/HelloShip.app`: an unsigned iOS app for arm64
+devices. Paths in the output that start with `/work` are inside the build container, where `/work` is your project
+directory: `/work/.xless/build/ios/final/HelloShip.app` is that same app. No Apple account is needed for this step.
 
 The build runs as root inside the container, so the files it creates in `~/HelloShip` (`.xless`, `.build`, `.bsp`,
 `xtool` and `xtool.yml`) belong to root. Remove the copy with `sudo rm -rf ~/HelloShip`.

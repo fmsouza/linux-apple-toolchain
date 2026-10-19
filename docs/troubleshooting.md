@@ -9,7 +9,7 @@ their own tables: [tauri.md](tauri.md#troubleshooting), [react-native.md](react-
 
 | Symptom | What to do |
 |---|---|
-| `xless: command not found` after the install | `~/.local/bin` is not on your `PATH`. Run the `export PATH=…` line the installer printed, and add it to your shell's startup file (`~/.bashrc`, `~/.zshrc` or `~/.profile`). |
+| `xless: command not found` after the install | `~/.local/bin` is not on your `PATH` in this shell. Open a new terminal (many Linux systems add `~/.local/bin` at login once it exists), or run the `export PATH=…` line the installer printed. If a new terminal still cannot find `xless`, add that line to your shell's startup file (`~/.bashrc`, `~/.zshrc` or `~/.profile`). |
 | `unsupported OS` or `unsupported architecture` | Releases exist for Linux on x86_64 and arm64 only. On a Mac, use a Linux VM or container. |
 | `sha256 mismatch …; nothing was installed` | The download was damaged or changed. Run the install line again; if it keeps failing, report it. |
 | `warning: docker is not installed` / `the daemon is not reachable` | xless is installed, but builds need Docker: see the next section. |
@@ -30,17 +30,32 @@ Running the install line again upgrades xless in place.
 | `Docker refused the connection: permission denied on its socket` | Add yourself to the `docker` group: `sudo usermod -aG docker $USER`, then log out and in again (or run `newgrp docker`). |
 | `cannot connect to the Docker daemon` | Start Docker: `sudo systemctl start docker`. |
 | `docker buildx is not available` | Install Docker's buildx plugin (the `docker-buildx-plugin` package on Docker's own apt and dnf repositories). |
-| `… GB free under … for the cache (the SDK export)` | Free some space, or put the cache on a larger disk: `XDG_CACHE_HOME=/big/disk/cache xless setup …`. |
-| `… GB free under … for Docker's data root` | Free some space (`docker system prune`), or move Docker's data root to a larger disk. |
+| `… GB free under … for the cache (the SDK export, …)` | Free some space, or put the cache on a larger disk: `XDG_CACHE_HOME=/big/disk/cache xless setup …`. See the disk check below. |
+| `… GB free under … for Docker's data root (…)` | Free some space (`docker system prune`), or move Docker's data root to a larger disk. See the disk check below. |
 | `… is not a supported Xcode (supported: Xcode 26.2 (17C52), Xcode 27.0 (27A266a))` | The file is not one of the supported downloads: another Xcode version, a beta, or an incomplete download. Download a supported one ([apple-requirements.md](apple-requirements.md#how-to-get-xcode-on-linux)). |
 | `… contains ':', which docker cannot mount` | Move or rename the `.xip` so that its path has no `:`. |
 | Setup was interrupted | Run the same command again. A half-written SDK export is deleted, never reused; images already built come from Docker's cache. |
 | `the images *:local-<arch>-xcode<V> are another build of Xcode <V>` | Images from another build of the same Xcode version (a beta) exist. `XLESS_XCODE_RETAG=1 xless setup …` keeps them under a `-xcode<V>-<build>` tag and builds the new ones. |
 | `this xless is a development build … there is no release to download the linux-<arch> xless from` | Only with `--arch` for the other architecture and an xless built from source: set `XLESS_BIN_ARM64` or `XLESS_BIN_AMD64` to a Linux `xless` binary of that architecture. |
 
-The disk check asks for `XLESS_SETUP_DISK_GB` GB (from `versions.env`, 120 today) both under the cache and under
-Docker's data root. If you know you need less, for example because most image layers are already built, set it
-yourself: `XLESS_SETUP_DISK_GB=60 xless setup …`.
+### The disk check
+
+Before it runs anything, `xless setup` checks the free space in two places, per architecture it builds (`--arch`):
+
+| Where | Asked for | Why | Set by |
+|---|---|---|---|
+| The cache: `$XDG_CACHE_HOME/xless`, else `~/.cache/xless` | 16 GB, only when this run exports the SDK | xtool unpacks the `.xip` into the SDK export there (measured peak about 14 GB); about 3 GB stays | `XLESS_SETUP_CACHE_GB` |
+| Docker's data root (`docker info`, `/var/lib/docker` by default; checked on Linux) | 40 GB | the four images and their build cache (measured about 30 GB for the first chain) | `XLESS_SETUP_DOCKER_GB` |
+
+The figures come from `versions.env` and were measured on first runs from the Xcode 26.2 and 27.0 `.xip`s
+([acceptance-m5.md](acceptance-m5.md)). With `--arch arm64 --arch amd64` each is doubled. The refusal names the
+directory it checked, the free and the needed space, and the variable. If you know a run needs less, for example
+because most image layers are already built, set that variable to the GB per architecture to ask for:
+`XLESS_SETUP_DOCKER_GB=10 xless setup …`. `xless setup --dry-run` prints what the check asks for.
+
+To put a newer xless into the images after an upgrade, run `xless setup` again: the images are rebuilt around the new
+`xless` (the SDK export is reused), and the previous ones stay on disk without a tag until `docker image prune`
+removes them.
 
 `xless setup --reexport` exports the SDK again even when the cache has it. The cache is
 `$XDG_CACHE_HOME/xless`, else `~/.cache/xless`; deleting it costs only a new export.
