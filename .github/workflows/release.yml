@@ -1,0 +1,119 @@
+name: release
+on:
+  schedule:
+    - cron: '0 3 * * *'
+  workflow_dispatch:
+    inputs:
+      first_version:
+        description: Version of the first release (x.y.z); used only when no v* tag exists yet
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  # Decides whether anything is releasable. A scheduled run with no v* tag yields an empty version.
+  # Only main releases: a dispatch from another branch skips every job.
+  plan:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    outputs:
+      version: ${{ steps.next.outputs.version }}
+      sha: ${{ steps.next.outputs.sha }}
+      prev: ${{ steps.next.outputs.prev }}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+      - name: Next version
+        id: next
+        env:
+          FIRST_VERSION: ${{ inputs.first_version }}
+        run: |
+          version=$(scripts/next-version.sh ${FIRST_VERSION:+--first "$FIRST_VERSION"})
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+          prev=$(git tag --merged HEAD --list 'v[0-9]*' --sort=-v:refname | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | head -n 1 || true)
+          echo "prev=$prev" >> "$GITHUB_OUTPUT"
+          if [ -n "$version" ]; then echo "Releasing v$version from $(git rev-parse HEAD)"; else echo "No releasable change."; fi
+
+  build:
+    name: build (${{ matrix.name }})
+    needs: plan
+    if: needs.plan.outputs.version != ''
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 90
+    container: swift:6.4.0-jammy
+    strategy:
+      fail-fast: true
+      matrix:
+        include:
+          - { name: x86_64, runner: ubuntu-24.04, triple: x86_64-swift-linux-musl }
+          - { name: arm64, runner: ubuntu-24.04-arm, triple: aarch64-swift-linux-musl }
+    steps:
+      - name: Install tools
+        run: apt-get update -qq && apt-get install -y -qq git curl ca-certificates >/dev/null
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ needs.plan.outputs.sha }}
+      - name: Build and package
+        uses: ./.github/actions/build-package
+        with:
+          arch: ${{ matrix.name }}
+          triple: ${{ matrix.triple }}
+          version: ${{ needs.plan.outputs.version }}
+          out-dir: dist
+          stamp: 'true'
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: tarball-${{ matrix.name }}
+          path: dist/xless-*.tar.gz
+          if-no-files-found: error
+          retention-days: 1
+
+  # Runs on the runner itself (gh is not in the swift container). The only job with write access.
+  publish:
+    needs: [plan, build]
+    if: needs.plan.outputs.version != ''
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    env:
+      VERSION: ${{ needs.plan.outputs.version }}
+      SHA: ${{ needs.plan.outputs.sha }}
+      PREV: ${{ needs.plan.outputs.prev }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ needs.plan.outputs.sha }}
+          fetch-depth: 0
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          pattern: tarball-*
+          path: dist
+          merge-multiple: true
+      - name: Checksums and installer
+        run: |
+          cd dist
+          ls -l
+          sha256sum xless-*.tar.gz | LC_ALL=C sort -k2 > SHA256SUMS
+          cat SHA256SUMS
+          cp ../scripts/install.sh install.sh
+      - name: Release notes
+        run: |
+          scripts/release-notes.sh "$PREV" "$SHA" > notes.md
+          cat notes.md
+      # --target makes gh create the tag at the planned commit together with the release, so a failure leaves no orphan tag.
+      - name: Create the tag and the release
+        run: |
+          gh release create "v$VERSION" --target "$SHA" --title "v$VERSION" --notes-file notes.md \
+            dist/xless-*.tar.gz dist/SHA256SUMS dist/install.sh

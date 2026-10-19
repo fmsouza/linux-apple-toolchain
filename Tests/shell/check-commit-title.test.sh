@@ -20,6 +20,8 @@ ok 'fix(install): verify checksums'
 ok 'feat!: drop Xcode 26.2'
 ok 'ci(release): nightly'
 ok 'revert: feat: x'
+ok 'fix(-x): scope may start with punctuation'
+ok 'fix(_x.y/z-1): any of a-z0-9._/-'
 
 bad 'Add setup'
 bad 'feat:missing space'
