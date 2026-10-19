@@ -59,7 +59,9 @@ mkdir -p "$t/share"; cp -R "$root/scripts" "$root/versions.env" "$t/share/"
 grep -Eq -- "--build-arg XLESS_IMAGE_ID=v0\.0\.0-dev-[0-9a-f]{12}-x( |$)" "$DOCKER_ARGV" || fail "rn image id outside git: $(cat "$DOCKER_ARGV")"
 want="$( (sha256sum "$root/versions.env" 2>/dev/null || shasum -a 256 "$root/versions.env") | cut -c1-12)"
 has "--build-arg XLESS_IMAGE_ID=v0.0.0-dev-$want-x" "rn id hash"
-# Inside the checkout: the commit.
+# Inside the checkout: the commit (skipped where git cannot read it, e.g. a container running as another user).
+if [[ "$(git -C "$root" rev-parse --show-toplevel 2>/dev/null || true)" == "$root" ]]; then
 "$S" rn --arch arm64 --suffix -x 2>/dev/null
 grep -Eq -- "--build-arg XLESS_IMAGE_ID=[0-9a-f]{12}(-dirty)?-$want-x( |$)" "$DOCKER_ARGV" || fail "rn image id in git: $(cat "$DOCKER_ARGV")"
+fi
 echo "docker-images.test.sh: ok"
