@@ -57,6 +57,24 @@ for v in ASC_KEY_ID ASC_ISSUER_ID_FILE ASC_KEY_P8_FILE XLESS_DIST_KEY_FILE; do
   [[ $code -eq 2 ]] || fail "missing $v exits $code, want 2"
   grep -q "$v\|ASC_ISSUER_ID" "$t/err" || fail "error does not name $v"
 done
+# a project directory run that stops before sign needs no secret at all (the README's sample build)
+nosec=(env -i HOME="$t/home" PATH="$t/bin:/usr/bin:/bin" XLESS_TESTFLIGHT_ENV="$t/none.env" XLESS_TESTFLIGHT_DRY_RUN=1 XLESS_USE_DOCKER=1)
+for to in "--to finalize" "--to=build" "--build-number 1 --to finalize"; do
+  # shellcheck disable=SC2086
+  out=$("${nosec[@]}" "$S" "$t/proj" $to 2>"$t/err") || fail "project dir '$to' without secrets failed: $(cat "$t/err")"
+  [[ "$out" == *"xless ship --platform ios $to"* ]] || fail "'$to' not passed on: $out"
+  [[ "$out" != *"/secrets/"* && "$out" != *"ASC_KEY_ID"* ]] || fail "'$to' mounts secrets: $out"
+done
+code=0; "${nosec[@]}" "$S" "$t/proj" --from sign >/dev/null 2>"$t/err" || code=$?
+[[ $code -eq 2 ]] && grep -q ASC_KEY_ID "$t/err" || fail "a project dir run through sign without secrets: exit $code"
+code=0; "${nosec[@]}" "$S" "$t/proj" --to sign >/dev/null 2>"$t/err" || code=$?
+[[ $code -eq 2 ]] || fail "--to sign without secrets: exit $code, want 2"
+# with secrets set, a run that stops before sign still mounts none
+out=$("${base[@]}" "$S" "$t/proj" --to finalize 2>/dev/null) || fail "--to finalize with secrets failed"
+[[ "$out" != *"/secrets/"* ]] || fail "--to finalize mounts secrets: $out"
+code=0; "${nosec[@]}" "$S" "$t/proj" --to nowhere >/dev/null 2>"$t/err" || code=$?
+[[ $code -eq 2 ]] && grep -q "unknown stage" "$t/err" || fail "unknown --to stage: exit $code"
+
 # relative secret paths are made absolute before mounting
 out=$(cd "$t" && "${base[@]}" ASC_KEY_P8_FILE=key.p8 "$S" proj 2>/dev/null) || fail "relative path run failed"
 [[ "$out" == *"--mount type=bind,src=$t/key.p8,dst=/secrets/asc.p8,readonly"* || "$out" == *"--mount "*"$t/key.p8,dst=/secrets/asc.p8,readonly"* ]] || fail "relative path not resolved: $out"

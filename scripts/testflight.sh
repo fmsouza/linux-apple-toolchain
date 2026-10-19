@@ -196,9 +196,19 @@ if [[ -n "$OVERLAY" ]]; then
   build_kind="$(top_value build)"
   [[ "$PLATFORM" != ios || $SIM == 1 || -n "${XLESS_BUILD_NUMBER:-}" || $given_build == 1 || $fi_ -gt 1 || ( -n "$build_kind" && "$build_kind" != dated ) ]] || step1=1
   [[ $ti -ge 4 ]] || step3=0
+else
+  # A project directory is one container: it gets the secrets unless the run stops before sign (`--to finalize`).
+  pto=upload; prev=""
+  for a in "$@"; do
+    [[ "$prev" != --to ]] || pto="$a"
+    case "$a" in --to=*) pto="${a#--to=}" ;; esac
+    prev="$a"
+  done
+  pti="$(index "$pto")"
+  [[ $pti -ge 4 ]] || step3=0
 fi
 
-# The secrets of the steps that run (all of them for a project directory: one container).
+# The secrets of the steps that run (for a project directory: all of them, or none before sign).
 need_asc=0; need_key=0
 [[ $step1 == 0 && $step3 == 0 ]] || need_asc=1
 [[ $step3 == 0 ]] || need_key=1
@@ -342,7 +352,7 @@ if [[ -z "$OVERLAY" ]]; then
     image="${XLESS_IMAGE:-xless:local-$arch}"
     [[ -n "${XLESS_IMAGE:-}" ]] || apply_pin image
     check_pin "$image"
-    run "${docker_run[@]}" --mount "$(bind "$PROJECT" /work)" -w /work "${asc_secrets[@]}" "${dist_secret[@]}" -e XLESS_BUILD_NUMBER \
+    run "${docker_run[@]}" --mount "$(bind "$PROJECT" /work)" -w /work ${asc_secrets[@]+"${asc_secrets[@]}"} ${dist_secret[@]+"${dist_secret[@]}"} -e XLESS_BUILD_NUMBER \
       "$image" xless ship --platform ios "$@"
   else
     cd "$PROJECT"
