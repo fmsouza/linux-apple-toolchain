@@ -285,7 +285,10 @@ code=0; "${base[@]}" "$S" --config "$t/ov/my.overlay.yml" --destination simulato
 # natively: the app's path is reported as it is, for scripts/sim-launch.sh
 printf '#!/bin/sh\necho "==> build"\necho /w/.xless/build/ios-simulator/app/App.app\n' > "$t/bin/xless"
 msg=$("${bare[@]}" XLESS_USE_DOCKER=0 "$S" --config "$t/rn/app.yml" --destination simulator 2>&1 >/dev/null) || fail "native simulator run failed"
-[[ "$msg" == *"==> Simulator app: /w/.xless/build/ios-simulator/app/App.app"* && "$msg" == *"sim-launch.sh /w/.xless/build/ios-simulator/app/App.app"* ]] || fail "simulator app not reported: $msg"
+[[ "$msg" == *"==> Simulator app: /w/.xless/build/ios-simulator/app/App.app"* ]] || fail "simulator app not reported: $msg"
+# the sim-launch.sh hint is Mac-only
+if [[ "$(uname -s)" == Darwin ]]; then [[ "$msg" == *"sim-launch.sh /w/.xless/build/ios-simulator/app/App.app"* ]] || fail "no launch hint on a Mac: $msg"
+else [[ "$msg" != *"sim-launch.sh"* ]] || fail "launch hint off a Mac: $msg"; fi
 # a source inside a git checkout: the checkout's top is mounted, --source names the app below it
 git init -q "$t/repo"; mkdir -p "$t/repo/apps/one"
 printf 'type: react-native\nsource: %s\n' "$t/repo/apps/one" > "$t/rn/sub.yml"
