@@ -95,6 +95,8 @@ echo "$out" | grep -qi "unsupported" || fail "riscv64: no 'unsupported': $out"
 run "${base[@]}" XLESS_PREFIX="$t/pn" PATH="$t/tools"
 [[ $rc == 0 ]] || fail "off-PATH install exited $rc"
 echo "$out" | grep -qF "export PATH=\"$t/pn/bin:\$PATH\"" || fail "no export PATH line: $out"
+echo "$out" | grep -qF "$t/pn/bin is not on PATH in this shell. Open a new terminal" || fail "the PATH hint does not say 'in this shell': $out"
+echo "$out" | grep -qF "add that line to " || fail "the PATH hint does not name a startup file: $out"
 
 # No docker: still exit 0, with the link.
 run "${base[@]}" XLESS_PREFIX="$t/pd" PATH="$t/pd/bin:$t/tools-nodocker"
