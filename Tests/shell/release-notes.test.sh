@@ -43,6 +43,19 @@ if [ "$out" != "$want" ]; then
   echo "FAIL: notes differ"; diff <(echo "$want") <(echo "$out") || true; fail=1
 fi
 
+# A squash subject carries " (#N)": shown once, after the scope; the title still counts at 100 characters.
+commit -m "feat(cli): $(printf 'x%.0s' $(seq 1 89)) (#42)"; h_pr=$(hash)
+pr_out=$(notes "$h_feat2" HEAD)
+want_pr="## Features
+- $(printf 'x%.0s' $(seq 1 89)) (cli) (#42) ($h_pr)"
+[ "$pr_out" = "$want_pr" ] || { echo "FAIL: PR number: '$pr_out'"; fail=1; }
+
+# Markdown in a subject is printed as written.
+commit -m 'fix: handle `a_b` and *c* [d](e)'; h_md=$(hash)
+md_out=$(notes "$h_pr" HEAD)
+[ "$md_out" = "## Fixes
+- handle \`a_b\` and *c* [d](e) ($h_md)" ] || { echo "FAIL: markdown: '$md_out'"; fail=1; }
+
 # Empty sections are omitted.
 only=$(notes v0.1.0 "$h_fix")
 [ "$only" = "## Fixes

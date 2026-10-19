@@ -37,6 +37,14 @@ runs:
         swift sdk install "$STATIC_SDK_URL" --checksum "$STATIC_SDK_SHA256"
         swift build -c release --product xless --swift-sdk "$TRIPLE"
         echo "XLESS_BIN=$(swift build -c release --product xless --swift-sdk "$TRIPLE" --show-bin-path)/xless" >> "$GITHUB_ENV"
+    - name: The binary reports the stamped version
+      if: inputs.stamp == 'true'
+      shell: bash
+      env:
+        VERSION: ${{ inputs.version }}
+      run: |
+        got=$("$XLESS_BIN" --version)
+        [ "$got" = "$VERSION" ] || { echo "::error::xless --version printed '$got', expected '$VERSION'"; exit 1; }
     - name: Package
       shell: bash
       env:

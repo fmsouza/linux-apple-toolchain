@@ -31,11 +31,12 @@ fi
 level=0 # 1 patch, 2 minor, 3 breaking
 re='^([a-z]+)(\([^)]*\))?(!)?: '
 while IFS= read -r sha; do
-  subject=$(git log -1 --format=%s "$sha")
+  subject=$(cc_subject_title "$(git log -1 --format=%s "$sha")")
   cc_is_valid "$subject" || continue
   [[ "$subject" =~ $re ]]
   type="${BASH_REMATCH[1]}"
-  if [ -n "${BASH_REMATCH[3]}" ] || git log -1 --format=%b "$sha" | grep -Eq '^BREAKING[ -]CHANGE:'; then
+  body=$(git log -1 --format=%b "$sha")
+  if [ -n "${BASH_REMATCH[3]}" ] || grep -Eq '^BREAKING[ -]CHANGE:' <<<"$body"; then
     l=3
   else
     case "$type" in

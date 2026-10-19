@@ -2,7 +2,7 @@
 # Prints Markdown release notes for the commits in <from-ref>..<to-ref> (an empty from-ref means all history up to to-ref).
 #   scripts/release-notes.sh <from-ref|""> <to-ref>
 # Sections, in this order, each omitted when empty: Breaking changes, Features, Fixes, Performance. One bullet per
-# commit: "- <description> (<scope>) (<short hash>)", newest first. Commits with an invalid title are skipped.
+# commit: "- <description> (<scope>) (#<PR>) (<short hash>)", newest first. Commits with an invalid title are skipped.
 set -euo pipefail
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=scripts/check-commit-title.sh
@@ -19,14 +19,18 @@ range="$to"
 breaking="" features="" fixes="" perf=""
 re='^([a-z]+)(\(([^)]*)\))?(!)?: (.*)$'
 while IFS= read -r sha; do
-  subject=$(git log -1 --format=%s "$sha")
+  raw=$(git log -1 --format=%s "$sha")
+  subject=$(cc_subject_title "$raw")
   cc_is_valid "$subject" || continue
+  pr=$(cc_subject_pr "$raw")
   [[ "$subject" =~ $re ]]
   type="${BASH_REMATCH[1]}" scope="${BASH_REMATCH[3]}" bang="${BASH_REMATCH[4]}" desc="${BASH_REMATCH[5]}"
   line="- $desc"
   [ -z "$scope" ] || line="$line ($scope)"
+  [ -z "$pr" ] || line="$line ($pr)"
   line="$line ($(git rev-parse --short=7 "$sha"))"
-  if [ -n "$bang" ] || git log -1 --format=%b "$sha" | grep -Eq '^BREAKING[ -]CHANGE:'; then
+  body=$(git log -1 --format=%b "$sha")
+  if [ -n "$bang" ] || grep -Eq '^BREAKING[ -]CHANGE:' <<<"$body"; then
     breaking="$breaking$line"$'\n'
     continue
   fi

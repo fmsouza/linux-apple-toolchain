@@ -8,6 +8,16 @@ cc_is_valid() {
   [ "${#1}" -le "$cc_max_length" ] && [[ "$1" =~ $cc_title_regex ]]
 }
 
+# GitHub appends " (#N)" to a squash-merged PR title; the title itself is what must be valid (and at most 100 characters).
+# cc_subject_title <subject> prints the subject without that trailing PR reference; cc_subject_pr prints "#N" or nothing.
+cc_pr_re='^(.*) \(#([0-9]+)\)$'
+cc_subject_title() {
+  if [[ "$1" =~ $cc_pr_re ]]; then printf '%s' "${BASH_REMATCH[1]}"; else printf '%s' "$1"; fi
+}
+cc_subject_pr() {
+  if [[ "$1" =~ $cc_pr_re ]]; then printf '#%s' "${BASH_REMATCH[2]}"; fi
+}
+
 if [ "${BASH_SOURCE[0]}" = "$0" ]; then
   if [ "$#" -ne 1 ]; then
     echo "usage: $0 <title>" >&2

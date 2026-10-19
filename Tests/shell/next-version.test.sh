@@ -88,6 +88,23 @@ expect 'unreachable tag ignored' '0.1.1'
 repo; commit -m 'chore: init'; tag v1.0.0; commit -m 'feat: a' -m '- detail' -m 'BREAKING CHANGE: gone'
 expect 'footer in a squash body' '2.0.0'
 
+# GitHub appends " (#N)" on squash: a 100-character title stays valid.
+title100="feat: $(printf 'x%.0s' $(seq 1 94))"
+repo; commit -m 'chore: init'; tag v0.1.0; commit -m "$title100 (#123)"
+expect '100-char title plus PR suffix' '0.2.0'
+repo; commit -m 'chore: init'; tag v0.1.0; commit -m "${title100}y (#123)"
+expect '101-char title is still invalid' ''
+repo; commit -m 'chore: init'; tag v0.1.0; commit -m 'fix(cli): a (#7)'
+expect 'short title plus PR suffix' '0.1.1'
+
+# A prerelease-looking tag is not a release.
+repo; commit -m 'chore: init'; tag v0.9.0; commit -m 'chore: x'; tag v1.0.0-rc.1; commit -m 'fix: a'
+expect 'prerelease tag ignored' '0.9.1'
+
+# BREAKING CHANGE in a subject (not a footer) does not count.
+repo; commit -m 'chore: init'; tag v1.2.3; commit -m 'fix: BREAKING CHANGE: not a footer'
+expect 'breaking text in subject' '1.2.4'
+
 # --first applies only when there is no tag.
 repo; commit -m 'chore: init'; tag v0.1.0; commit -m 'fix: a'
 expect '--first ignored when tagged' '0.1.1' --first 5.0.0
