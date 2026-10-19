@@ -14,8 +14,10 @@ struct SetupCommand: AsyncParsableCommand {
         SDK is exported into $XDG_CACHE_HOME/xless/sdk/xcode<V>-<B>/ (default ~/.cache/xless) and reused by later runs \
         (--reexport exports again). The Linux xless that goes into xless-base: XLESS_BIN_ARM64 / XLESS_BIN_AMD64 when set, \
         else this xless on a Linux host of that arch, else the release's linux tarball, checked against its SHA256SUMS. \
-        Before any step it checks that Docker answers, that buildx is installed, and that the cache and (on Linux) Docker's \
-        data root have XLESS_SETUP_DISK_GB free (versions.env's value; the environment's wins).
+        Before any step it checks that Docker answers, that buildx is installed, and that there is free space, per \
+        architecture: XLESS_SETUP_CACHE_GB under the cache (only when the SDK is exported) and, on Linux, \
+        XLESS_SETUP_DOCKER_GB under Docker's data root (versions.env's values; an environment variable of the same name \
+        wins). --dry-run prints the plan and what the disk check asks for, and runs nothing.
         """)
 
     @Option(help: "The Xcode: a downloaded Xcode .xip (any name) or an Xcode.app.") var xcode: String
@@ -58,13 +60,14 @@ struct SetupCommand: AsyncParsableCommand {
         let work = fm.temporaryDirectory.appendingPathComponent("xless-setup-\(UUID().uuidString)")
         defer { try? fm.removeItem(at: work) }
 
+        // The disk figures are per architecture; the cache one counts only the architectures exported in this run.
+        // An environment variable of the same name (e.g. when most layers are already cached) wins over versions.env's.
+        let table = KnownXcodes.parseEnv((try? String(contentsOf: versionsEnv, encoding: .utf8)) ?? "")
+        let sdkDir = SetupPlan.sdkDir(cacheRoot: cacheRoot, xcode: x)
+        let exporting = archs.filter { reexport || !fm.fileExists(atPath: sdkDir.appendingPathComponent("\($0)/darwin.xtoolsdk").path) }
+        let need = SetupDisk.needs(archs: archs.count, exporting: exporting.count, env: env, table: table)
         var rootless = false
-        if !dryRun {
-            // XLESS_SETUP_DISK_GB in the environment (e.g. when most layers are already cached) wins over versions.env's.
-            let table = KnownXcodes.parseEnv((try? String(contentsOf: versionsEnv, encoding: .utf8)) ?? "")
-            let diskGB = (env["XLESS_SETUP_DISK_GB"].flatMap { Int($0) }) ?? table["XLESS_SETUP_DISK_GB"].flatMap { Int($0) } ?? 120
-            rootless = try Self.preflight(cacheRoot: cacheRoot, diskGB: diskGB)
-        }
+        if !dryRun { rootless = try Self.preflight(cacheRoot: cacheRoot, need: need) }
         var binaries: [String: URL] = [:]
         for a in archs { binaries[a] = try binary(arch: a, host: host, env: env, exe: exe, cwd: cwd, home: home, work: work) }
 
@@ -75,8 +78,11 @@ struct SetupCommand: AsyncParsableCommand {
             .map { rootless ? Self.withoutUser($0) : $0 }
 
         say("==> Xcode \(x.shortVersion) (\(x.build)) from \(source.url.path) (\(source.kind == .xip ? ".xip" : ".app")), for \(archs.joined(separator: ", ")); SDK in \(SetupPlan.sdkDir(cacheRoot: cacheRoot, xcode: x).path)")
+        say("    (\(SetupPlan.estimateNote))")
         if dryRun {
             say("dry run: the plan, nothing runs")
+            say("disk: the check asks for about \(need.cache.spoken) free under \(cacheRoot.path) (\(need.cache.key))"
+                + (Self.isLinux ? " and \(need.docker.spoken) under Docker's data root (\(need.docker.key))" : ""))
             for (n, s) in steps.enumerated() {
                 say("[\(n + 1)/\(steps.count)] \(s.title) (\(s.estimate))")
                 say("    " + s.argv.map(Self.quote).joined(separator: " "))
@@ -153,7 +159,7 @@ struct SetupCommand: AsyncParsableCommand {
 
     /// Docker answers (the cause named: permission denied or no daemon), buildx is there, and the disks have room.
     /// Returns whether the daemon is rootless.
-    private static func preflight(cacheRoot: URL, diskGB: Int) throws -> Bool {
+    private static func preflight(cacheRoot: URL, need: (cache: SetupDisk.Need, docker: SetupDisk.Need)) throws -> Bool {
         let root: String, rootless: Bool
         do {
             let info = try Shell.run("docker", ["info", "--format", "{{.DockerRootDir}}|{{json .SecurityOptions}}"], stage: .sdk).stdout
@@ -180,12 +186,14 @@ struct SetupCommand: AsyncParsableCommand {
         do { try Shell.run("docker", ["buildx", "version"], stage: .sdk) } catch {
             throw XlessError(.sdk, "docker buildx is not available", fix: "install Docker's buildx plugin (e.g. the docker-buildx-plugin package)")
         }
-        try checkFree(cacheRoot, needGB: diskGB, what: "the cache (the SDK export)",
-                      fix: "free some space, or set XDG_CACHE_HOME to a directory on a larger disk")
+        if need.cache.totalGB > 0 {
+            try checkFree(cacheRoot, need: need.cache, what: "the cache (the SDK export, which expands the .xip there)",
+                          fix: "free some space, or set XDG_CACHE_HOME to a directory on a larger disk")
+        }
         // Docker's data root, when it is on this machine (a Linux host; a Mac's Docker keeps it inside its VM).
         #if os(Linux)
         if !root.isEmpty, FileManager.default.fileExists(atPath: root) {
-            try checkFree(URL(fileURLWithPath: root), needGB: diskGB, what: "Docker's data root",
+            try checkFree(URL(fileURLWithPath: root), need: need.docker, what: "Docker's data root (the images and their build cache)",
                           fix: "free some space (docker system prune), or move Docker's data-root to a larger disk")
         }
         #endif
@@ -199,14 +207,14 @@ struct SetupCommand: AsyncParsableCommand {
         return SetupStep(title: s.title, argv: argv, estimate: s.estimate, action: s.action)
     }
 
-    private static func checkFree(_ url: URL, needGB: Int, what: String, fix: String) throws {
+    private static func checkFree(_ url: URL, need: SetupDisk.Need, what: String, fix: String) throws {
         var dir = url
         while !FileManager.default.fileExists(atPath: dir.path), dir.path != "/" { dir = dir.deletingLastPathComponent() }
         guard let attrs = try? FileManager.default.attributesOfFileSystem(forPath: dir.path),
               let free = (attrs[.systemFreeSize] as? NSNumber)?.int64Value else { return }
-        let freeGB = free / 1_000_000_000
-        guard freeGB >= needGB else {
-            throw XlessError(.sdk, "\(freeGB) GB free under \(dir.path) for \(what); xless setup needs about \(needGB) GB", fix: fix)
+        if let cause = SetupDisk.shortfall(freeGB: free / 1_000_000_000, path: dir.path, what: what, need: need) {
+            throw XlessError(.sdk, cause, fix: "\(fix); or, if you know this run needs less (e.g. the layers are already built), "
+                             + "set \(need.key) to the GB per architecture to ask for (docs/troubleshooting.md#xless-setup)")
         }
     }
 

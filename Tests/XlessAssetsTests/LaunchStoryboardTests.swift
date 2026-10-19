@@ -146,5 +146,5 @@ func launchStoryboardCompiledIntoBundleRoot(family: [Int], minimumOS: String, fl
     }
     #expect(e.stage == .assets)
     #expect(e.cause == "this image's Xcode build 27A9275 has no measured asset/storyboard tools profile")
-    #expect(e.fix.contains("make images"))
+    #expect(e.fix.contains("xless setup --xcode"))
 }

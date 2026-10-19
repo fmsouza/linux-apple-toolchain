@@ -36,6 +36,9 @@ private func tempEnv(_ text: String) throws -> URL {
     #expect(xcodes.map(\.appleSwift) == ["6.2.3", "6.4"])
     #expect(xcodes.map(\.shortVersion) == ["26.2", "27.0"])
     #expect(xcodes.map(\.buildMachineOSBuild) == ["26A434", "26A434"])
+    // 17C52: the Universal and the Apple silicon download; 27A266a: one download.
+    #expect(xcodes.map(\.xipSHA256.count) == [2, 1])
+    #expect(xcodes.allSatisfy { $0.xipSHA256.allSatisfy { $0.wholeMatch(of: /[0-9a-f]{64}/) != nil } })
 }
 
 @Test func loadParsesSpaceSeparatedHashes() throws {

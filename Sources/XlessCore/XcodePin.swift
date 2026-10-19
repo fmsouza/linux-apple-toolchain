@@ -1,7 +1,7 @@
 import Foundation
 
 /// Ruling R8: a project may pin the Xcode whose SDK builds it (`xcode: "26.2"` in xless.yml or an overlay), so an app
-/// is built with the SDK its own release pipeline uses. xless images bake one SDK each (`make images XCODE=…`, tagged
+/// is built with the SDK its own release pipeline uses. xless images bake one SDK each (`xless setup --xcode …`, tagged
 /// `-xcode<version>`); prepare (overlay projects) and the build stage refuse an image whose SDK comes from another Xcode
 /// (`BuildSDKCheck`), and the build stage records the SDK it used (`BuildSDKRecord`) for finalize, which stamps the app from that same SDK. Without a pin the image's SDK is used.
 public enum XcodePin {
@@ -27,13 +27,13 @@ public enum XcodePin {
     }
 
     /// The image's SDK checked against the pin (nil: no pin, anything goes). The refusal names the image tag and the
-    /// `make` command that builds images from that Xcode.
+    /// command that builds images from that Xcode.
     public static func check(pin: String?, meta: ToolchainMeta, platform: Platform, file: String, stage: Stage = .build) throws {
         guard let pin else { return }
         guard matches(pin: pin, meta: meta) else {
             let sdk = (try? meta.sdk(for: platform)).map { "the \($0.sdkName) SDK" } ?? "its SDK"
             throw XlessError(stage, "\(file) pins xcode: \"\(pin)\", but this image has \(sdk) from Xcode \(xcodeVersion(meta)) (\(meta.xcodeBuild))",
-                             fix: "build with the images made from Xcode \(pin) (`make images XCODE=<path to Xcode \(pin).app or .xip>`, tags *-xcode\(pin); scripts/testflight.sh selects them from the pin), or change the pin to \(xcodeVersion(meta))")
+                             fix: "build with the images made from Xcode \(pin) (`xless setup --xcode <path to Xcode \(pin)'s .xip>`, tags *-xcode\(pin); xless docker selects them from the pin), or change the pin to \(xcodeVersion(meta))")
         }
     }
 }

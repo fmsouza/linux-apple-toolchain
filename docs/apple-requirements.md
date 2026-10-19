@@ -27,8 +27,8 @@ is not used.
 ## From `Xcode.xip`
 
 `xless setup` runs `xtool sdk build` on the `.xip`, which writes a Darwin SDK bundle (`darwin.xtoolsdk`, about 3 GB)
-into `~/.cache/xless/sdk/xcode<version>-<build>/<arch>/`. That bundle, and the metadata read from it, is all xless takes
-from the download. It goes into the `xless` image and from there into the images built on it.
+into `~/.cache/xless/sdk/xcode<version>-<build>/<arch>/`; xtool unpacks the `.xip` there first, so that directory
+peaks at about 15 GB. That bundle, and the metadata read from it, is all xless takes from the download. It goes into the `xless` image and from there into the images built on it.
 
 | File or tree (inside the Xcode bundle) | Used by | Why there is no open replacement |
 |---|---|---|

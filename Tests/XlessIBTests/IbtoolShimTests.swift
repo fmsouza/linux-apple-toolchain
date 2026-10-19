@@ -52,7 +52,7 @@ func versionProbeAnswersAsTheImagesIbtool(_ build: String, _ bundle: String, _ s
         #expect(r.exitCode == 70)
         #expect(r.stdout.isEmpty)
         #expect(r.stderr.contains("this image's Xcode build 27A9275 has no measured asset/storyboard tools profile"), "\(r.stderr)")
-        #expect(r.stderr.contains("make images"), "\(r.stderr)")
+        #expect(r.stderr.contains("xless setup --xcode"), "\(r.stderr)")
     }
     #expect(!FileManager.default.fileExists(atPath: dir.appendingPathComponent("real-logo-plus-label.storyboardc").path))
 }

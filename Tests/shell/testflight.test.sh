@@ -381,7 +381,7 @@ code=0; "${base[@]}" "$S" "$t/proj" --config "$t/ov/my.overlay.yml" >/dev/null 2
 printf 'type: tauri\n' > "$t/ov/nosrc.yml"
 code=0; "${base[@]}" "$S" --config "$t/ov/nosrc.yml" >/dev/null 2>&1 || code=$?
 [[ $code -eq 2 ]] || fail "overlay without source exits $code, want 2"
-# xcode: pin (Ruling R8): every step in the images made from that Xcode (make images), *:local-<arch>-xcode<pin>
+# xcode: pin (Ruling R8): every step in the images made from that Xcode (xless setup), *:local-<arch>-xcode<pin>
 case "$(uname -m)" in arm64|aarch64) A=arm64 ;; *) A=amd64 ;; esac
 mkdir -p "$t/fd"
 cat > "$t/fd/docker" <<'D'

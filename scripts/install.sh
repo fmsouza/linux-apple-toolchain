@@ -116,8 +116,17 @@ case ":${PATH:-}:" in
   *":$prefix/bin:"*) ;;
   *)
     case "${SHELL:-}" in */zsh) profile="$home/.zshrc" ;; */bash) profile="$home/.bashrc" ;; *) profile="$home/.profile" ;; esac
-    echo "$prefix/bin is not on your PATH. Add it to $profile:"
-    echo "  export PATH=\"$prefix/bin:\$PATH\""
+    if [ "$prefix" = "$home/.local" ]; then
+      # Many systems (Ubuntu's ~/.profile among them) put ~/.local/bin on PATH at login once it exists.
+      echo "$prefix/bin is not on PATH in this shell. Open a new terminal (many systems add ~/.local/bin to PATH at login"
+      echo "once it exists), or run:"
+      echo "  export PATH=\"$prefix/bin:\$PATH\""
+      echo "If xless is still not found in a new terminal, add that line to $profile."
+    else
+      echo "$prefix/bin is not on PATH in this shell. Run:"
+      echo "  export PATH=\"$prefix/bin:\$PATH\""
+      echo "and add that line to $profile."
+    fi
     ;;
 esac
 
