@@ -3,25 +3,25 @@ import Foundation
 @testable import XlessSDK
 @testable import XlessCore
 
-private let table = ["XLESS_SETUP_CACHE_GB": "16", "XLESS_SETUP_DOCKER_GB": "40"]
+private let table = ["XLESS_SETUP_CACHE_GB": "17", "XLESS_SETUP_DOCKER_GB": "40"]
 
 @Test func perArchitectureFiguresComeFromVersionsEnv() {
     let n = SetupDisk.needs(archs: 1, exporting: 1, env: [:], table: table)
-    #expect(n.cache == SetupDisk.Need(key: "XLESS_SETUP_CACHE_GB", perArchGB: 16, archs: 1))
+    #expect(n.cache == SetupDisk.Need(key: "XLESS_SETUP_CACHE_GB", perArchGB: 17, archs: 1))
     #expect(n.docker == SetupDisk.Need(key: "XLESS_SETUP_DOCKER_GB", perArchGB: 40, archs: 1))
-    #expect(n.cache.spoken == "16 GB")
+    #expect(n.cache.spoken == "17 GB")
 }
 
 @Test func bothArchitecturesDoubleTheNeed() {
     let n = SetupDisk.needs(archs: 2, exporting: 2, env: [:], table: table)
-    #expect(n.cache.totalGB == 32)
+    #expect(n.cache.totalGB == 34)
     #expect(n.docker.totalGB == 80)
     #expect(n.docker.spoken == "80 GB (40 GB per architecture × 2)")
 }
 
 @Test func anExistingExportNeedsNoCacheSpace() {
     let n = SetupDisk.needs(archs: 2, exporting: 1, env: [:], table: table)
-    #expect(n.cache.totalGB == 16)
+    #expect(n.cache.totalGB == 17)
     #expect(SetupDisk.needs(archs: 1, exporting: 0, env: [:], table: table).cache.totalGB == 0)
 }
 
@@ -30,7 +30,7 @@ private let table = ["XLESS_SETUP_CACHE_GB": "16", "XLESS_SETUP_DOCKER_GB": "40"
     #expect(n.cache.perArchGB == 5)
     #expect(n.docker.perArchGB == 7)
     // Not a whole number: ignored, versions.env's value stands.
-    #expect(SetupDisk.perArchGB("XLESS_SETUP_CACHE_GB", env: ["XLESS_SETUP_CACHE_GB": "lots"], table: table) == 16)
+    #expect(SetupDisk.perArchGB("XLESS_SETUP_CACHE_GB", env: ["XLESS_SETUP_CACHE_GB": "lots"], table: table) == 17)
     // Neither: the built-in figure.
     #expect(SetupDisk.perArchGB("XLESS_SETUP_DOCKER_GB", env: [:], table: [:]) == SetupDisk.fallback["XLESS_SETUP_DOCKER_GB"])
 }

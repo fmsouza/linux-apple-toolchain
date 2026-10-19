@@ -8,7 +8,7 @@ public enum SetupDisk {
     public static let cacheKey = "XLESS_SETUP_CACHE_GB"
     public static let dockerKey = "XLESS_SETUP_DOCKER_GB"
     /// When versions.env has no value (an older share): the figures measured for Xcode 26.2 and 27.0.
-    public static let fallback = [cacheKey: 16, dockerKey: 40]
+    public static let fallback = [cacheKey: 17, dockerKey: 40]
 
     public struct Need: Equatable, Sendable {
         /// The variable that sets (and overrides) `perArchGB`.
@@ -17,7 +17,7 @@ public enum SetupDisk {
         public let archs: Int
         public var totalGB: Int { perArchGB * archs }
 
-        /// "32 GB (16 GB per architecture × 2)", or "16 GB" for one architecture.
+        /// "34 GB (17 GB per architecture × 2)", or "17 GB" for one architecture.
         public var spoken: String { archs > 1 ? "\(totalGB) GB (\(perArchGB) GB per architecture × \(archs))" : "\(totalGB) GB" }
     }
 

@@ -54,7 +54,7 @@ private func kinds(_ steps: [SetupStep]) -> [String] {
                                      final: cache.appendingPathComponent("sdk/xcode27.0-27A266a/arm64")))
     #expect(export.argv.contains("\(cache.path)/sdk/xcode27.0-27A266a/arm64.partial:/out"))
     // The .xip is unpacked in the cache first: the estimate names that peak, not only what stays.
-    #expect(export.estimate.contains("~14 GB in the cache"))
+    #expect(export.estimate.contains("~15 GB in the cache"))
     // The base image takes this arch's linux xless; the sdk image reads the export.
     #expect(steps[0].argv == [share.appendingPathComponent("scripts/docker-images.sh").path, "base", "--arch", "arm64",
                               "--suffix", "-xcode27.0-27A266a", "--xless-bin", "/tmp/bin-arm64/xless"])

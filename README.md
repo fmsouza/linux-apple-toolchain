@@ -9,8 +9,8 @@ images that you build once, on your own machine, from the Xcode download Apple g
 - A Linux machine, x86_64 or arm64.
 - [Docker Engine](https://docs.docker.com/engine/install/) with the buildx plugin, usable without `sudo`
   (your user is in the `docker` group).
-- Free disk space, per Xcode version and architecture: about 16 GB in your home directory's cache (`~/.cache`) while
-  the SDK is taken out of the `.xip` (about 3 GB of it stays), and about 40 GB where Docker keeps its data
+- Free disk space, per Xcode version and architecture: about 17 GB in your home directory's cache (`~/.cache`) while
+  the SDK is taken out of the `.xip` (about 3.5 GB of it stays), and about 40 GB where Docker keeps its data
   (`/var/lib/docker` by default) for the images and their build cache, plus a few GB for each app's build caches.
   `xless setup` checks both before it starts.
 - Xcode 27.0 or 26.2 from Apple, as the `.xip` file Apple distributes. xless takes Apple's SDK out of it; it never runs

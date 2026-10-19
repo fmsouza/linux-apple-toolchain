@@ -32,7 +32,6 @@ public enum SetupPlan {
     /// Printed before the steps: what the per-step times are.
     public static let estimateNote = "step times are rough: measured on an 8-core arm64 machine with a fast network; yours depend on your CPU and network"
 
-
     public static func make(source: XcodeSource.Identified, archs: [String], hostArch: String, share: URL, cacheRoot: URL,
                             xlessBinaries: [String: URL], reexport: Bool, existing: (URL) -> Bool) -> [SetupStep] {
         let x = source.xcode
@@ -51,7 +50,7 @@ public enum SetupPlan {
         for a in archs {
             let emulated = a != hostArch
             // Measured on an 8-core arm64 Linux machine with a fast network (docs/acceptance-m5.md); `estimateNote` says so.
-            func est(_ s: String, disk: String = "") -> String { (emulated ? "\(s) natively, 2-3x longer under emulation" : s) + disk }
+            func est(_ s: String, disk: String = "") -> String { (emulated ? "\(s) natively; emulated: 2-3x slower under Rosetta, slower still under QEMU" : s) + disk }
             var base = [script, "base", "--arch", a, "--suffix", bsuffix]
             if let bin = xlessBinaries[a] { base += ["--xless-bin", bin.path] }
             steps.append(SetupStep(title: "xless-base:local-\(a)\(bsuffix)", argv: base, estimate: est("~3 min")))
@@ -65,7 +64,7 @@ public enum SetupPlan {
                            "-e", "HOME=/tmp", "-w", "/tmp",
                            "-v", "\(source.url.path):\(inContainer):ro", "-v", "\(partial.path):/out",
                            "xless-base:local-\(a)\(bsuffix)", "xtool", "sdk", "build", inContainer, "/out"],
-                    estimate: est("~2 min", disk: source.kind == .xip ? "; up to ~14 GB in the cache while the .xip is unpacked, ~3 GB stays" : "; ~3 GB on disk"),
+                    estimate: est("~2 min", disk: source.kind == .xip ? "; up to ~15 GB in the cache while the .xip is unpacked, ~3 GB stays" : "; ~3 GB on disk"),
                     action: .export(partial: partial, final: final)))
             }
             if !wroteMeta {

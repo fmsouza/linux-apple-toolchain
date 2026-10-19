@@ -44,11 +44,11 @@ Before it runs anything, `xless setup` checks the free space in two places, per 
 
 | Where | Asked for | Why | Set by |
 |---|---|---|---|
-| The cache: `$XDG_CACHE_HOME/xless`, else `~/.cache/xless` | 16 GB, only when this run exports the SDK | xtool unpacks the `.xip` into the SDK export there (measured peak about 14 GB); about 3 GB stays | `XLESS_SETUP_CACHE_GB` |
-| Docker's data root (`docker info`, `/var/lib/docker` by default; checked on Linux) | 40 GB | the four images and their build cache (measured about 30 GB for the first chain) | `XLESS_SETUP_DOCKER_GB` |
+| The cache: `$XDG_CACHE_HOME/xless`, else `~/.cache/xless` | 17 GB, only when this run exports the SDK | xtool unpacks the `.xip` into the SDK export there (measured peak about 15 GB); about 3.5 GB stays | `XLESS_SETUP_CACHE_GB` |
+| Docker's data root (`docker info`, `/var/lib/docker` by default; checked on Linux) | 40 GB | the four images and their build cache (measured about 31 GB for the first chain) | `XLESS_SETUP_DOCKER_GB` |
 
-The figures come from `versions.env` and were measured on first runs from the Xcode 26.2 and 27.0 `.xip`s
-([acceptance-m5.md](acceptance-m5.md)). With `--arch arm64 --arch amd64` each is doubled. The refusal names the
+The figures are decimal GB (10^9 bytes), from `versions.env`, measured on first runs from the Xcode 26.2 and 27.0
+`.xip`s ([acceptance-m5.md](acceptance-m5.md)). With `--arch arm64 --arch amd64` each is doubled. The refusal names the
 directory it checked, the free and the needed space, and the variable. If you know a run needs less, for example
 because most image layers are already built, set that variable to the GB per architecture to ask for:
 `XLESS_SETUP_DOCKER_GB=10 xless setup …`. `xless setup --dry-run` prints what the check asks for.

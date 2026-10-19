@@ -60,7 +60,7 @@ docker run --rm --platform linux/$A --user "$(id -u):$(id -g)" -e HOME=/tmp -w /
   xless-base:local-$A$SUFFIX xtool sdk build /xcode/Xcode.xip /out
 ```
 
-With rootless Docker leave out `--user …`. The result is `$SDK/$A/darwin.xtoolsdk`, about 3 GB (xtool unpacks the `.xip` under `$SDK/$A` first: about 14 GB at the peak).
+With rootless Docker leave out `--user …`. The result is `$SDK/$A/darwin.xtoolsdk`, about 3 GB (xtool unpacks the `.xip` under `$SDK/$A` first: about 15 GB at the peak).
 
 **3. `toolchain-meta.json`.** xless reads the SDK's version files (no program from the SDK runs) and the
 supported-Xcode table in `versions.env`:
@@ -108,7 +108,7 @@ onwards: each image is built on the previous one of the same architecture and su
 
 `--arch` replaces the default (this machine's architecture): `xless setup --xcode … --arch amd64` builds only the
 amd64 chain, and `--arch arm64 --arch amd64` builds both. A chain for another architecture than the machine's runs
-under emulation, 3 to 5 times slower. Use a Docker that runs the other architecture through Rosetta (an Apple-silicon
+under emulation: 2 to 3 times slower under Rosetta, slower still under QEMU. Use a Docker that runs the other architecture through Rosetta (an Apple-silicon
 Mac) or a native host when you can: under QEMU's user-mode emulation gcc and Swift have crashed at random. The `xless`
 binary for the other architecture comes from the release tarball (checked against `SHA256SUMS`), or from
 `XLESS_BIN_ARM64` / `XLESS_BIN_AMD64` when set.
