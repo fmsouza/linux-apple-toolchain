@@ -16,16 +16,34 @@ public enum ToolchainMetaCollector {
               let build = version["ProductBuildVersion"] as? String else {
             throw XlessError(.sdk, "Xcode version.plist lacks version keys", fix: "pass the path to a full Xcode.app")
         }
+        let platforms = try readPlatforms(under: xcodeApp.appendingPathComponent("Contents/Developer"),
+                                          fix: "pass the path to a full Xcode.app with the %@ platform installed")
+        return ToolchainMeta(xcodeVersion: try xcodeVersionCode(short), xcodeBuild: build,
+                             buildMachineOSBuild: buildMachineOSBuild, compiler: ToolchainMeta.clangCompiler,
+                             platforms: platforms, swiftVersion: try swiftVersion(xcodeApp: xcodeApp))
+    }
+
+    /// The same metadata from an xtool SDK (`darwin.xtoolsdk`), whose `Developer/` tree mirrors Xcode's. The Xcode's
+    /// identity, Swift and BuildMachineOSBuild come from the supported-Xcode table: nothing is executed.
+    public static func collect(xtoolSDK: URL, xcode: KnownXcode) throws -> ToolchainMeta {
+        let platforms = try readPlatforms(under: xtoolSDK.appendingPathComponent("Developer"),
+                                          fix: "pass the darwin.xtoolsdk that xtool built from the Xcode (it lacks the %@ platform)")
+        return ToolchainMeta(xcodeVersion: try xcodeVersionCode(xcode.shortVersion), xcodeBuild: xcode.build,
+                             buildMachineOSBuild: xcode.buildMachineOSBuild, compiler: ToolchainMeta.clangCompiler,
+                             platforms: platforms, swiftVersion: xcode.appleSwift)
+    }
+
+    private static func readPlatforms(under developer: URL, fix: String) throws -> [String: PlatformSDKInfo] {
         var platforms: [String: PlatformSDKInfo] = [:]
         for (p, dirName) in [(Platform.ios, "iPhoneOS"), (Platform.macos, "MacOSX")] {
-            let platformDir = xcodeApp.appendingPathComponent("Contents/Developer/Platforms/\(dirName).platform")
+            let platformDir = developer.appendingPathComponent("Platforms/\(dirName).platform")
             let sdkDir = platformDir.appendingPathComponent("Developer/SDKs/\(dirName).sdk")
             let settingsURL = sdkDir.appendingPathComponent("SDKSettings.json")
             guard let data = try? Data(contentsOf: settingsURL),
                   let settings = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
                   let canonical = settings["CanonicalName"] as? String,
                   let sdkVersion = settings["Version"] as? String else {
-                throw XlessError(.sdk, "cannot read \(settingsURL.path)", fix: "pass the path to a full Xcode.app with the \(dirName) platform installed")
+                throw XlessError(.sdk, "cannot read \(settingsURL.path)", fix: fix.replacingOccurrences(of: "%@", with: dirName))
             }
             let sysVersion = try Plist.read(sdkDir.appendingPathComponent("System/Library/CoreServices/SystemVersion.plist"), stage: .sdk)
             guard let sdkBuild = sysVersion["ProductBuildVersion"] as? String else {
@@ -38,9 +56,7 @@ public enum ToolchainMetaCollector {
                 platformVersion: platformInfo["DTPlatformVersion"] as? String ?? sdkVersion,
                 platformBuild: platformInfo["DTPlatformBuild"] as? String ?? sdkBuild)
         }
-        return ToolchainMeta(xcodeVersion: try xcodeVersionCode(short), xcodeBuild: build,
-                             buildMachineOSBuild: buildMachineOSBuild, compiler: ToolchainMeta.clangCompiler,
-                             platforms: platforms, swiftVersion: try swiftVersion(xcodeApp: xcodeApp))
+        return platforms
     }
 
     /// The Swift the Xcode ships (Ruling R10), black-box: its default toolchain's `swift --version`, e.g. "Apple Swift

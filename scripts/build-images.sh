@@ -62,7 +62,7 @@ bsuffix="$suffix-$build"   # this Xcode build's own tags: never moved by another
 set -a; . "$repo/versions.env"; set +a
 default=0; [[ "$version" == "$XCODE_VERSION" && "$build" == "$XCODE_BUILD" ]] && default=1
 # Ruling R10: the app Swift toolchain (make variables for Dockerfile.sdk); refused before anything is built.
-swift_out="$("$repo/scripts/xcode-swift.sh" "$xcode" "$build")" || exit 2
+swift_out="$("$repo/scripts/xcode-swift.sh" "$build")" || exit 2
 swift_vars=($swift_out)
 # The asset and storyboard tools: an Xcode whose actool/ibtool/copypng formats are not measured (no XcodeToolsProfile entry)
 # is refused, as the image's shims would refuse it.
