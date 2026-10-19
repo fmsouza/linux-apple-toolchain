@@ -24,10 +24,10 @@ test_partial_match_refused() {   # a prefix or substring of a profiled build is 
 }
 test_build_images_calls_it() {
   grep -q 'xcode-tools.sh' "$repo/scripts/build-images.sh" || fail "build-images.sh does not call xcode-tools.sh"
-  # before anything is built: ahead of the first make / docker use
+  # before anything is built: ahead of the first image build
   local gate make
   gate=$(grep -n 'xcode-tools.sh' "$repo/scripts/build-images.sh" | head -1 | cut -d: -f1)
-  make=$(grep -n '^make -C' "$repo/scripts/build-images.sh" | head -1 | cut -d: -f1)
+  make=$(grep -n '^images base' "$repo/scripts/build-images.sh" | head -1 | cut -d: -f1)
   [[ "$gate" -lt "$make" ]] || fail "the gate runs after make"
 }
 test_rn_reference_refuses_unprofiled() {
