@@ -12,8 +12,9 @@ public enum XlessShare {
         while true {
             if fm.fileExists(atPath: dir.appendingPathComponent("versions.env").path),
                fm.fileExists(atPath: dir.appendingPathComponent("docker/Dockerfile.base").path) { return dir }
-            let parent = dir.deletingLastPathComponent()
-            if parent.path == dir.path { break }
+            // Stop at the root: past it, Foundation can return "/.." (and "/../..", …) instead of "/" again.
+            let parent = dir.deletingLastPathComponent().standardizedFileURL
+            if dir.path == "/" || parent.path == dir.path { break }
             dir = parent
         }
         throw XlessError(.sdk, "cannot find xless's share directory", fix: "reinstall xless (see README) or set XLESS_SHARE")
