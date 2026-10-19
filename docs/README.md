@@ -127,12 +127,20 @@ mkdir -p ~/.cache/xless && cp -cR /Applications/Xcode.app ~/.cache/xless/Xcode.a
 make sdk-export XCODE=$HOME/.cache/xless/Xcode.app
 ```
 
+### Install a release
+
+```sh
+curl -fsSL https://github.com/fmsouza/linux-apple-toolchain/releases/latest/download/install.sh | sh
+```
+
+Installs `xless` and its `share/xless` files into `~/.local` (`XLESS_PREFIX` or `--prefix` to change it) after verifying the tarball against the release's `SHA256SUMS`.
+
 ### Native install
 
 For a Debian/Ubuntu machine (arm64 or x86_64) without Docker:
 
 ```sh
-scripts/install.sh [--prefix /usr/local]
+scripts/install-native.sh [--prefix /usr/local]
 ```
 
 It installs Swift 6.4.0 (via swiftly, if not already present), xtool and rcodesign (checksum-verified), and builds and installs `xless`. It uses `sudo` when not root and is safe to re-run. Then install the SDK, using files from `xless sdk export` on the Mac:

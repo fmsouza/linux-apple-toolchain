@@ -10,13 +10,15 @@ permissions:
 
 concurrency:
   group: pr-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
+  # Only a superseded pull request run is cancelled; every push to main runs to the end.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   # The squash-merge commit takes the PR title, so the title must be a Conventional Commit.
   title:
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-24.04
+    timeout-minutes: 5
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
       - name: Check the PR title
@@ -27,6 +29,7 @@ jobs:
   linux-tests:
     name: linux-tests (${{ matrix.name }})
     runs-on: ${{ matrix.runner }}
+    timeout-minutes: 60
     container: swift:6.4.0-jammy
     strategy:
       fail-fast: false
@@ -36,7 +39,7 @@ jobs:
           - { name: arm64, runner: ubuntu-24.04-arm }
     steps:
       - name: Install tools
-        run: apt-get update -qq && apt-get install -y -qq zip unzip rsync git python3 >/dev/null
+        run: apt-get update -qq && apt-get install -y -qq zip unzip rsync git python3 curl ca-certificates >/dev/null
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
       - name: swift test
         run: swift test
@@ -47,8 +50,68 @@ jobs:
       #   (none)
       - name: Shell tests
         run: |
+          failed=""
           for t in Tests/shell/*.test.sh; do
             echo "::group::$t"
-            bash "$t"
+            if ! bash "$t"; then failed="$failed $t"; fi
             echo "::endgroup::"
           done
+          if [ -n "$failed" ]; then echo "::error::failed shell tests:$failed"; exit 1; fi
+
+  # The release tarball, built the way the release build will build it (a static musl binary), installed with the
+  # one-line installer from a file:// release, and run.
+  package:
+    name: package (${{ matrix.name }})
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 90
+    container: swift:6.4.0-jammy
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { name: x86_64, runner: ubuntu-24.04, triple: x86_64-swift-linux-musl }
+          - { name: arm64, runner: ubuntu-24.04-arm, triple: aarch64-swift-linux-musl }
+    steps:
+      - name: Install tools
+        run: apt-get update -qq && apt-get install -y -qq git curl ca-certificates >/dev/null
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - name: Build the static binary
+        run: |
+          # GitHub answers 401 to some git versions over HTTP/2.
+          git config --global http.version HTTP/1.1
+          . ./versions.env
+          swift sdk install "$STATIC_SDK_URL" --checksum "$STATIC_SDK_SHA256"
+          swift build -c release --product xless --swift-sdk "${{ matrix.triple }}"
+          echo "XLESS_BIN=$(swift build -c release --product xless --swift-sdk '${{ matrix.triple }}' --show-bin-path)/xless" >> "$GITHUB_ENV"
+      - name: Package
+        run: |
+          mkdir -p release/download/v0.0.0-dev
+          scripts/package-release.sh 0.0.0-dev "${{ matrix.name }}" "$XLESS_BIN" release/download/v0.0.0-dev
+          ls -l release/download/v0.0.0-dev
+          mkdir -p release/latest
+          cp -R release/download/v0.0.0-dev release/latest/download
+          tar -tzf "release/download/v0.0.0-dev/xless-0.0.0-dev-linux-${{ matrix.name }}.tar.gz"
+      - name: Install from the file:// release
+        run: |
+          XLESS_RELEASE_BASE="file://$PWD/release" sh scripts/install.sh
+          ~/.local/bin/xless --version | grep -x '0.0.0-dev'
+      - name: The installed xless refuses a file that is not an Xcode
+        run: |
+          rc=0
+          err=$(~/.local/bin/xless setup --xcode /etc/hostname 2>&1 >/dev/null) || rc=$?
+          echo "$err"
+          [ "$rc" -eq 11 ]
+          echo "$err" | grep -F 'Xcode 26.2 (17C52)'
+          echo "$err" | grep -F 'Xcode 27.0 (27A266a)'
+
+  shellcheck:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - name: install.sh is POSIX sh
+        run: shellcheck -s sh scripts/install.sh
+      - name: Shipped scripts
+        run: |
+          shellcheck scripts/docker-images.sh scripts/package-release.sh scripts/stamp-version.sh scripts/third-party-licenses.sh
+          shellcheck --severity=error scripts/testflight.sh scripts/xcode-swift.sh
