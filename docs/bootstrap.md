@@ -77,4 +77,4 @@ docker run --rm -v "$PWD":/work -w /work -e ASC_KEY_ID -e ASC_ISSUER_ID -e ASC_K
   <image> xless ship --platform ios
 ```
 
-or install natively (`scripts/install.sh`, then `xless sdk install --image <image>`); see [README.md](README.md#native-install).
+or install natively (`scripts/install-native.sh`, then `xless sdk install --image <image>`); see [README.md](README.md#native-install).

@@ -52,7 +52,10 @@ fi
 
 root="$(cd "$(dirname "$0")/.." && pwd)"
 docker_cmd="${DOCKER:-docker}"
-set -a; . "$root/versions.env"; set +a
+set -a
+# shellcheck disable=SC1091
+. "$root/versions.env"
+set +a
 cd "$root"
 
 tag="local-$arch$suffix"

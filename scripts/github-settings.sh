@@ -11,7 +11,7 @@ gh api -X PATCH "repos/$repo" \
   -f squash_merge_commit_title=PR_TITLE -f squash_merge_commit_message=PR_BODY \
   -F delete_branch_on_merge=true >/dev/null
 
-# Ruleset on main: PR required (0 approvals), the three checks required, no force pushes, no deletion.
+# Ruleset on main: PR required (0 approvals), the six checks required, no force pushes, no deletion.
 ruleset=$(cat <<JSON
 {
   "name": "$ruleset_name",
@@ -28,7 +28,10 @@ ruleset=$(cat <<JSON
         "required_status_checks": [
           { "context": "title" },
           { "context": "linux-tests (x86_64)" },
-          { "context": "linux-tests (arm64)" } ] } },
+          { "context": "linux-tests (arm64)" },
+          { "context": "package (x86_64)" },
+          { "context": "package (arm64)" },
+          { "context": "shellcheck" } ] } },
     { "type": "non_fast_forward" },
     { "type": "deletion" }
   ]
@@ -36,7 +39,7 @@ ruleset=$(cat <<JSON
 JSON
 )
 
-id=$(gh api "repos/$repo/rulesets" --jq ".[] | select(.name == \"$ruleset_name\") | .id" | head -n1)
+id=$(gh api "repos/$repo/rulesets" --jq "[.[] | select(.name == \"$ruleset_name\") | .id] | first // empty")
 if [ -n "$id" ]; then
   echo "$ruleset" | gh api -X PUT "repos/$repo/rulesets/$id" --input - >/dev/null
   echo "updated ruleset $id on $repo"
