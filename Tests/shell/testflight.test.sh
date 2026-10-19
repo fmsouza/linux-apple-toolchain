@@ -40,6 +40,17 @@ printf '#!/bin/sh\n' > "$t/bin/xless"; chmod +x "$t/bin/xless"
 out=$("${base[@]}" XLESS_USE_DOCKER=0 "$S" "$t/proj" --from upload 2>/dev/null)
 [[ "$out" == "xless ship --platform ios --from upload " ]] || fail "native command wrong: '$out'"
 
+# without XLESS_USE_DOCKER: docker, unless a native SDK's toolchain-meta.json exists
+out=$("${base[@]}" XLESS_USE_DOCKER= "$S" "$t/proj" 2>/dev/null) || fail "auto dry run failed"
+[[ "$out" == *"docker "* && "$out" == *"xless ship --platform ios"* ]] || fail "auto without a native SDK does not use docker: $out"
+printf '{}' > "$t/meta.json"
+out=$("${base[@]}" XLESS_USE_DOCKER= XLESS_TOOLCHAIN_META="$t/meta.json" "$S" "$t/proj" 2>/dev/null) || fail "auto native dry run failed"
+[[ "$out" == "xless ship --platform ios "* ]] || fail "auto with a toolchain-meta does not run native: $out"
+mkdir -p "$t/home/.config/xless"; printf '{}' > "$t/home/.config/xless/toolchain-meta.json"
+out=$("${base[@]}" XLESS_USE_DOCKER= "$S" "$t/proj" 2>/dev/null) || fail "auto native (default meta) failed"
+[[ "$out" == "xless ship --platform ios "* ]] || fail "default toolchain-meta path ignored: $out"
+rm -rf "$t/home/.config"
+
 # every missing variable is a usage error (exit 2) naming the variable
 for v in ASC_KEY_ID ASC_ISSUER_ID_FILE ASC_KEY_P8_FILE XLESS_DIST_KEY_FILE; do
   code=0; "${base[@]}" "$v=" "$S" "$t/proj" >/dev/null 2>"$t/err" || code=$?
@@ -369,7 +380,7 @@ grep -q 'xcode: "26.2" (pinned)' "$t/err" || fail "pin not reported: $(cat "$t/e
 printf '%s\n' "xless-rn:local-$A" "xless-base:local-$A" "xless-base:local-$A-xcode26.2" > "$t/images"
 code=0; "${pinned[@]}" "$S" --config "$t/pin/rn.yml" >/dev/null 2>"$t/err" || code=$?
 [[ $code -eq 2 ]] || fail "missing pinned image exits $code, want 2"
-grep -qF "pins xcode: \"26.2\", but these images are missing: xless-rn:local-$A-xcode26.2; build them from Xcode 26.2: make images XCODE=<path to Xcode 26.2's .app or .xip> ARCHS=$A" "$t/err" \
+grep -qF "pins xcode: \"26.2\", but these images are missing: xless-rn:local-$A-xcode26.2; build them from Xcode 26.2: xless setup --xcode <path to Xcode 26.2's .app or .xip> --arch $A" "$t/err" \
   || fail "missing image message: $(cat "$t/err")"
 # The pin is looked up as image tags spell it (major.minor, the patch when not 0): "26.2.0" → -xcode26.2, "26" → -xcode26.0
 printf '%s\n' "xless-rn:local-$A-xcode26.2" "xless-base:local-$A-xcode26.2" "xless-rn:local-$A-xcode26.0" "xless-base:local-$A-xcode26.0" \

@@ -45,9 +45,8 @@
 #   number in step 1). When set it is passed to steps 2 and 3.
 #
 # Where it runs
-#   macOS            inside the xless Linux image, through docker.
-#   Linux            natively when `xless` is on PATH, otherwise through docker.
-#   XLESS_USE_DOCKER=1 forces docker; XLESS_USE_DOCKER=0 forces native.
+#   Docker (the xless images), unless a native SDK is installed on this host: $XLESS_TOOLCHAIN_META, else ~/.config/xless/toolchain-meta.json.
+#   XLESS_USE_DOCKER=1 forces docker; XLESS_USE_DOCKER=0 forces native; unset: docker unless a native SDK (toolchain-meta.json) is installed.
 #
 # Configuration comes from the environment, and from a local file that is sourced first when it exists:
 #   $XLESS_TESTFLIGHT_ENV, default ~/.config/xless/testflight.env   (keep it out of git; it holds paths and IDs only)
@@ -72,10 +71,10 @@
 #   `xless ship --platform macos --from sign --to package` with XLESS_DEVID_KEY_FILE and the App Store Connect key (the
 #   read-only certificate lookup and notarization); it prints the DMG path last. `--from package` reuses the signed app.
 # xcode: "<version>" (a top-level line of the overlay, or of xless.yml; Ruling R8): with docker, every step runs in the
-#   images made from that Xcode by `make images XCODE=<Xcode.app | .xip>`: <image>:local-<arch>-xcode<version>, e.g.
+#   images made from that Xcode by `xless setup --xcode <Xcode.app | .xip>`: <image>:local-<arch>-xcode<version>, e.g.
 #   xless-rn:local-arm64-xcode26.2 and xless-base:local-arm64-xcode26.2. For versions.env's XCODE_VERSION the plain
 #   local-<arch> images serve when the suffixed ones do not exist. A missing image stops the script (exit 2) with the
-#   `make images` command that builds it. XLESS_IMAGE / XLESS_SIGN_IMAGE still win. Prepare (exit 19; the build stage
+#   `xless setup` command that builds it. XLESS_IMAGE / XLESS_SIGN_IMAGE still win. Prepare (exit 19; the build stage
 #   for xless.yml) checks the SDK inside the image against the pin either way (natively too).
 # --destination simulator (only with a React Native --config): an ad-hoc signed app for the iOS Simulator (`make simulator`).
 #   Step 2 only, with no secret and no App Store Connect query (a dated build number comes from the clock):
@@ -229,7 +228,8 @@ use_docker=0
 case "${XLESS_USE_DOCKER:-auto}" in
   1) use_docker=1 ;;
   0) use_docker=0 ;;
-  auto) if [[ "$(uname -s)" == Darwin ]] || ! command -v xless >/dev/null 2>&1; then use_docker=1; fi ;;
+  # auto: the images, unless an SDK is installed natively (xless sdk install writes toolchain-meta.json)
+  auto) if [[ ! -e "${XLESS_TOOLCHAIN_META:-${XDG_CONFIG_HOME:-$HOME/.config}/xless/toolchain-meta.json}" ]] || ! command -v xless >/dev/null 2>&1; then use_docker=1; fi ;;
   *) die "XLESS_USE_DOCKER must be 0, 1 or unset" ;;
 esac
 
@@ -314,7 +314,7 @@ if [[ $use_docker == 1 ]]; then
   fi
 fi
 
-# xcode: pin (docker only; XLESS_IMAGE / XLESS_SIGN_IMAGE win): IMAGE-xcode<pin>, made by `make images`. The plain
+# xcode: pin (docker only; XLESS_IMAGE / XLESS_SIGN_IMAGE win): IMAGE-xcode<pin>, made by `xless setup --xcode <Xcode.xip>`. The plain
 # default images are versions.env's Xcode's, so they serve that pin when no suffixed image exists.
 default_xcode="$(sed -n 's/^XCODE_VERSION=//p' "$(dirname "$0")/../versions.env" 2>/dev/null || true)"
 image_exists() { "${docker_cli[@]}" image inspect "$1" >/dev/null 2>&1; }
@@ -329,7 +329,7 @@ apply_pin() {   # VAR: the image named by $VAR, for the pinned Xcode
 }
 check_pin() {   # after apply_pin: refuse missing images with the command that builds them
   [[ -n "$XCODE_PIN" && $use_docker == 1 ]] || return 0
-  [[ ${#pin_missing[@]} -eq 0 ]] || die "$pin_file pins xcode: \"$XCODE_PIN\", but these images are missing: ${pin_missing[*]}; build them from Xcode $XCODE_TAG: make images XCODE=<path to Xcode $XCODE_TAG's .app or .xip> ARCHS=$arch"
+  [[ ${#pin_missing[@]} -eq 0 ]] || die "$pin_file pins xcode: \"$XCODE_PIN\", but these images are missing: ${pin_missing[*]}; build them from Xcode $XCODE_TAG: xless setup --xcode <path to Xcode $XCODE_TAG's .app or .xip> --arch $arch"
   echo "==> xcode: \"$XCODE_PIN\" (pinned): $*" >&2
 }
 
@@ -400,9 +400,9 @@ fi
 if [[ $use_docker == 1 && $RN == 1 && $SIM == 0 && "${XLESS_TESTFLIGHT_DRY_RUN:-0}" != 1 ]]; then
   digest() { "${docker_run[@]}" --entrypoint sha256sum "$1" /usr/local/bin/xless 2>/dev/null | cut -c1-64; }
   d2="$(digest "$image")" || true; d13="$(digest "$key_image")" || true
-  [[ -n "$d2" ]] || die "cannot read xless from $image (is the image built? make base-local sdk-local tauri-local rn-local)"
-  [[ -n "$d13" ]] || die "cannot read xless from $key_image (is the image built? make base-local)"
-  [[ "$d2" == "$d13" ]] || die "$image and $key_image hold different xless builds (${d2:0:12} vs ${d13:0:12}); rebuild both from the same commit (make base-local sdk-local tauri-local rn-local), or set XLESS_IMAGE / XLESS_SIGN_IMAGE to matching images"
+  [[ -n "$d2" ]] || die "cannot read xless from $image (is the image built? xless setup --xcode <Xcode.xip>)"
+  [[ -n "$d13" ]] || die "cannot read xless from $key_image (is the image built? xless setup --xcode <Xcode.xip>)"
+  [[ "$d2" == "$d13" ]] || die "$image and $key_image hold different xless builds (${d2:0:12} vs ${d13:0:12}); rebuild both from the same commit (xless setup --xcode <Xcode.xip>), or set XLESS_IMAGE / XLESS_SIGN_IMAGE to matching images"
 fi
 
 # Step 1: the build number, only for a run that starts (later stages read the one recorded in the work copy).
@@ -451,7 +451,7 @@ if [[ $fi_ -le 3 ]]; then
       built="$(grep '\.app$' "$log2" | tail -1 || true)"
       if [[ $use_docker == 1 ]]; then built="volume:$rn_work:$built"; fi
       echo "==> Simulator app: $built" >&2
-      echo "==> launch it on this Mac: scripts/sim-launch.sh $built" >&2
+      if [[ "$(uname -s)" == Darwin ]]; then echo "==> launch it on this Mac: scripts/sim-launch.sh $built" >&2; fi
     fi
     echo "==> Simulator build finished (nothing signed for distribution or uploaded)" >&2
     exit 0
