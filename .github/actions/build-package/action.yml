@@ -1,0 +1,49 @@
+name: Build and package xless
+description: Builds the static Linux xless for one architecture and packs the release tarball (used by pr.yml and release.yml).
+inputs:
+  arch:
+    description: x86_64 or arm64
+    required: true
+  triple:
+    description: Swift SDK triple, e.g. x86_64-swift-linux-musl
+    required: true
+  version:
+    description: Version for the tarball name (0.0.0-dev for the PR check, x.y.z for a release)
+    required: true
+  out-dir:
+    description: Directory that receives the tarball and its SHA256SUMS line
+    required: true
+  stamp:
+    description: "'true' stamps the version into the tree before building (releases only; needs x.y.z)"
+    required: false
+    default: 'false'
+runs:
+  using: composite
+  steps:
+    - name: Stamp the version
+      if: inputs.stamp == 'true'
+      shell: bash
+      env:
+        VERSION: ${{ inputs.version }}
+      run: scripts/stamp-version.sh "$VERSION"
+    - name: Build the static binary
+      shell: bash
+      env:
+        TRIPLE: ${{ inputs.triple }}
+      run: |
+        # GitHub answers 401 to some git versions over HTTP/2.
+        git config --global http.version HTTP/1.1
+        . ./versions.env
+        swift sdk install "$STATIC_SDK_URL" --checksum "$STATIC_SDK_SHA256"
+        swift build -c release --product xless --swift-sdk "$TRIPLE"
+        echo "XLESS_BIN=$(swift build -c release --product xless --swift-sdk "$TRIPLE" --show-bin-path)/xless" >> "$GITHUB_ENV"
+    - name: Package
+      shell: bash
+      env:
+        VERSION: ${{ inputs.version }}
+        ARCH: ${{ inputs.arch }}
+        OUT_DIR: ${{ inputs.out-dir }}
+      run: |
+        mkdir -p "$OUT_DIR"
+        scripts/package-release.sh "$VERSION" "$ARCH" "$XLESS_BIN" "$OUT_DIR"
+        ls -l "$OUT_DIR"

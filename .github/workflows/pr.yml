@@ -75,19 +75,15 @@ jobs:
       - name: Install tools
         run: apt-get update -qq && apt-get install -y -qq git curl ca-certificates >/dev/null
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
-      - name: Build the static binary
+      - name: Build and package
+        uses: ./.github/actions/build-package
+        with:
+          arch: ${{ matrix.name }}
+          triple: ${{ matrix.triple }}
+          version: 0.0.0-dev
+          out-dir: release/download/v0.0.0-dev
+      - name: Lay out the file:// release
         run: |
-          # GitHub answers 401 to some git versions over HTTP/2.
-          git config --global http.version HTTP/1.1
-          . ./versions.env
-          swift sdk install "$STATIC_SDK_URL" --checksum "$STATIC_SDK_SHA256"
-          swift build -c release --product xless --swift-sdk "${{ matrix.triple }}"
-          echo "XLESS_BIN=$(swift build -c release --product xless --swift-sdk '${{ matrix.triple }}' --show-bin-path)/xless" >> "$GITHUB_ENV"
-      - name: Package
-        run: |
-          mkdir -p release/download/v0.0.0-dev
-          scripts/package-release.sh 0.0.0-dev "${{ matrix.name }}" "$XLESS_BIN" release/download/v0.0.0-dev
-          ls -l release/download/v0.0.0-dev
           mkdir -p release/latest
           cp -R release/download/v0.0.0-dev release/latest/download
           tar -tzf "release/download/v0.0.0-dev/xless-0.0.0-dev-linux-${{ matrix.name }}.tar.gz"
@@ -114,4 +110,5 @@ jobs:
       - name: Shipped scripts
         run: |
           shellcheck scripts/docker-images.sh scripts/package-release.sh scripts/stamp-version.sh scripts/third-party-licenses.sh
+          shellcheck -x scripts/check-commit-title.sh scripts/next-version.sh scripts/release-notes.sh
           shellcheck --severity=error scripts/testflight.sh scripts/xcode-swift.sh

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Conventional Commit title check: scripts/check-commit-title.sh <title>
 # Exit 0 when valid; exit 1 (message on stderr) when not. Sourcing defines cc_title_regex and cc_is_valid and runs nothing.
-cc_title_regex='^(feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert)(\([a-z0-9][a-z0-9._/-]*\))?!?: [^[:space:]].*$'
+cc_title_regex='^(feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert)(\([a-z0-9._/-]+\))?!?: [^[:space:]].*$'
 cc_max_length=100
 
 cc_is_valid() {
