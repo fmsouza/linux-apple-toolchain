@@ -147,7 +147,7 @@ that export ([apple-requirements.md](apple-requirements.md)).
 
 ## Privacy scan (criterion 7)
 
-- Every tracked file at the branch head (3,847 files, binary files included) against the maintainer's local list of
+- Every tracked file at the branch head (3,848 files, binary files included) against the maintainer's local list of
   private identifiers and home paths: no hit. No tracked file is Apple SDK material (`.tbd`, `SDKSettings`,
   `.swiftinterface`, `.swiftmodule`, SDK directories, `.xip`, `.car`).
 - Both release tarballs, extracted (160 files): no private identifier and no home path. The only matches of the
