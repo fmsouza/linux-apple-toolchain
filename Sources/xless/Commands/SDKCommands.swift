@@ -148,7 +148,7 @@ struct SDKInstallCommand: AsyncParsableCommand {
             try Shell.run("docker", ["cp", "\(cid):/opt/xless/toolchain-meta.json", metaStage.path], stage: .sdk)
         } else {
             guard let xtoolsdk, let meta else {
-                throw XlessError(.sdk, "pass --xtoolsdk and --meta, or --image", fix: "see docs/README.md#native-install")
+                throw XlessError(.sdk, "pass --xtoolsdk and --meta, or --image", fix: "see docs/native-install.md")
             }
             for (name, path) in [("--xtoolsdk", xtoolsdk), ("--meta", meta)] where !fm.fileExists(atPath: path) {
                 throw XlessError(.sdk, "\(name) \(path) does not exist", fix: "pass the files produced by `xless sdk export`")

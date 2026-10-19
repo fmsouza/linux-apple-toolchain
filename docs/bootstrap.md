@@ -53,28 +53,31 @@ App Store Connect creates a certificate from a CSR but never returns the private
 App Store Connect's New App dialog only offers bundle IDs that are already registered, so register the `bundleID` from `xless.yml` first. Either:
 
 - by hand: developer.apple.com → Certificates, IDs & Profiles → Identifiers → + → App IDs → App, with the `bundleID` as an explicit Bundle ID; or
-- with xless, once the image or native install from steps 6–7 is ready: run `xless ship --platform ios` once. The `sign` stage registers the bundle ID (as a universal identifier, usable by both the iOS and the macOS build), and the run then stops at `upload` with "no app record". After step 5, finish with `xless upload --platform ios`, without a build-number override (or with the same one).
+- with xless, once the images from step 6 are ready: run the build once (`xless docker <project-dir>`, or `xless ship --platform ios` natively). The `sign` stage registers the bundle ID (as a universal identifier, usable by both the iOS and the macOS build), and the run then stops at `upload` with "no app record". After step 5, finish with `XLESS_BUILD_NUMBER=<the number that run printed> xless docker <project-dir> --from upload` (natively: `xless upload --platform ios`, without a build-number override).
 
 ## 5. App record
 
 App Store Connect → My Apps → + → New App, choosing the bundle ID registered in step 4 (for iOS, `platforms.ios.bundleID` if you override it). The API cannot create app records; `xless upload` fails until this exists. macOS Developer ID builds do not need an app record.
 
-## 6. Images (Mac, once per Xcode release)
+## 6. Images (once per Xcode release)
+
+On your Linux machine, build the images from the Xcode download ([README](../README.md#build-the-images)):
 
 ```sh
-cp registry.env.example registry.env     # edit: XLESS_REGISTRY, then XLESS_REGISTRY_PRIVATE=true after verifying it is private
-make base-push sdk-export sdk-push
+xless setup --xcode ~/Downloads/Xcode_27.xip
 ```
 
-Details, including making Xcode visible to the Docker VM, are in [README.md](README.md#building-the-images-on-the-mac).
+To use the images on other machines (a CI runner, a build server), push them to your own private registry
+([maintainers.md](maintainers.md#private-registries)); never to a public one, since they contain Apple's SDK.
 
-## 7. Linux
+## 7. Ship
 
-Either run in Docker:
+From the machine with the images, with the secrets in `~/.config/xless/testflight.env`:
 
 ```sh
-docker run --rm -v "$PWD":/work -w /work -e ASC_KEY_ID -e ASC_ISSUER_ID -e ASC_KEY_P8 -e XLESS_DIST_KEY \
-  <image> xless ship --platform ios
+xless docker <project-dir>
 ```
 
-or install natively (`scripts/install-native.sh`, then `xless sdk install --image <image>`); see [README.md](README.md#native-install).
+[signing-and-testflight.md](signing-and-testflight.md) covers the secrets file, the overlay apps (Tauri, React Native)
+and running `xless ship` in a container yourself. Without Docker, install natively instead
+([native-install.md](native-install.md)).
