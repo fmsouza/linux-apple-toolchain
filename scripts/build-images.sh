@@ -61,9 +61,8 @@ suffix="-xcode$version"
 bsuffix="$suffix-$build"   # this Xcode build's own tags: never moved by another build of the same version
 set -a; . "$repo/versions.env"; set +a
 default=0; [[ "$version" == "$XCODE_VERSION" && "$build" == "$XCODE_BUILD" ]] && default=1
-# Ruling R10: the app Swift toolchain (make variables for Dockerfile.sdk); refused before anything is built.
-swift_out="$("$repo/scripts/xcode-swift.sh" "$build")" || exit 2
-swift_vars=($swift_out)
+# Ruling R10: the app Swift toolchain for Dockerfile.sdk (scripts/docker-images.sh reads it again); refused before anything is built.
+"$repo/scripts/xcode-swift.sh" "$build" >/dev/null || exit 2
 # The asset and storyboard tools: an Xcode whose actool/ibtool/copypng formats are not measured (no XcodeToolsProfile entry)
 # is refused, as the image's shims would refuse it.
 "$repo/scripts/xcode-tools.sh" "$build" || exit 2
@@ -91,7 +90,7 @@ for a in "${archs[@]}"; do
   echo "==> XLESS_XCODE_RETAG=1: *:local-$a$suffix moves from Xcode $version ($old) to $build; the $old images stay as *:local-$a$suffix-$old" >&2
 done
 
-targets=(base-local sdk-export sdk-local tauri-local rn-local)
+export_sdk=1
 sdk_dir="$repo/dist/sdk-xcode$version"
 reuse=0
 if [[ "${XLESS_SDK_REEXPORT:-0}" != 1 && -f "$sdk_dir/toolchain-meta.json" ]] && grep -Eq "\"xcodeBuild\" *: *\"$build\"" "$sdk_dir/toolchain-meta.json"; then
@@ -99,7 +98,7 @@ if [[ "${XLESS_SDK_REEXPORT:-0}" != 1 && -f "$sdk_dir/toolchain-meta.json" ]] &&
 fi
 if [[ $reuse == 1 ]]; then
   echo "==> reusing the SDK exported from Xcode $version ($build) in $sdk_dir (XLESS_SDK_REEXPORT=1 exports it again)" >&2
-  targets=(base-local sdk-local tauri-local rn-local)
+  export_sdk=0
   # Metadata exported before Ruling R10 lacks the Xcode's Swift version, which prepare and the build stage check: write it again
   # (the SDK itself is unchanged).
   if ! grep -q '"swiftVersion"' "$sdk_dir/toolchain-meta.json"; then
@@ -109,7 +108,14 @@ if [[ $reuse == 1 ]]; then
 fi
 
 start=$(date +%s)
-make -C "$repo" "${targets[@]}" XCODE="$xcode" ARCHS="${archs[*]}" IMAGE_SUFFIX="$bsuffix" SDK_DIR="dist/sdk-xcode$version" "${swift_vars[@]}"
+images() { local i a; for a in "${archs[@]}"; do for i in "$@"; do
+  local extra=(); [[ "$i" != sdk ]] || extra=(--sdk-dir "$sdk_dir" --xcode-build "$build")
+  "$repo/scripts/docker-images.sh" "$i" --arch "$a" --suffix "$bsuffix" ${extra[@]+"${extra[@]}"} || exit 1
+done; done; }
+images base
+# The Mac's own step: xless sdk export (xtool in the base image, Xcode mounted read-only). -o: the base images are built above.
+[[ $export_sdk == 0 ]] || make -C "$repo" -o base-local sdk-export XCODE="$xcode" ARCHS="${archs[*]}" IMAGE_SUFFIX="$bsuffix" SDK_DIR="dist/sdk-xcode$version"
+images sdk tauri rn
 
 for a in "${archs[@]}"; do
   for i in xless-base xless xless-tauri xless-rn; do

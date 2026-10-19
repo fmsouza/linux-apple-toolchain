@@ -44,13 +44,13 @@ images:
 
 .PHONY: base-local sdk-export sdk-local base-push sdk-push
 base-local:
-	for a in $(ARCHS); do docker buildx build --platform linux/$$a --load -t xless-base:local-$$a$(IMAGE_SUFFIX) -f docker/Dockerfile.base $(BUILD_ARGS) . || exit 1; done
+	for a in $(ARCHS); do scripts/docker-images.sh base --arch $$a --suffix '$(IMAGE_SUFFIX)' || exit 1; done
 
 sdk-export: base-local
 	swift run xless sdk export --xcode "$(XCODE)" --out $(SDK_DIR) --base-image 'xless-base:local-{arch}$(IMAGE_SUFFIX)' --arch $(ARCHS)
 
 sdk-local:
-	for a in $(ARCHS); do docker buildx build --platform linux/$$a --load -t xless:local-$$a$(IMAGE_SUFFIX) -f docker/Dockerfile.sdk --build-context sdk=$(SDK_DIR) --build-arg BASE=xless-base:local-$$a$(IMAGE_SUFFIX) $(SDK_BUILD_ARGS) . || exit 1; done
+	for a in $(ARCHS); do scripts/docker-images.sh sdk --arch $$a --suffix '$(IMAGE_SUFFIX)' --sdk-dir '$(SDK_DIR)' --xcode-build '$(XCODE_BUILD)' || exit 1; done
 
 base-push:
 	R=$$(scripts/check-private-registry.sh) && docker buildx build --platform linux/arm64,linux/amd64 --push \
@@ -107,21 +107,17 @@ parity:
 ib-parity:
 	scripts/ib-parity.sh
 
-TAURI_BUILD_ARGS = --build-arg NODE_VERSION=$(NODE_VERSION) --build-arg NODE_SHA256_ARM64=$(NODE_SHA256_ARM64) --build-arg NODE_SHA256_X64=$(NODE_SHA256_X64) \
-  --build-arg RUSTUP_VERSION=$(RUSTUP_VERSION) --build-arg RUSTUP_SHA256_AARCH64=$(RUSTUP_SHA256_AARCH64) --build-arg RUSTUP_SHA256_X86_64=$(RUSTUP_SHA256_X86_64) \
-  --build-arg LIBDMG_HFSPLUS_COMMIT=$(LIBDMG_HFSPLUS_COMMIT) --build-arg LIBDMG_HFSPLUS_SHA256=$(LIBDMG_HFSPLUS_SHA256)
 .PHONY: tauri-local
 tauri-local:
-	for a in $(ARCHS); do docker buildx build --platform linux/$$a --load -t xless-tauri:local-$$a$(IMAGE_SUFFIX) -f docker/Dockerfile.tauri --build-arg BASE=xless:local-$$a$(IMAGE_SUFFIX) $(TAURI_BUILD_ARGS) . || exit 1; done
+	for a in $(ARCHS); do scripts/docker-images.sh tauri --arch $$a --suffix '$(IMAGE_SUFFIX)' || exit 1; done
 
 .PHONY: tauri-reference
 # make tauri-reference APP=<tauri app root> OUT=<dir> [PLATFORM=ios|macos] [TAURI_FEATURES=…]: Mac-only black-box
 # reference build of a Tauri app with the real Tauri CLI and Xcode (see scripts/tauri-ios-reference.sh); PLATFORM
-# defaults to ios, macos builds the universal .app and .dmg. TAURI_BUILD_ARGS (exported by this Makefile for the docker
-# build) is not a Tauri variable, so it is kept out of the recorded TAURI_* env.
+# defaults to ios, macos builds the universal .app and .dmg. The docker recipes live in scripts/docker-images.sh.
 tauri-reference:
 	@test -n "$(APP)" -a -n "$(OUT)" || { echo "usage: make tauri-reference APP=<tauri app root> OUT=<dir> [PLATFORM=ios|macos]" >&2; exit 2; }
-	env -u TAURI_BUILD_ARGS scripts/tauri-ios-reference.sh --platform "$(or $(PLATFORM),ios)" "$(APP)" "$(OUT)"
+	scripts/tauri-ios-reference.sh --platform "$(or $(PLATFORM),ios)" "$(APP)" "$(OUT)"
 
 .PHONY: rn-reference
 # make rn-reference [APP=samples/HelloRN] [OUT=<APP>/reference]: Mac-only reference build of an Expo app (pnpm install,
@@ -129,20 +125,8 @@ tauri-reference:
 rn-reference:
 	scripts/rn-reference.sh "$(or $(APP),samples/HelloRN)" "$(or $(OUT),$(or $(APP),samples/HelloRN)/reference)"
 
-RN_BUILD_ARGS = --build-arg SWIFT_VERSION=$(SWIFT_VERSION) --build-arg RN_RUBY_VERSION=$(RN_RUBY_VERSION) --build-arg RN_RUBY_SHA256=$(RN_RUBY_SHA256) \
-  --build-arg RN_BUNDLER_VERSION=$(RN_BUNDLER_VERSION) --build-arg RN_BUNDLER_SHA256=$(RN_BUNDLER_SHA256) \
-  --build-arg SWB_TAG=$(SWB_TAG) --build-arg SWB_SHA256=$(SWB_SHA256) --build-arg SWB_DRIVER_SHA256=$(SWB_DRIVER_SHA256) \
-  --build-arg SWB_LLBUILD_SHA256=$(SWB_LLBUILD_SHA256) --build-arg SWB_TSC_SHA256=$(SWB_TSC_SHA256) \
-  --build-arg SWB_TOOLS_PROTOCOLS_SHA256=$(SWB_TOOLS_PROTOCOLS_SHA256) \
-  --build-arg SWB_ARGUMENT_PARSER_VERSION=$(SWB_ARGUMENT_PARSER_VERSION) --build-arg SWB_ARGUMENT_PARSER_SHA256=$(SWB_ARGUMENT_PARSER_SHA256) \
-  --build-arg SWB_SYSTEM_VERSION=$(SWB_SYSTEM_VERSION) --build-arg SWB_SYSTEM_SHA256=$(SWB_SYSTEM_SHA256) \
-  --build-arg SWB_SQLITE_VERSION=$(SWB_SQLITE_VERSION) --build-arg SWB_SQLITE_SHA256=$(SWB_SQLITE_SHA256) \
-  --build-arg HERMES_TAG=$(HERMES_TAG) --build-arg HERMES_SHA256=$(HERMES_SHA256) --build-arg XLESS_IMAGE_ID=$(XLESS_IMAGE_ID)
-# Names the xless-rn image for `xless prepare`'s fingerprint: the commit (with -dirty for uncommitted changes), versions.env
-# and the image suffix (the Xcode of `make images`; prepare also folds in the SDK's toolchain metadata itself).
-XLESS_IMAGE_ID ?= $(shell git rev-parse --short=12 HEAD 2>/dev/null)$(shell git diff --quiet HEAD 2>/dev/null || echo -dirty)-$(shell git hash-object versions.env | cut -c1-12)$(IMAGE_SUFFIX)
 .PHONY: rn-local
 # make rn-local [ARCHS="arm64"]: the xless-rn image (Ruby/Bundler, Swift Build's swbuild, hermesc) on xless-tauri.
 # Swift Build is compiled in the image, so an amd64 build on an arm64 host runs swift under emulation (slow, best-effort).
 rn-local:
-	for a in $(ARCHS); do docker buildx build --platform linux/$$a --load -t xless-rn:local-$$a$(IMAGE_SUFFIX) -f docker/Dockerfile.rn --build-arg BASE=xless-tauri:local-$$a$(IMAGE_SUFFIX) $(RN_BUILD_ARGS) . || exit 1; done
+	for a in $(ARCHS); do scripts/docker-images.sh rn --arch $$a --suffix '$(IMAGE_SUFFIX)' || exit 1; done
