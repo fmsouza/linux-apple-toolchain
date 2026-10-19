@@ -108,6 +108,16 @@ grep -q 'disk: the check asks for about .* GB free under .* (XLESS_SETUP_CACHE_G
 grep -q 'xless-rn:local-arm64-xcode27.0' "$t/out" || fail "the plan does not tag xless-rn: $(cat "$t/out")"
 grep -q '^run' "$log" && fail "--dry-run ran docker: $(cat "$log")"
 grep -q 'next: xless docker' "$t/out" && fail "--dry-run promised the next step"
+# The xless that goes into xless-base is always a copy in the setup work dir (<arch>-bin/xless): its source directory
+# (~/.local/bin, say) is never what docker-images.sh gets as the build context.
+mkdir -p "$t/ext"; echo stub > "$t/ext/xless"; echo "do not send me to docker" > "$t/ext/other-file"
+extra=(XLESS_BIN_ARM64="$t/ext/xless")
+run ok --xcode "$xip" --arch arm64 --dry-run
+[[ $code == 0 ]] || fail "--dry-run with XLESS_BIN_ARM64 exits $code: $(cat "$t/err")"
+binline="$(grep 'docker-images.sh' "$t/out" | grep -E '(^|[ =])[^ ]*xless-setup-[^ /]*/arm64-bin/xless' || true)"
+[[ -n "$binline" ]] || fail "the build context is not the work dir's arm64-bin/xless: $(cat "$t/out")"
+grep -F "$t/ext" "$t/out" && fail "the plan names the binary's own directory $t/ext: $(cat "$t/out")"
+extra=()
 # The same .xip under the default (unregistered) table is refused: identification is by content.
 share="$repo" run ok --xcode "$xip" --dry-run
 [[ $code == 11 ]] || fail "an unregistered .xip exits $code, want 11"

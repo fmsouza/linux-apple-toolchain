@@ -214,7 +214,7 @@ struct SetupCommand: AsyncParsableCommand {
               let free = (attrs[.systemFreeSize] as? NSNumber)?.int64Value else { return }
         if let cause = SetupDisk.shortfall(freeGB: free / 1_000_000_000, path: dir.path, what: what, need: need) {
             throw XlessError(.sdk, cause, fix: "\(fix); or, if you know this run needs less (e.g. the layers are already built), "
-                             + "set \(need.key) to the GB per architecture to ask for (docs/troubleshooting.md#xless-setup)")
+                             + "set \(need.key) to the GB per architecture to ask for (https://github.com/fmsouza/linux-apple-toolchain/blob/main/docs/troubleshooting.md#xless-setup)")
         }
     }
 
@@ -242,14 +242,16 @@ struct SetupCommand: AsyncParsableCommand {
                 throw XlessError(.sdk, "\(bin.path) is not a Linux \(a) xless", fix: "set \(key) to the linux-\(a) xless binary")
             }
         }
-        // docker-images.sh takes a file named xless (its directory is the build context).
-        if bin.lastPathComponent != "xless" {
-            let dir = work.appendingPathComponent("\(a)-bin")
+        // docker-images.sh takes a file named xless and uses its directory as the build context, so the binary always goes
+        // into a directory of its own under the work dir (never the directory it came from, e.g. ~/.local/bin).
+        let dir = work.appendingPathComponent("\(a)-bin")
+        let copy = dir.appendingPathComponent("xless")
+        if !dryRun {
             try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
-            let copy = dir.appendingPathComponent("xless")
-            if !dryRun { try FileManager.default.copyItem(at: bin, to: copy) }
-            bin = copy
+            try? FileManager.default.removeItem(at: copy)
+            try FileManager.default.copyItem(at: bin, to: copy)
         }
+        bin = copy
         return bin
     }
 

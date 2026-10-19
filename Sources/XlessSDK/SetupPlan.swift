@@ -64,7 +64,7 @@ public enum SetupPlan {
                            "-e", "HOME=/tmp", "-w", "/tmp",
                            "-v", "\(source.url.path):\(inContainer):ro", "-v", "\(partial.path):/out",
                            "xless-base:local-\(a)\(bsuffix)", "xtool", "sdk", "build", inContainer, "/out"],
-                    estimate: est("~2 min", disk: source.kind == .xip ? "; up to ~15 GB in the cache while the .xip is unpacked, ~3 GB stays" : "; ~3 GB on disk"),
+                    estimate: est("~2 min", disk: source.kind == .xip ? "; up to ~15 GB in the cache while the .xip is unpacked, ~3.5 GB stays" : "; ~3 GB on disk"),
                     action: .export(partial: partial, final: final)))
             }
             if !wroteMeta {
