@@ -3,7 +3,7 @@
 `xless.yml` lives in the project directory next to `Package.swift`. Example (the HelloShip sample):
 
 ```yaml
-bundleID: app.example.helloship
+bundleID: com.example.helloship
 teamID: ABCDE12345
 version: 1.0.0
 build: 1
@@ -22,13 +22,13 @@ infoPlist: Resources/Info.plist
 | `bundleID` | string | yes | Reverse-DNS, e.g. `com.example.app`: dot-separated segments of letters, digits and `-`, at least two segments. |
 | `teamID` | string | yes | Exactly 10 characters, `A-Z` and `0-9`. From developer.apple.com → Membership. `sign` fails if it differs from the team of the App Store Connect key (read from the provisioning profile). |
 | `version` | string | yes | Marketing version (`CFBundleShortVersionString`): 1 to 3 dot-separated integers. Quote it if YAML would read it as a number. |
-| `build` | string or integer | yes | Build number (`CFBundleVersion`): 1 to 3 dot-separated integers. Overridden by `--build-number` or `XLESS_BUILD_NUMBER`. Each upload of a given `version` needs a higher one than every earlier upload, from any machine (see [README.md](README.md#secrets)). |
+| `build` | string or integer | yes | Build number (`CFBundleVersion`): 1 to 3 dot-separated integers. Overridden by `--build-number` or `XLESS_BUILD_NUMBER`. Each upload of a given `version` needs a higher one than every earlier upload, from any machine (see [build numbers](signing-and-testflight.md#build-numbers)). |
 | `platforms` | map | yes | At least one of `ios`, `macos`. Any other key is an error. |
 | `assets` | path | required for iOS (app-store) | Asset catalog (`.xcassets`), relative to the project. Compiled to `Assets.car` on iOS and to an `.icns` icon on macOS (macOS has no `Assets.car`). App Store builds fail at `assets` unless it contains an `.appiconset`. |
 | `privacyManifest` | path | required for iOS (app-store) | `PrivacyInfo.xcprivacy`, copied into the bundle; `finalize` fails for App Store builds if it is missing. |
 | `infoPlist` | path | no | Extra Info.plist keys merged into the generated one (usage descriptions, orientations, export-compliance keys). |
 | `usesNonExemptEncryption` | boolean | no | Stamps `ITSAppUsesNonExemptEncryption` (export compliance) into the Info.plist. `finalize` refuses iOS App Store builds whose Info.plist has no such key (they would stall at "Missing Compliance" in TestFlight). Set it here, or put the key in the `infoPlist` file. If both define it with different values, `finalize` refuses. `false` means the app uses no encryption beyond what Apple's OS provides or only exempt encryption. `true` is valid, but App Store Connect then needs an export compliance answer for each build before testers can install it. A non-boolean value in the Info.plist is refused. |
-| `xcode` | string | no | The Xcode whose SDK must build the app, e.g. `"26.2"` (Ruling R8; see [react-native.md](react-native.md#pinning-the-xcode-sdk)). `build` refuses an image whose SDK comes from another Xcode, the app compiles with the Swift toolchain that Xcode ships (Ruling R10), `scripts/testflight.sh` runs in the images `make images XCODE=…` made from it (`xless:local-<arch>-xcode<version>`). Default: the image's SDK. |
+| `xcode` | string | no | The Xcode whose SDK must build the app, e.g. `"26.2"` (Ruling R8; see [react-native.md](react-native.md#pinning-the-xcode-sdk)). `build` refuses an image whose SDK comes from another Xcode, the app compiles with an open-source Swift release matching that Xcode's Swift, `xless docker` runs in the images `xless setup --xcode …` made from it (`xless:local-<arch>-xcode<version>`). Default: the image's SDK. |
 | `testflight` | map | no | Deliver uploaded builds to TestFlight groups. See [`testflight`](#testflight). |
 | `launchStoryboard` | path | no | iOS only (ignored for macOS). A launch-screen `.storyboard` (must end in `.storyboard`), relative to the project. See [Launch storyboard](#launch-storyboard). |
 
@@ -63,7 +63,7 @@ After `upload` reaches `VALID`, xless (iOS only; ignored for macOS):
 - sets or updates "What to Test" for `locale` when `whatToTest` is given;
 - prints the build number, the groups and `available to N testers`, and warns about groups with 0 testers. Internal testers must be App Store Connect users, added once in the web UI (Users and Access, then TestFlight).
 
-A failure here exits 17 as `[upload] …`; the build is already uploaded and processed, so the message says so (ship again with a higher build number, or finish in App Store Connect). One-command usage: [README](README.md#one-command-testflight).
+A failure here exits 17 as `[upload] …`; the build is already uploaded and processed, so the message says so (ship again with a higher build number, or finish in App Store Connect). One-command usage: [signing-and-testflight.md](signing-and-testflight.md#one-command-testflight).
 
 ## Launch storyboard
 
@@ -85,7 +85,7 @@ the image's Xcode (27A266a or 17C52; any other Xcode is refused, [research/xcode
   `[assets] launch storyboard <path>: unsupported … at line <n> — …` (exit code 13).
 
 Example: [samples/HelloShipLaunch](../samples/HelloShipLaunch) (`launchStoryboard: Resources/LaunchScreen.storyboard`).
-On the Mac, `make ib-parity` checks the compiler against ibtool (golden drift, and a simulator screenshot of the sample's
+On the Mac, `make ib-parity` ([maintainers.md](maintainers.md#parity-tests)) checks the compiler against ibtool (golden drift, and a simulator screenshot of the sample's
 launch screen compiled both ways).
 
 ## Validation rules
@@ -103,4 +103,4 @@ launch screen compiled both ways).
 | `XLESS_BUILD_NUMBER` | Overrides `build`. `--build-number` takes precedence. |
 | `XLESS_TOOLCHAIN_META` | Path of `toolchain-meta.json`. Default: `/opt/xless/toolchain-meta.json` if present, else `$XDG_CONFIG_HOME/xless/toolchain-meta.json` (`~/.config/xless/toolchain-meta.json` when `XDG_CONFIG_HOME` is unset). |
 
-Secrets (`ASC_*`, `XLESS_DIST_KEY`, `XLESS_DEVID_KEY`) are never part of `xless.yml`; see [README.md](README.md#secrets).
+Secrets (`ASC_*`, `XLESS_DIST_KEY`, `XLESS_DEVID_KEY`) are never part of `xless.yml`; see [signing-and-testflight.md](signing-and-testflight.md#secrets).

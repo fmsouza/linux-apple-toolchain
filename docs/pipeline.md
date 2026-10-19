@@ -1,0 +1,83 @@
+# How xless builds an app
+
+xless takes an app's source and produces what Apple's own tools would:
+
+- **iOS and iPadOS:** a signed `.ipa`, uploaded to App Store Connect and delivered to TestFlight.
+- **macOS:** a Developer ID signed, notarized and stapled `.app` inside a `.zip`. A Tauri v2 macOS app gets a `.dmg`
+  instead ([tauri.md](tauri.md#macos)). There is no Mac App Store `.pkg` ([why](research/mas-pkg.md)) and no upload
+  step for macOS.
+
+It does this on Linux, without Xcode on the build machine. The Darwin SDK comes from an Xcode release you download
+from Apple ([apple-requirements.md](apple-requirements.md)). Two Xcode releases are supported: 27.0 (27A266a) and
+26.2 (17C52).
+
+## Where things run
+
+```
+┌─ your Linux machine, once per Xcode release ──────────────────────────────┐
+│ xless setup --xcode Xcode_27.xip                                           │
+│   → xtool (open source) unpacks the SDK from the .xip in xless-base        │
+│   → images xless-base, xless, xless-tauri, xless-rn (:local-<arch>…)       │
+└───────────────────────────────────────────────────────────────────────────┘
+┌─ every build ─────────────────────────────────────────────────────────────┐
+│ xless docker <project-dir>  or  xless docker --config <overlay.yml>        │
+│   → xless ship, in the images:                                             │
+│     [prepare →] build → assets → finalize → sign → package → upload        │
+└───────────────────────────────────────────────────────────────────────────┘
+```
+
+- **The images.** `xless setup` builds them from the `.xip` ([images.md](images.md) shows each step, for building them
+  by hand). `xless-base` holds xless, xtool and rcodesign; `xless` adds the Darwin SDK and the open-source Swift
+  release whose version matches that Xcode's Swift (6.4 for 27.0, 6.2.3 for 26.2; Apple's own toolchain is never in
+  an image); `xless-tauri` adds Node, pnpm and Rust; `xless-rn` adds Ruby, Bundler, Swift Build, Hermes and the Xcode
+  tool replacements a React Native build calls. They are tagged `<image>:local-<arch>-xcode<version>` (for
+  example `xless:local-arm64-xcode26.2`), and also plain `<image>:local-<arch>` for Xcode 27.0, the default.
+- **`xless docker`** runs a build in those images. With a project directory (an `xless.yml` project) it runs
+  `xless ship` in one container. With `--config <overlay.yml>` (a Tauri or React Native app) it runs three containers,
+  so that the app's own build code never runs next to a signing key ([signing-and-testflight.md](signing-and-testflight.md#the-three-step-split)).
+  The options after the project or overlay go to `xless ship`, for example `--to finalize` or `--from sign`.
+- **Natively.** On a Debian or Ubuntu machine with the toolset installed ([native-install.md](native-install.md)),
+  `xless ship` runs without Docker.
+
+## The project
+
+An `xless.yml` project is a Swift package with an `xless.yml` next to `Package.swift` ([xless-yml.md](xless-yml.md)).
+The installed sample `~/.local/share/xless/samples/HelloShip` is one. A Tauri or React Native app is described by an
+**overlay** file that lives outside the app's repository and points at it: the app's repository is never changed
+([tauri.md](tauri.md), [react-native.md](react-native.md)).
+
+## Stages
+
+`xless ship` runs the stages in order. Each stage reads only the previous stage's directory under
+`.xless/build/<platform>/` and writes only its own, so you can resume a failed run with `--from <stage>`, stop after a
+stage with `--to <stage>`, or run one stage on its own (`xless build`, `xless sign`, …). A stage builds into
+`<dir>.partial` and renames it only on success, so a stage directory exists only if that stage succeeded; a failed
+stage also removes its previous output.
+
+| Stage | Command | Output | Exit code on failure |
+|---|---|---|---|
+| prepare | `xless prepare` | Overlays only: the work copy, the app's dependencies and toolchains (React Native: `expo prebuild`, `pod install`) | 19 |
+| build | `xless build` | `app/`: the unsigned bundle | 12 |
+| assets | `xless assets` | `assets/` (iOS: `Assets.car`; macOS: `.icns`) | 13 |
+| finalize | `xless finalize` | `final/`: Xcode's metadata stamped into Info.plist, binaries patched. The app is complete but unsigned. | 14 |
+| sign | `xless sign` | `signed/` | 15 |
+| package | `xless package` | `out/`: the `.ipa`, the notarized `.zip`, or (Tauri macOS) the notarized and stapled `.dmg` | 16 |
+| upload | `xless upload` | `upload.json` (iOS only; rewritten at every state change, so it keeps the build ID if processing fails or times out). With a [`testflight:` block](xless-yml.md#testflight) it then delivers the processed build to your TestFlight groups. | 17 |
+
+Config errors exit 10 and SDK errors exit 11. `xless docker` itself exits 2 for a usage or configuration error of its
+own (a missing project, overlay or secret file). Errors are printed as `[stage] cause — fix`.
+
+All stage commands take `--platform ios|macos`, `--project <dir>` (default `.`) and `--build-number`; overlays take
+`--config <overlay.yml>` and `--source <dir>` instead of `--project`. Sign, package and upload need an Apple Developer
+account and its keys ([signing-and-testflight.md](signing-and-testflight.md)); the stages before them need none.
+
+## Other commands
+
+- `xless inspect <bundle> --platform <p>` prints Info.plist and Mach-O build versions as JSON (useful when comparing
+  with an Xcode build); `xless inspect --config <overlay>` prints what an overlay's build would do.
+- `xless next-build --config <overlay>` (React Native) and `xless tauri next-build --config <overlay>` print the build
+  number the next run would use (a read-only App Store Connect query).
+- `xless sdk meta|install` manage a native SDK install ([native-install.md](native-install.md)).
+- `xless storyboard compile` compiles a launch storyboard without ibtool ([xless-yml.md](xless-yml.md#launch-storyboard)).
+- `xless sign bootstrap` creates signing keys and certificates ([bootstrap.md](bootstrap.md)).
+- `xless help <command>` describes any command.

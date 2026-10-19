@@ -15,7 +15,7 @@ Capabilities and portal steps:
 
 Issues found during acceptance and fixed in xless:
 - llvm-strip left the LINKEDIT string pool 4-byte aligned; dyld refused the image at launch — the strip shim re-lays LINKEDIT, and finalize refuses any image dyld would reject.
-- The image's iOS 27 SDK makes UIKit require the scene life cycle, which the app (built by its own pipeline with Xcode 26.2) does not adopt — per-project `xcode:` pin with images per Xcode, each compiling with the Swift toolchain that Xcode ships.
+- The image's iOS 27 SDK makes UIKit require the scene life cycle, which the app (built by its own pipeline with Xcode 26.2) does not adopt — per-project `xcode:` pin with images per Xcode, each compiling with an open-source Swift release matching that Xcode's Swift.
 - `identifiers.replace` did not reach Info.plist values the app reads at runtime — it now covers the Info.plists of the app and its extensions.
 - Every asset-catalog bitmap was marked opaque (transparent images drew black) and named colors were unreadable — AssetKit writes opacity and colors as actool does; the parity check compares asset catalogs rendition by rendition.
 - Build outputs cached inside `node_modules` survived a toolchain change — a toolchain change reinstalls JS dependencies and clears derived data.

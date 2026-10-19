@@ -127,4 +127,4 @@ elif ! docker info >/dev/null 2>&1; then
   echo "warning: docker is installed but the daemon is not reachable (is it running, and are you in the docker group?). See https://docs.docker.com/engine/install/" >&2
 fi
 
-echo "next: xless setup --xcode ~/Downloads/Xcode_27.0.xip"
+echo "next: xless setup --xcode ~/Downloads/Xcode_27.xip"
