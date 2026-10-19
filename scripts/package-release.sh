@@ -58,6 +58,9 @@ COPYFILE_DISABLE=1 tar "${tar_opts[@]}" -czf "$tarball" -C "$work" "$name"
 if command -v sha256sum >/dev/null 2>&1; then sum=$(cd "$outdir" && sha256sum "$name.tar.gz")
 else sum=$(cd "$outdir" && shasum -a 256 "$name.tar.gz"); fi
 sums="$outdir/SHA256SUMS"
-{ [[ -f "$sums" ]] && grep -vF "  $name.tar.gz" "$sums" || true; echo "$sum"; } | sort -k2 > "$work/sums"
+{
+  if [[ -f "$sums" ]]; then grep -vF "  $name.tar.gz" "$sums" || true; fi
+  echo "$sum"
+} | sort -k2 > "$work/sums"
 cat "$work/sums" > "$sums"
 echo "$tarball"

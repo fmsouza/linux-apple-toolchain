@@ -78,7 +78,7 @@ mkdir -p "$prefix/bin" "$prefix/share"
 stage="$(mktemp -d "$prefix/share/.xless-install.XXXXXX")"
 top="xless-$version-linux-$arch"
 tar -xzf "$tmp/$name" -C "$stage" || die "could not unpack $name"
-[ -f "$stage/$top/bin/xless" ] && [ -d "$stage/$top/share/xless" ] || die "$name does not have the expected layout"
+if [ ! -f "$stage/$top/bin/xless" ] || [ ! -d "$stage/$top/share/xless" ]; then die "$name does not have the expected layout"; fi
 
 # Swap share/xless first, then the binary (a rename within one directory each, so the binary is never half-written).
 if [ -e "$prefix/share/xless" ]; then mv "$prefix/share/xless" "$stage/previous" || die "could not move the old share/xless aside"; fi
