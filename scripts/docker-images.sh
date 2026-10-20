@@ -65,7 +65,7 @@ args=(buildx build --platform "linux/$arch" --load -t "xless-$image:$tag")
 case "$image" in
   base)
     args+=(-f docker/Dockerfile.base
-      --build-arg "SWIFT_VERSION=$SWIFT_VERSION" --build-arg "XTOOL_VERSION=$XTOOL_VERSION" --build-arg "RCODESIGN_VERSION=$RCODESIGN_VERSION"
+      --build-arg "SWIFT_IMAGE=$SWIFT_IMAGE" --build-arg "XTOOL_VERSION=$XTOOL_VERSION" --build-arg "RCODESIGN_VERSION=$RCODESIGN_VERSION"
       --build-arg "STATIC_SDK_URL=$STATIC_SDK_URL" --build-arg "STATIC_SDK_SHA256=$STATIC_SDK_SHA256"
       --build-arg "XTOOL_SHA256_AARCH64=$XTOOL_SHA256_AARCH64" --build-arg "XTOOL_SHA256_X86_64=$XTOOL_SHA256_X86_64"
       --build-arg "RCODESIGN_SHA256_AARCH64=$RCODESIGN_SHA256_AARCH64" --build-arg "RCODESIGN_SHA256_X86_64=$RCODESIGN_SHA256_X86_64")
@@ -92,7 +92,7 @@ case "$image" in
     if command -v sha256sum >/dev/null 2>&1; then vsum="$(sha256sum versions.env | cut -d' ' -f1)"; else vsum="$(shasum -a 256 versions.env | cut -d' ' -f1)"; fi
     id+="-${vsum:0:12}$suffix"
     args+=(-f docker/Dockerfile.rn --build-arg "BASE=xless-tauri:$tag"
-      --build-arg "SWIFT_VERSION=$SWIFT_VERSION" --build-arg "RN_RUBY_VERSION=$RN_RUBY_VERSION" --build-arg "RN_RUBY_SHA256=$RN_RUBY_SHA256"
+      --build-arg "SWIFT_IMAGE=$SWIFT_IMAGE" --build-arg "RN_RUBY_VERSION=$RN_RUBY_VERSION" --build-arg "RN_RUBY_SHA256=$RN_RUBY_SHA256"
       --build-arg "RN_BUNDLER_VERSION=$RN_BUNDLER_VERSION" --build-arg "RN_BUNDLER_SHA256=$RN_BUNDLER_SHA256"
       --build-arg "SWB_TAG=$SWB_TAG" --build-arg "SWB_SHA256=$SWB_SHA256" --build-arg "SWB_DRIVER_SHA256=$SWB_DRIVER_SHA256"
       --build-arg "SWB_LLBUILD_SHA256=$SWB_LLBUILD_SHA256" --build-arg "SWB_TSC_SHA256=$SWB_TSC_SHA256"

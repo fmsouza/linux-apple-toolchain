@@ -37,7 +37,7 @@ description re-runs; the others are `.github/workflows/pr.yml`, which runs when 
 | Check | What it runs |
 |---|---|
 | `title` | The pull request title against the regular expression above |
-| `linux-tests (x86_64)`, `linux-tests (arm64)` | `swift test`, AssetKit's tests and every `Tests/shell/*.test.sh`, in `swift:6.4.0-jammy` |
+| `linux-tests (x86_64)`, `linux-tests (arm64)` | `swift test`, AssetKit's tests and every `Tests/shell/*.test.sh`, in `swift:6.4.0-jammy`, pinned by digest (`SWIFT_IMAGE` in `versions.env`) |
 | `package (x86_64)`, `package (arm64)` | The release tarball built as a release would build it, installed with `scripts/install.sh` from a local release, and run |
 | `shellcheck` | shellcheck on the shipped scripts |
 
@@ -56,12 +56,24 @@ release tag and computes the next version (`scripts/next-version.sh`):
 |---|---|
 | a breaking change (`!` or `BREAKING CHANGE:`) | the next major (`1.4.2` → `2.0.0`); while the major is 0, the next minor (`0.3.1` → `0.4.0`) |
 | a `feat` | the next minor (`0.3.1` → `0.4.0`) |
-| a `fix` or `perf` | the next patch (`0.3.1` → `0.3.2`) |
-| only `docs`, `style`, `refactor`, `test`, `build`, `ci`, `chore` or `revert` | no release that night |
+| a `fix`, `perf` or `revert` | the next patch (`0.3.1` → `0.3.2`) |
+| only `docs`, `style`, `refactor`, `test`, `build`, `ci` or `chore` | no release that night |
 
 The highest bump wins. The release is tagged `v<version>` and its notes are generated from the same titles. The first
 release, `v0.1.0`, is cut by hand ([maintainers.md](docs/maintainers.md#releases)). The source tree's version is always
 `0.0.0-dev`; only a release build stamps the real one.
+
+### Reverts
+
+A revert undoes a change users may already have, so it is released: a `revert` title is a patch, or a major (a minor
+while the major is 0) with `!` or a `BREAKING CHANGE:` footer, for example when it removes something released as a
+feature that users rely on. Title it `revert: <the reverted title>` (GitHub's Revert button proposes `Revert "…"`, which
+the title check refuses) and keep the line that names what it reverts in the description: `This reverts commit <sha>.`
+as `git revert` writes it, or `Reverts fmsouza/xless#<N>` as GitHub's Revert button does.
+
+When the reverted commit has not been released yet (both land between two nightlies), the two cancel out: neither
+counts towards the version or appears in the release notes. Reverting a revert in the same range brings the original
+back. Released reverts are listed in the notes under **Reverts**.
 
 ## Documentation
 

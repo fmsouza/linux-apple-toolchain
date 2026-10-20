@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 # Prints Markdown release notes for the commits in <from-ref>..<to-ref> (an empty from-ref means all history up to to-ref).
 #   scripts/release-notes.sh <from-ref|""> <to-ref>
-# Sections, in this order, each omitted when empty: Breaking changes, Features, Fixes, Performance. One bullet per
-# commit: "- <description> (<scope>) (#<PR>) (<short hash>)", newest first. Commits with an invalid title are skipped.
+# Sections, in this order, each omitted when empty: Breaking changes, Features, Fixes, Performance, Reverts. One bullet
+# per commit: "- <description> (<scope>) (#<PR>) (<short hash>)", newest first. Commits with an invalid title are
+# skipped, and so are a commit and a revert of it that are both in the range (they cancel out: cc_cancelled).
 set -euo pipefail
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=scripts/check-commit-title.sh
@@ -16,9 +17,11 @@ from="$1" to="$2"
 range="$to"
 [ -z "$from" ] || range="$from..$to"
 
-breaking="" features="" fixes="" perf=""
+breaking="" features="" fixes="" perf="" reverts=""
 re='^([a-z]+)(\(([^)]*)\))?(!)?: (.*)$'
+cancelled=$(cc_cancelled "$range")
 while IFS= read -r sha; do
+  if [ -n "$cancelled" ] && grep -qx "$sha" <<<"$cancelled"; then continue; fi
   raw=$(git log -1 --format=%s "$sha")
   subject=$(cc_subject_title "$raw")
   cc_is_valid "$subject" || continue
@@ -38,6 +41,7 @@ while IFS= read -r sha; do
     feat) features="$features$line"$'\n' ;;
     fix) fixes="$fixes$line"$'\n' ;;
     perf) perf="$perf$line"$'\n' ;;
+    revert) reverts="$reverts$line"$'\n' ;;
   esac
 done < <(git rev-list "$range")
 
@@ -51,4 +55,5 @@ section "Breaking changes" "$breaking"
 section "Features" "$features"
 section "Fixes" "$fixes"
 section "Performance" "$perf"
+section "Reverts" "$reverts"
 printf '%s' "$out"

@@ -9,8 +9,8 @@ The scripts named here run from a source checkout. Those that run Apple's progra
 
 ## Tests
 
-- `swift test` runs the unit tests on the Mac; `make test-linux` runs them in Linux (the `swift:<SWIFT_VERSION>-jammy`
-  image). `swift test --package-path ThirdParty/AssetKit` runs AssetKit's.
+- `swift test` runs the unit tests on the Mac; `make test-linux` runs them in Linux (versions.env's `SWIFT_IMAGE`: the
+  `swift:<SWIFT_VERSION>-jammy` image, pinned by digest). `swift test --package-path ThirdParty/AssetKit` runs AssetKit's.
 - `bash Tests/shell/<name>.test.sh` runs one shell test; CI runs them all.
 - `python3 -I scripts/check-doc-links.py README.md CONTRIBUTING.md docs/*.md` checks the documentation's relative
   links (`Tests/shell/check-doc-links.test.sh` runs it too).
