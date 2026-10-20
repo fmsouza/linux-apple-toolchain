@@ -129,6 +129,23 @@ then tags `v<version>` and publishes a GitHub release with the tarballs, `SHA256
 gh workflow run release.yml --ref main -f first_version=0.1.0
 ```
 
+### The nightly may be switched off
+
+GitHub disables the scheduled workflows of a public repository after 60 days without activity in it, and the nightly
+would then stop without a word: whatever is merged after a quiet spell would never be released. Two things cover it:
+
+- `.github/workflows/nightly-state.yml` runs on every push to `main` (`scripts/nightly-state.sh`). When GitHub has
+  disabled `release.yml` for inactivity (state `disabled_inactivity`), it enables it again and leaves a warning on the
+  run; the next nightly then releases what was merged. A `release.yml` disabled by hand (`disabled_manually`) is left
+  alone, with a warning.
+- To check or fix it yourself:
+
+  ```sh
+  gh api 'repos/fmsouza/xless/actions/workflows/release.yml' --jq .state    # active when the nightly runs
+  gh workflow enable release.yml
+  gh workflow run release.yml --ref main                                    # release now instead of tonight
+  ```
+
 ## Repository settings
 
 `scripts/github-settings.sh [owner/repo]` applies the settings the workflow relies on, with `gh api` (it needs a token
