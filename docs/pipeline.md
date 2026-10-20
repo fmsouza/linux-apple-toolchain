@@ -80,4 +80,5 @@ account and its keys ([signing-and-testflight.md](signing-and-testflight.md)); t
 - `xless sdk meta|install` manage a native SDK install ([native-install.md](native-install.md)).
 - `xless storyboard compile` compiles a launch storyboard without ibtool ([xless-yml.md](xless-yml.md#launch-storyboard)).
 - `xless sign bootstrap` creates signing keys and certificates ([bootstrap.md](bootstrap.md)).
+- `xless clean` removes the images, volumes and cache xless made, to free disk space ([uninstall.md](uninstall.md)).
 - `xless help <command>` describes any command.

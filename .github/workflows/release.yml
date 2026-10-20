@@ -68,7 +68,7 @@ jobs:
     if: needs.plan.outputs.version != ''
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 90
-    container: swift:6.4.0-jammy
+    container: swift:6.4.0-jammy@sha256:11bb836ebbc05dbe59b28ffa6cb6ca6b452375d7a65b322c5b6c83f44d52f8c0   # versions.env SWIFT_IMAGE (Tests/shell/swift-image.test.sh)
     strategy:
       fail-fast: true
       matrix:

@@ -98,6 +98,7 @@ The build runs as root inside the container, so the files it creates in `~/Hello
 - [React Native and Expo apps](docs/react-native.md)
 - [Tauri v2 apps](docs/tauri.md), for iOS and macOS
 - [Troubleshooting](docs/troubleshooting.md)
+- [Uninstall xless and free its disk space](docs/uninstall.md): `xless clean`
 - [All documentation](docs/README.md), including how xless works and how to contribute
 
 ## Apple software
