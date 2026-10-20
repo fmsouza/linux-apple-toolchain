@@ -50,9 +50,14 @@ let package = Package(
             .product(name: "Yams", package: "Yams"),
             .product(name: "Crypto", package: "swift-crypto"),
         ]),
+        // Plain Cargo apps (`type: cargo` overlays): a Rust binary built for iOS and/or macOS and packaged without Xcode.
+        .target(name: "XlessCargo", dependencies: [
+            "XlessCore", "XlessMachO", "XlessTauri",
+            .product(name: "Yams", package: "Yams"),
+        ]),
         .executableTarget(name: "xless", dependencies: [
             "XlessCore", "XlessTauri", "XlessSDK", "XlessBuild", "XlessAssets", "XlessFinalize", "XlessSign", "XlessASC", "XlessPackage", "XlessIB",
-            "XlessXcode", "XlessReactNative",
+            "XlessXcode", "XlessReactNative", "XlessCargo",
             .product(name: "ArgumentParser", package: "swift-argument-parser"),
         ]),
         // Research tool: compares the storyboard compiler with ibtool outputs (scripts/ib-corpus/differential.py).
@@ -83,6 +88,7 @@ let package = Package(
         .testTarget(name: "XlessTauriTests", dependencies: ["XlessTauri", "XlessCore", "XlessMachO", .product(name: "Crypto", package: "swift-crypto")], exclude: ["Fixtures"]),
         .testTarget(name: "XlessMachOTests", dependencies: ["XlessMachO"]),
         .testTarget(name: "XlessReactNativeTests", dependencies: ["XlessReactNative", "XlessXcode", "XlessCore", "XlessTauri", "XlessASC"]),
+        .testTarget(name: "XlessCargoTests", dependencies: ["XlessCargo", "XlessCore", "XlessTauri"]),
         .testTarget(name: "XlessXcodeTests", dependencies: ["XlessXcode", "XlessCore", "XlessTauri", "XlessMachO"], exclude: ["Fixtures"]),
     ]
 )
