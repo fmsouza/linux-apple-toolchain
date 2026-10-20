@@ -8,6 +8,8 @@ public struct ResolvedCargo: Sendable {
     public var platform: CargoPlatform
     /// The version as Cargo or the overlay states it, prerelease included (`0.2.0-rc.1`); `config.version` is `0.2.0`.
     public var fullVersion: String
+    /// The overlay's `plistVars`: values for the `@NAME@` placeholders of the app's Info.plist (`CargoBundler.infoPlist`).
+    public var plistVars: [String: String] = [:]
 }
 
 public enum CargoProject {
@@ -35,6 +37,6 @@ public enum CargoProject {
             testflight: ios ? overlay.testflight : nil, usesNonExemptEncryption: overlay.usesNonExemptEncryption,
             buildScheme: dated ? .dated : .fixed, xcode: overlay.xcode)
         try config.validate()
-        return ResolvedCargo(config: config, platform: block, fullVersion: fullVersion)
+        return ResolvedCargo(config: config, platform: block, fullVersion: fullVersion, plistVars: overlay.plistVars)
     }
 }
