@@ -7,11 +7,11 @@ test:
 
 test-linux:
 	mkdir -p .build-linux
-	docker run --rm -v "$(CURDIR)":/src -v "$(CURDIR)/.build-linux":/scratch -w /src swift:$(SWIFT_VERSION)-jammy \
+	docker run --rm -v "$(CURDIR)":/src -v "$(CURDIR)/.build-linux":/scratch -w /src $(SWIFT_IMAGE) \
 	  bash -c 'apt-get update -qq && apt-get install -y -qq zip unzip rsync git >/dev/null && swift test --scratch-path /scratch'
 
 XLESS_TAG = xcode$(XCODE_VERSION)-$(XCODE_BUILD)-v$(XLESS_VERSION)
-BUILD_ARGS = --build-arg SWIFT_VERSION=$(SWIFT_VERSION) --build-arg XTOOL_VERSION=$(XTOOL_VERSION) --build-arg RCODESIGN_VERSION=$(RCODESIGN_VERSION) \
+BUILD_ARGS = --build-arg SWIFT_IMAGE=$(SWIFT_IMAGE) --build-arg XTOOL_VERSION=$(XTOOL_VERSION) --build-arg RCODESIGN_VERSION=$(RCODESIGN_VERSION) \
   --build-arg STATIC_SDK_URL=$(STATIC_SDK_URL) --build-arg STATIC_SDK_SHA256=$(STATIC_SDK_SHA256) \
   --build-arg XTOOL_SHA256_AARCH64=$(XTOOL_SHA256_AARCH64) --build-arg XTOOL_SHA256_X86_64=$(XTOOL_SHA256_X86_64) \
   --build-arg RCODESIGN_SHA256_AARCH64=$(RCODESIGN_SHA256_AARCH64) --build-arg RCODESIGN_SHA256_X86_64=$(RCODESIGN_SHA256_X86_64)

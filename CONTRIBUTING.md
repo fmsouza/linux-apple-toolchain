@@ -36,7 +36,7 @@ Check a title locally with `scripts/check-commit-title.sh "feat(setup): accept a
 | Check | What it runs |
 |---|---|
 | `title` | The pull request title against the regular expression above |
-| `linux-tests (x86_64)`, `linux-tests (arm64)` | `swift test`, AssetKit's tests and every `Tests/shell/*.test.sh`, in `swift:6.4.0-jammy` |
+| `linux-tests (x86_64)`, `linux-tests (arm64)` | `swift test`, AssetKit's tests and every `Tests/shell/*.test.sh`, in `swift:6.4.0-jammy`, pinned by digest (`SWIFT_IMAGE` in `versions.env`) |
 | `package (x86_64)`, `package (arm64)` | The release tarball built as a release would build it, installed with `scripts/install.sh` from a local release, and run |
 | `shellcheck` | shellcheck on the shipped scripts |
 
