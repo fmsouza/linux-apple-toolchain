@@ -2,7 +2,8 @@
 # each app's Gemfile.lock at prepare time), Swift Build's `swbuild` CLI and its build service, and a host-arch `hermesc`.
 # Each tool is built in its own stage on the same base so shared libraries match; only the results are copied.
 ARG BASE
-ARG SWIFT_VERSION
+# SWIFT_IMAGE: versions.env's swift:<SWIFT_VERSION>-jammy@sha256:… (pinned by digest)
+ARG SWIFT_IMAGE
 
 FROM ${BASE} AS ruby
 ARG RN_RUBY_VERSION
@@ -94,7 +95,7 @@ RUN set -eux; \
 
 # The Swift toolchain's own llvm-objcopy (LLVM 21, the LLVM of ld64.lld; it is llvm-strip when called by that name): the
 # strip shim's tool, whose output is closest to Xcode's strip. xless-tauri's LLVM 14 package replaced /usr/bin/llvm-objcopy.
-FROM swift:${SWIFT_VERSION}-jammy AS swifttools
+FROM ${SWIFT_IMAGE} AS swifttools
 
 FROM ${BASE}
 ARG RN_RUBY_VERSION

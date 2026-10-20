@@ -17,7 +17,7 @@ has() { [[ " $(cat "$DOCKER_ARGV") " == *" $1 "* ]] || fail "$2: '$1' missing fr
 # base: the platform, the tag, the Dockerfile and every pin the Makefile passed.
 "$S" base --arch amd64 --suffix -x 2>/dev/null
 has "--platform linux/amd64 --load -t xless-base:local-amd64-x -f docker/Dockerfile.base" base
-for k in SWIFT_VERSION XTOOL_VERSION RCODESIGN_VERSION STATIC_SDK_URL STATIC_SDK_SHA256 XTOOL_SHA256_AARCH64 XTOOL_SHA256_X86_64 \
+for k in SWIFT_IMAGE XTOOL_VERSION RCODESIGN_VERSION STATIC_SDK_URL STATIC_SDK_SHA256 XTOOL_SHA256_AARCH64 XTOOL_SHA256_X86_64 \
          RCODESIGN_SHA256_AARCH64 RCODESIGN_SHA256_X86_64; do
   grep -q -- "--build-arg $k=." "$DOCKER_ARGV" || fail "base: --build-arg $k missing"
 done
