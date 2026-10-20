@@ -120,8 +120,11 @@ Releases are cut by `.github/workflows/release.yml`, at 03:00 UTC every night an
 `v*` tag (`scripts/next-version.sh`; the rules are in [CONTRIBUTING.md](../CONTRIBUTING.md#versions-and-releases)).
 With no releasable commit it does nothing. Otherwise it builds both tarballs from that commit
 (`.github/actions/build-package`: `scripts/stamp-version.sh`, a static musl build, `scripts/package-release.sh`),
-then tags `v<version>` and publishes a GitHub release with the tarballs, `SHA256SUMS`, `install.sh` and notes from
-`scripts/release-notes.sh`. The source tree stays at version `0.0.0-dev`; only the release build stamps one.
+then installs them on both architectures before publishing anything (the `verify` job: `scripts/release-assets.sh`
+writes `SHA256SUMS` and copies `install.sh`, and `scripts/verify-release.sh` lays them out like a GitHub release, installs
+with that `install.sh` from `file://`, pinned and as the latest, and checks that `xless --version` and
+`share/xless/VERSION` are the new version). Only then does it tag `v<version>` and publish a GitHub release with the
+tarballs, `SHA256SUMS`, `install.sh` and notes from `scripts/release-notes.sh`. The source tree stays at version `0.0.0-dev`; only the release build stamps one.
 
 **The first release.** While there is no `v*` tag the nightly releases nothing. The first one is cut by hand, once:
 
