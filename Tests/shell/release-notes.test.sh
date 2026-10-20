@@ -69,5 +69,14 @@ case "$all" in "## Fixes"*) ;; *) echo "FAIL: empty from-ref: '$all'"; fail=1 ;;
 none=$(notes "$h_perf" "$h_perf")
 [ -z "$none" ] || { echo "FAIL: expected empty, got '$none'"; fail=1; }
 
+# Reverts get their own section; a commit and its revert in the same range are both left out.
+commit -m 'chore: base'; h_base=$(hash)
+commit -m 'feat: short-lived'; h_short=$(git -C "$repo" rev-parse HEAD)
+commit -m 'revert: feat: short-lived' -m "This reverts commit $h_short."
+commit -m 'revert(install): feat(install): verify checksums (#9)' -m 'Reverts fmsouza/xless#3'; h_rev=$(hash)
+rev_out=$(notes "$h_base" HEAD)
+[ "$rev_out" = "## Reverts
+- feat(install): verify checksums (install) (#9) ($h_rev)" ] || { echo "FAIL: reverts: '$rev_out'"; fail=1; }
+
 [ "$fail" -eq 0 ] && echo "release-notes: ok"
 exit "$fail"
