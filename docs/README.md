@@ -21,6 +21,7 @@ build. The pages below go further.
   audit behind that list.
 - [images.md](images.md): the Docker images, and how to build each one by hand.
 - [native-install.md](native-install.md): running xless on Debian or Ubuntu without Docker for builds.
+- [uninstall.md](uninstall.md): `xless clean`, freeing disk space after an upgrade, and uninstalling.
 
 ## Working on xless
 
