@@ -65,3 +65,5 @@ COPY --from=xless-bin --chmod=755 /xless /usr/local/bin/xless
 RUN mkdir -p /opt/xless/config && chmod -R a+rwX /opt/xless \
  && xtool --help >/dev/null && rcodesign --version && xless --version
 WORKDIR /work
+# Every image of the chain inherits this label; `xless clean --images` prunes the untagged older builds by it.
+LABEL org.xless.image=true
