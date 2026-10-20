@@ -50,6 +50,16 @@ prints. If a new terminal still cannot find `xless`, add that line to your shell
 xless --version
 ```
 
+Each release asset also carries a signed build provenance attestation: proof that the release workflow of
+`fmsouza/xless` built it, from which commit. To check a download yourself with the [GitHub CLI](https://cli.github.com/)
+(signed in with `gh auth login`):
+
+```sh
+gh attestation verify xless-<version>-linux-<arch>.tar.gz -R fmsouza/xless
+```
+
+`SHA256SUMS` and `install.sh` are attested too. The installer itself checks the checksum only; it does not need `gh`.
+
 ## Build the images
 
 ```sh
