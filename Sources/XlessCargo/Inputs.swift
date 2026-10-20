@@ -26,6 +26,14 @@ public enum CargoInputs {
         }
     }
 
+    /// What `xless cargo inputs` prints for the overlay at `url`: `name<TAB>absolute host path` for every path input
+    /// (`hostMounts`), the directories scripts/testflight.sh mounts read-only at `/inputs/<name>`. Git inputs need no mount.
+    public static func hostMountLines(overlayAt url: URL, sourceOverride: String?,
+                                      env: [String: String] = ProcessInfo.processInfo.environment) throws -> [String] {
+        let (overlay, sourceRoot, _) = try CargoOverlay.load(from: url, sourceOverride: sourceOverride, env: env)
+        return hostMounts(overlay.inputs, sourceRoot: sourceRoot, env: env).map { "\($0.name)\t\($0.path.path)" }
+    }
+
     /// Absolute, `~`-prefixed (with `env`'s HOME) or relative to the source root; may leave the source root.
     static func resolve(_ path: String, sourceRoot: URL, env: [String: String]) -> URL {
         var path = path

@@ -46,7 +46,7 @@ let package = Package(
         ]),
         // React Native / Expo iOS apps (`type: react-native` overlays): prepare (prebuild, CocoaPods) and the Swift Build build.
         .target(name: "XlessReactNative", dependencies: [
-            "XlessCore", "XlessMachO", "XlessXcode", "XlessTauri",
+            "XlessCore", "XlessMachO", "XlessXcode", "XlessTauri", "XlessCargo",
             .product(name: "Yams", package: "Yams"),
             .product(name: "Crypto", package: "swift-crypto"),
         ]),
@@ -88,7 +88,7 @@ let package = Package(
         .testTarget(name: "XlessTauriTests", dependencies: ["XlessTauri", "XlessCore", "XlessMachO", .product(name: "Crypto", package: "swift-crypto")], exclude: ["Fixtures"]),
         .testTarget(name: "XlessMachOTests", dependencies: ["XlessMachO"]),
         .testTarget(name: "XlessReactNativeTests", dependencies: ["XlessReactNative", "XlessXcode", "XlessCore", "XlessTauri", "XlessASC"]),
-        .testTarget(name: "XlessCargoTests", dependencies: ["XlessCargo", "XlessCore", "XlessTauri", "XlessMachO"]),
+        .testTarget(name: "XlessCargoTests", dependencies: ["XlessCargo", "XlessCore", "XlessTauri", "XlessMachO", "XlessReactNative"]),
         .testTarget(name: "XlessXcodeTests", dependencies: ["XlessXcode", "XlessCore", "XlessTauri", "XlessMachO"], exclude: ["Fixtures"]),
     ]
 )

@@ -1,5 +1,6 @@
 import Foundation
 import XlessASC
+import XlessCargo
 import XlessCore
 import XlessReactNative
 import XlessTauri
@@ -27,12 +28,19 @@ struct Context {
     /// `--destination simulator` (React Native overlays only): stages after build are refused.
     var simulator = false
 
+    /// With `--config` and a `type: cargo` overlay (`overlay` is nil then), for either platform.
+    var cargo: CargoOverlay? = nil
+    /// The cargo overlay resolved for `platform`; its `config` is the settled one (`config`).
+    var cargoResolved: ResolvedCargo? = nil
+
     /// True with `--config` and a Tauri overlay, for either platform.
     var isTauri: Bool { overlay != nil }
     /// True with `--config` and a React Native overlay.
     var isReactNative: Bool { rnOverlay != nil }
+    /// True with `--config` and a cargo overlay.
+    var isCargo: Bool { cargo != nil }
     /// Overlays build from a work copy that `prepare` syncs: a build without it is never right.
-    var hasPrepare: Bool { isTauri || isReactNative }
+    var hasPrepare: Bool { isTauri || isReactNative || isCargo }
 
     /// The Tauri stages' view of this context; nil without `--config` or for `--platform macos`.
     var tauriBuild: TauriBuildContext? {
@@ -53,9 +61,16 @@ struct Context {
                                        destination: simulator ? .iphonesimulator : .iphoneos)
     }
 
+    /// The cargo stages' view of this context; nil without a `type: cargo` overlay.
+    var cargoBuild: CargoBuildContext? {
+        guard let cargo, let cargoResolved, let sourceRoot, let workRoot else { return nil }
+        return CargoBuildContext(overlay: cargo, resolved: cargoResolved, platform: platform, sourceRoot: sourceRoot, workRoot: workRoot, paths: paths)
+    }
+
     static func load(_ opts: ProjectOptions, env: [String: String] = ProcessInfo.processInfo.environment, fresh: Bool = false) async throws -> Context {
         let override = opts.buildNumber ?? env["XLESS_BUILD_NUMBER"].flatMap { $0.isEmpty ? nil : $0 }
-        if let configURL = opts.configURL, try OverlayPaths.type(of: OverlayPaths.read(configURL)) == "react-native" {
+        let kind = try opts.configURL.map(OverlayKind.of)
+        if let configURL = opts.configURL, kind == .reactNative {
             guard opts.platform == .ios else {
                 throw XlessError(.config, "React Native overlays build iOS apps only", fix: "use --platform ios")
             }
@@ -74,6 +89,15 @@ struct Context {
                            simulator: simulator)
         }
         try StagePolicy.requireReactNativeForSimulator(simulator: opts.destination == .simulator, isReactNative: false)
+        if let configURL = opts.configURL, kind == .cargo {
+            let (overlay, sourceRoot, workRoot) = try CargoOverlay.load(from: configURL, sourceOverride: opts.source, env: env)
+            // The config holds only this platform: a macOS build's dated number is chosen locally (`isMacOnly`).
+            var resolved = try CargoProject.resolve(overlay: overlay, platform: opts.platform, source: sourceRoot)
+            try await settleBuild(&resolved.config, platform: opts.platform, override: override, workRoot: workRoot, env: env, fresh: fresh)
+            return Context(project: workRoot, config: resolved.config, platform: opts.platform,
+                           paths: StagePaths(project: workRoot, platform: opts.platform), secrets: Secrets(env: env),
+                           buildOverride: override, sourceRoot: sourceRoot, workRoot: workRoot, cargo: overlay, cargoResolved: resolved)
+        }
         if let configURL = opts.configURL {
             let loc = try OverlayLocation.load(from: configURL, sourceOverride: opts.source, env: env)
             if opts.platform == .macos {

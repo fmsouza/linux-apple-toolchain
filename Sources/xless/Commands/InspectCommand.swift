@@ -10,10 +10,10 @@ struct InspectCommand: AsyncParsableCommand {
     static let configuration = CommandConfiguration(
         commandName: "inspect",
         abstract: "Print Info.plist and Mach-O build versions of a bundle as JSON, or (--config) what an overlay's build would do.",
-        discussion: "With --config: a read-only report (writes nothing, runs no build tool). A React Native overlay reports its scheme, targets, bundle IDs, Swift packages and contract versions (the Xcode project is read from the work copy once `xless prepare` has generated it); a Tauri overlay prints `xless tauri inspect`'s report.")
+        discussion: "With --config: a read-only report (writes nothing, runs no build tool). A React Native overlay reports its scheme, targets, bundle IDs, Swift packages and contract versions (the Xcode project is read from the work copy once `xless prepare` has generated it); a Tauri overlay prints `xless tauri inspect`'s report. Cargo overlays are not supported yet.")
     @Argument(help: "The .app or .appex to describe (without --config).") var bundle: String?
     @Option(help: "Platform of the bundle (without --config); ios or macos.") var platform: Platform?
-    @Option(name: .long, help: "Overlay file (type: react-native or type: tauri).") var config: String?
+    @Option(name: .long, help: "Overlay file (type: react-native or type: tauri; type: cargo is refused).") var config: String?
     @Option(name: .long, help: "With --config: use this directory as the app source instead of the overlay's `source:`.") var source: String?
 
     func validate() throws {
@@ -32,7 +32,9 @@ struct InspectCommand: AsyncParsableCommand {
             return
         }
         let url = URL(fileURLWithPath: config).standardizedFileURL
-        guard try OverlayPaths.type(of: OverlayPaths.read(url)) == "react-native" else {
+        let kind = try OverlayKind.of(url)
+        try kind.requireInspectable()
+        guard kind == .reactNative else {
             var args = ["--config", config] + (source.map { ["--source", $0] } ?? [])
             if let platform { args += ["--platform", platform.rawValue] }
             let tauri = try TauriInspectCommand.parse(args)

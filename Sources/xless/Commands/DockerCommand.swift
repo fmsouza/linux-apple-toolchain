@@ -12,8 +12,8 @@ struct DockerCommand: ParsableCommand {
         discussion: """
         Usage: xless docker [<project-dir> | --config <overlay.yml>] [testflight.sh options …] [-- xless ship args]
 
-        Runs <share>/scripts/testflight.sh with the arguments unchanged, with XLESS_USE_DOCKER=1 unless you set it and \
-        XLESS_SHARE set to the share directory. Example: xless docker MyApp --build-number 1 --to finalize
+        Runs <share>/scripts/testflight.sh with the arguments unchanged, with XLESS_USE_DOCKER=1 unless you set it, \
+        XLESS_SHARE set to the share directory and XLESS_SELF to this xless executable. Example: xless docker MyApp --build-number 1 --to finalize
         """)
 
     @Argument(parsing: .allUnrecognized, help: "A project directory or --config <overlay.yml>, then testflight.sh's options.")
@@ -29,6 +29,8 @@ struct DockerCommand: ParsableCommand {
         }
         if env["XLESS_USE_DOCKER"]?.isEmpty ?? true { setenv("XLESS_USE_DOCKER", "1", 1) }
         setenv("XLESS_SHARE", share.path, 1)
+        // The script runs host-side helpers (`"$XLESS_SELF" cargo inputs`) with the xless that started it.
+        setenv("XLESS_SELF", exe.path, 1)
         let argv = ["bash", script] + arguments
         var cArgs: [UnsafeMutablePointer<CChar>?] = argv.map { strdup($0) }
         cArgs.append(nil)
