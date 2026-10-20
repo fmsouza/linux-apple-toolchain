@@ -123,8 +123,11 @@ With no releasable commit it does nothing. Otherwise it builds both tarballs fro
 then installs them on both architectures before publishing anything (the `verify` job: `scripts/release-assets.sh`
 writes `SHA256SUMS` and copies `install.sh`, and `scripts/verify-release.sh` lays them out like a GitHub release, installs
 with that `install.sh` from `file://`, pinned and as the latest, and checks that `xless --version` and
-`share/xless/VERSION` are the new version). Only then does it tag `v<version>` and publish a GitHub release with the
-tarballs, `SHA256SUMS`, `install.sh` and notes from `scripts/release-notes.sh`. The source tree stays at version `0.0.0-dev`; only the release build stamps one.
+`share/xless/VERSION` are the new version). Only then does it attest the build provenance of the tarballs, `SHA256SUMS` and `install.sh`
+(`actions/attest-build-provenance`, signed through GitHub's OIDC token with Sigstore and stored on GitHub; only the
+`publish` job gets `id-token: write` and `attestations: write`), tag `v<version>` and publish a GitHub release with
+those assets and notes from `scripts/release-notes.sh`. `gh attestation verify <asset> -R fmsouza/xless` checks one
+([README](../README.md#install)). The source tree stays at version `0.0.0-dev`; only the release build stamps one.
 
 **The first release.** While there is no `v*` tag the nightly releases nothing. The first one is cut by hand, once:
 
