@@ -114,6 +114,11 @@ private func materialize(_ inputs: [CargoInput], cache: URL, sourceRoot: URL? = 
         #expect(error?.stage == .prepare)
     }
 
+    @Test func defaultGitRunnerNeverPromptsForCredentials() {
+        #expect(CargoInputs.gitEnvironment["GIT_TERMINAL_PROMPT"] == "0")
+        #expect(CargoInputs.gitEnvironment["GIT_ASKPASS"] == "true")
+    }
+
     @Test func pathInputMissingFails() throws {
         let root = try tempDir()
         let error = #expect(throws: XlessError.self) {

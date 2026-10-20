@@ -9,6 +9,9 @@ public enum CargoInputs {
     /// Runs git with the given arguments and returns its stdout.
     typealias GitRunner = ([String]) throws -> String
 
+    /// Added to git's environment: a private or mistyped https repo must fail, not prompt for credentials on the terminal.
+    static let gitEnvironment: [String: String?] = ["GIT_TERMINAL_PROMPT": "0", "GIT_ASKPASS": "true"]
+
     /// `env-var → absolute path` for every input. `sourceRoot` resolves relative path inputs; `cache` holds the git
     /// clones (`<name>-<rev>`); `mounted`, when set, is where docker mounts the path inputs (`mounted/<name>`).
     public static func materialize(_ inputs: [CargoInput], sourceRoot: URL, cache: URL, mounted: URL?, env: [String: String]) throws -> [String: String] {
@@ -36,7 +39,7 @@ public enum CargoInputs {
     static func materialize(_ inputs: [CargoInput], sourceRoot: URL, cache: URL, mounted: URL?, env: [String: String],
                             allowFileURLs: Bool, git runner: GitRunner?) throws -> [String: String] {
         let git: GitRunner = runner ?? { args in
-            try Shell.run("git", args, baseEnvironment: env, stage: .prepare).stdout
+            try Shell.run("git", args, env: gitEnvironment, baseEnvironment: env, stage: .prepare).stdout
         }
         var result: [String: String] = [:]
         for input in inputs {
