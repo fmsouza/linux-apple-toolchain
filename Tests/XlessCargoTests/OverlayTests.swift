@@ -229,3 +229,43 @@ private func writeOverlay(_ yaml: String, named file: String = "my.overlay.yml")
     #expect(throws: XlessError.self) { try CargoOverlay.load(from: writeOverlay(minimalIOS), sourceOverride: nil, env: env) }
     #expect(throws: XlessError.self) { try CargoOverlay.load(from: url.appendingPathExtension("missing"), sourceOverride: nil, env: env) }
 }
+
+/// Ruling R6: the assets and sign stages read `assets` and `entitlements` from the work copy, so those may not name an input.
+@Test func refusesInputPathForAssetsAndEntitlements() {
+    let inputs = "inputs:\n  - { name: fonts, path: ../fonts, env: FONTS_DIR }\n"
+    let mac = """
+    macos:
+      package: hello
+      product: Hello
+      minimumOS: "11.0"
+
+    """
+    func expectRefused(_ yaml: String, _ key: String) {
+        do {
+            _ = try CargoOverlay.parse(yaml: yaml, name: "a")
+            Issue.record("expected a config error for \(key)")
+        } catch let e as XlessError {
+            #expect(e.stage == .config)
+            #expect(e.cause.contains(key), "cause: \(e.cause)")
+            #expect(e.fix.contains("repository"), "fix: \(e.fix)")
+        } catch {
+            Issue.record("unexpected error \(error)")
+        }
+    }
+    expectRefused(minimalIOS.replacingOccurrences(of: "assets: Assets.xcassets", with: "assets: input:fonts/Assets.xcassets") + inputs, "ios.assets")
+    expectRefused(minimalIOS.replacingOccurrences(of: "  product: Hello", with: "  product: Hello\n  entitlements: input:fonts/ios.entitlements") + inputs, "ios.entitlements")
+    expectRefused(minimalIOS + inputs + mac.replacingOccurrences(of: "  product: Hello", with: "  product: Hello\n  assets: input:fonts/Mac.xcassets"), "macos.assets")
+    expectRefused(minimalIOS + inputs + mac.replacingOccurrences(of: "  product: Hello", with: "  product: Hello\n  entitlements: input:fonts/mac.entitlements"), "macos.entitlements")
+    // infoPlist, icon and resources keep accepting input: paths.
+    let ok = minimalIOS.replacingOccurrences(of: "  product: Hello", with: "  product: Hello\n  infoPlist: input:fonts/Info.plist") + inputs
+        + mac.replacingOccurrences(of: "  product: Hello", with: "  product: Hello\n  icon: input:fonts/hello.icns\n  resources: [{ from: input:fonts/OFL.txt, to: Licenses/OFL.txt }]")
+    #expect((try? CargoOverlay.parse(yaml: ok, name: "a")) != nil)
+}
+
+/// Ruling R6: `xless cargo inputs` prints `name<TAB>path` lines, so a path input may not hold a tab or a line break.
+@Test func refusesControlCharactersInInputPath() {
+    for bad in ["a\\tb", "a\\nb", "a\\rb"] {
+        expectConfig(minimalIOS + "inputs:\n  - { name: fonts, path: \"../\(bad)\", env: FONTS_DIR }\n", mentioning: "fonts")
+    }
+    #expect((try? CargoOverlay.parse(yaml: minimalIOS + "inputs:\n  - { name: fonts, path: \"../my fonts\", env: FONTS_DIR }\n", name: "a")) != nil)
+}

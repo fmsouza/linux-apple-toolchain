@@ -17,10 +17,11 @@ public struct CargoPlatform: Sendable, Equatable {
     public var bundleID: String?
     /// Relative to the source root (the work copy), or `input:<name>/…`.
     public var infoPlist: String?
-    /// An asset catalog (`.xcassets`). Required on iOS; on macOS the alternative to `icon`.
+    /// An asset catalog (`.xcassets`). Required on iOS; on macOS the alternative to `icon`. In the source root only.
     public var assets: String?
     /// A ready `.icns` (macOS only).
     public var icon: String?
+    /// In the source root only (the sign stage reads it from the work copy).
     public var entitlements: String?
     public var resources: [CargoResource]
 }
@@ -48,7 +49,8 @@ public enum CargoInput: Sendable, Equatable {
 
 /// An xless overlay for a plain Cargo app (`type: cargo`). It lives outside the app repository.
 /// Paths: `privacyManifest` is relative to the overlay file (`load` makes it absolute); every other path is relative to
-/// the source root (the work copy), or `input:<name>/…` into a declared input.
+/// the source root (the work copy), or `input:<name>/…` into a declared input (except `assets` and `entitlements`,
+/// which the assets and sign stages read from the work copy).
 public struct CargoOverlay: Sendable, Equatable {
     /// Overlay file basename without extension (names the work copy).
     public var name: String
@@ -226,6 +228,10 @@ extension CargoOverlay {
             case (let path?, nil):
                 if input.rev != nil { throw invalid("input '\(input.name)' has rev without git", "rev pins a git input; remove it or use git:") }
                 if path.isEmpty { throw invalid("input '\(input.name)' has an empty path", "name the directory") }
+                // `xless cargo inputs` prints `name<TAB>path` lines for scripts/testflight.sh to read.
+                if path.contains(where: { $0 == "\t" || $0 == "\n" || $0 == "\r" }) {
+                    throw invalid("input '\(input.name)' has a tab or line break in its path", "rename the directory, or point path: at a link without one")
+                }
                 inputs.append(.path(name: input.name, path: path, env: variable))
             case (nil, let url?):
                 guard url.hasPrefix("https://"), url.count > "https://".count, !url.contains(where: \.isWhitespace) else {
@@ -245,7 +251,10 @@ extension CargoOverlay {
             if p.isEmpty { throw invalid("\(key) is empty", fix) }
             var rest = Substring(p)
             if rest.hasPrefix("input:") {
-                guard allowInput else { throw invalid("\(key) '\(p)' may not name an input", fix) }
+                // The assets and sign stages read these files from the work copy, where no input is.
+                guard allowInput else {
+                    throw invalid("\(key) '\(p)' may not name an input", "put the file in the repository and give its path relative to the source root")
+                }
                 let after = rest.dropFirst("input:".count)
                 let input = after.prefix(while: { $0 != "/" })
                 guard !input.isEmpty, after.count > input.count else {
@@ -306,8 +315,10 @@ extension CargoOverlay {
             } else if r.icon != nil && r.assets != nil {
                 throw invalid("macos sets both icon and assets", "use one: icon for a ready .icns, assets for an asset catalog")
             }
-            for (key, value) in [("infoPlist", r.infoPlist), ("assets", r.assets), ("icon", r.icon), ("entitlements", r.entitlements)] {
-                if let value { try checkPath(value, "\(which).\(key)") }
+            // `assets` and `entitlements` are read by the assets and sign stages from the work copy: no `input:` there.
+            for (key, value, allowInput) in [("infoPlist", r.infoPlist, true), ("assets", r.assets, false), ("icon", r.icon, true),
+                                             ("entitlements", r.entitlements, false)] {
+                if let value { try checkPath(value, "\(which).\(key)", allowInput: allowInput) }
             }
             var resources: [CargoResource] = []
             for (i, resource) in (r.resources ?? []).enumerated() {
