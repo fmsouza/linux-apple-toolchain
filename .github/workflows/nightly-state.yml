@@ -1,0 +1,29 @@
+name: nightly-state
+# GitHub turns off scheduled workflows in a public repository after 60 days without activity, and the nightly release
+# would stop silently. The first push to main after such a spell runs this: it re-enables release.yml when GitHub disabled
+# it for inactivity and warns either way (scripts/nightly-state.sh). Kept out of pr.yml so that a failure here never
+# blocks a release (scripts/ci-passed.sh looks at pr.yml's push run only).
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  nightly-state:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      actions: write   # gh workflow view / enable
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - name: The nightly release is enabled
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: scripts/nightly-state.sh release.yml
