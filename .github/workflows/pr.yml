@@ -99,5 +99,5 @@ jobs:
       - name: Shipped scripts
         run: |
           shellcheck scripts/docker-images.sh scripts/package-release.sh scripts/stamp-version.sh scripts/third-party-licenses.sh
-          shellcheck -x scripts/check-commit-title.sh scripts/next-version.sh scripts/release-notes.sh scripts/nightly-state.sh
+          shellcheck -x scripts/check-commit-title.sh scripts/next-version.sh scripts/release-notes.sh scripts/nightly-state.sh scripts/release-tag-check.sh
           shellcheck --severity=error scripts/testflight.sh scripts/xcode-swift.sh

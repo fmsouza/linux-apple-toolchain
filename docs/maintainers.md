@@ -154,6 +154,14 @@ merged branches deleted; and a ruleset on `main` that requires a pull request, t
 `linux-tests (x86_64)`, `linux-tests (arm64)`, `package (x86_64)`, `package (arm64)`, `shellcheck`), and blocks force
 pushes and deletion. It is idempotent: run it again after changing a required check.
 
+It also applies a **`release tags`** ruleset on `refs/tags/v*`, the tags `scripts/next-version.sh` counts from: nobody
+can move (update or force-push) or delete one. Creating one can't be restricted: the release workflow creates each tag
+with its `GITHUB_TOKEN`, and in a repository owned by a personal account a ruleset cannot let GitHub Actions bypass a
+rule. Instead, the release's `plan` job runs `scripts/release-tag-check.sh` on the latest `v*` tag and refuses to
+release when that tag has no GitHub release, i.e. when it was pushed by hand. To remove such a tag, disable the ruleset
+(Settings → Rules → Rulesets, or `gh api -X PUT repos/fmsouza/xless/rulesets/<id> -f enforcement=disabled`), run
+`git push origin :refs/tags/<tag>`, and enable it again.
+
 ## Private notes
 
 The maintainer's design notes and acceptance logs (`docs/superpowers/`, `docs/acceptance/`) are git-ignored and stay on
