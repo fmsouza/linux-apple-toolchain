@@ -4,7 +4,8 @@
 # The last release is the highest v<x.y.z> tag (by SemVer) reachable from HEAD. Commits after it count when their subject
 # is a valid Conventional Commit title (scripts/check-commit-title.sh); invalid subjects are ignored.
 #   breaking (`!` before the colon, or a `BREAKING CHANGE:` / `BREAKING-CHANGE:` footer line) -> major, or minor while 0.x
-#   feat -> minor    fix, perf -> patch    anything else -> not releasable
+#   feat -> minor    fix, perf, revert -> patch    anything else -> not releasable
+# A commit and a revert of it that are both in the range cancel out: neither counts (cc_cancelled).
 # With no v* tag at all, nothing is printed unless --first is given, which prints that version when any commit exists.
 set -euo pipefail
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -30,7 +31,9 @@ fi
 
 level=0 # 1 patch, 2 minor, 3 breaking
 re='^([a-z]+)(\([^)]*\))?(!)?: '
+cancelled=$(cc_cancelled "$last..HEAD")
 while IFS= read -r sha; do
+  if [ -n "$cancelled" ] && grep -qx "$sha" <<<"$cancelled"; then continue; fi
   subject=$(cc_subject_title "$(git log -1 --format=%s "$sha")")
   cc_is_valid "$subject" || continue
   [[ "$subject" =~ $re ]]
@@ -41,7 +44,7 @@ while IFS= read -r sha; do
   else
     case "$type" in
       feat) l=2 ;;
-      fix | perf) l=1 ;;
+      fix | perf | revert) l=1 ;;
       *) l=0 ;;
     esac
   fi

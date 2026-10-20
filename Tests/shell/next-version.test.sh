@@ -112,6 +112,47 @@ expect '--first ignored when tagged' '0.1.1' --first 5.0.0
 repo; commit -m 'docs: a'
 expect '--first prints with any commit' '0.1.0' --first 0.1.0
 
+# Reverts: a revert releases a patch; a commit and its revert in the same range cancel out.
+head_sha() { git -C "$repo" rev-parse HEAD; }
+repo; commit -m 'chore: init'; commit -m 'feat: a'; f=$(head_sha); tag v0.2.0
+commit -m 'revert: feat: a' -m "This reverts commit $f."
+expect 'revert of a released feat' '0.2.1'
+
+repo; commit -m 'chore: init'; tag v1.2.3; commit -m 'revert: something'
+expect 'revert naming nothing' '1.2.4'
+
+repo; commit -m 'chore: init'; tag v1.2.3; commit -m 'feat!: a'; f=$(head_sha)
+commit -m 'revert: feat!: a' -m "This reverts commit ${f:0:12}."
+expect 'breaking feat and its revert cancel out' ''
+commit -m 'fix: b'
+expect 'cancelled pair plus a fix' '1.2.4'
+
+# GitHub's Revert button: "Reverts owner/repo#N" in the squash body, N found from the reverted squash subject.
+repo; commit -m 'chore: init'; tag v0.3.0; commit -m 'feat(cli): a (#5)'
+commit -m 'revert: feat(cli): a (#6)' -m 'Reverts fmsouza/xless#5'
+expect 'Reverts owner/repo#N in range cancels' ''
+repo; commit -m 'chore: init'; tag v0.3.0; commit -m 'feat(cli): a (#5)'
+commit -m 'revert: feat(cli): a (#6)' -m 'Reverts #5'
+expect 'Reverts #N in range cancels' ''
+repo; commit -m 'chore: init'; commit -m 'feat(cli): a (#5)'; tag v0.3.0
+commit -m 'revert: feat(cli): a (#6)' -m 'Reverts fmsouza/xless#5'
+expect 'Reverts of a released PR' '0.3.1'
+
+# Re-applying (a revert of the revert) brings the original back.
+repo; commit -m 'chore: init'; tag v0.3.0; commit -m 'feat: a'; f=$(head_sha)
+commit -m 'revert: feat: a' -m "This reverts commit $f."; r=$(head_sha)
+commit -m 'revert: revert: feat: a' -m "This reverts commit $r."
+expect 're-applied feat' '0.4.0'
+
+repo; commit -m 'chore: init'; tag v1.2.3; commit -m 'revert!: drop the old flag'
+expect 'breaking revert' '2.0.0'
+
+# A reverted commit that is not a valid title still cancels with its valid revert only when it is in range; the
+# revert of an out-of-range commit counts on its own.
+repo; commit -m 'chore: init'; tag v0.3.0; commit -m 'Add a thing'; f=$(head_sha)
+commit -m 'revert: Add a thing' -m "This reverts commit $f."
+expect 'revert of an invalid-title commit in range cancels' ''
+
 if (cd "$repo" && bash "$script" --first nonsense >/dev/null 2>&1); then echo "FAIL: --first nonsense accepted"; fail=1; fi
 
 [ "$fail" -eq 0 ] && echo "next-version: ok"
