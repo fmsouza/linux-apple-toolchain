@@ -371,6 +371,78 @@ code=0; "${base[@]}" ASC_KEY_P8_FILE="$t/cs/key.p8" "$S" --config "$t/cs/o.yml" 
 # native: step 1 is `xless next-build`
 out=$("${base[@]}" XLESS_USE_DOCKER=0 "$S" --config "$t/rn/app.yml" 2>/dev/null)
 [[ "$(sed -n 1p <<<"$out")" == "xless next-build --config $t/rn/app.yml " ]] || fail "native rn step 1: '$out'"
+# --config with a cargo overlay: the Tauri image and caches, step 1 = `xless next-build`, an inputs cache, and path inputs
+# (listed by the host xless: `xless cargo inputs`) mounted read-only on step 2 only
+mkdir -p "$t/cg/app" "$t/fonts"
+printf 'type: cargo\nsource: app\n' > "$t/cg/o.yml"
+cat > "$t/bin/xless" <<X
+#!/bin/sh
+echo "\$*" >> "$t/xinputs.log"
+if [ "\$1 \$2" = "cargo inputs" ]; then printf 'fonts\t%s\n' "\$FONTS_DIR"; fi
+X
+chmod +x "$t/bin/xless"
+cg=("${base[@]}" FONTS_DIR="$t/fonts")
+: > "$t/xinputs.log"
+out=$("${cg[@]}" "$S" --config "$t/cg/o.yml" 2>"$t/err") || fail "cargo dry run failed: $(cat "$t/err")"
+[[ $(wc -l <<<"$out") -eq 3 ]] || fail "cargo: want three steps: $out"
+s1=$(line "xless next-build"); s2=$(line "--to finalize"); s3=$(line "--from sign")
+[[ "$s1" == *"xless next-build --config /config/o.yml --source /source " && "$s1" == *"xless-tauri:local-"* ]] || fail "cargo step 1: $s1"
+[[ "$s1" == *"dst=/secrets/asc.p8,readonly"* && "$s1" != *"dist-key"* && "$s1" != *"/cache/"* && "$s1" != *"/inputs/"* ]] || fail "cargo step 1 mounts: $s1"
+[[ "$s2" == *"xless-tauri:local-"* && "$s2" == *"--mount type=bind,src=$t/home/.cache/xless/inputs,dst=/cache/inputs"* ]] || fail "cargo step 2 image or inputs cache: $s2"
+[[ "$s2" == *"dst=/cache/work"* && "$s2" == *"dst=/cache/downloads"* && "$s2" == *"xless-rustup:/cache/rustup"* && "$s2" == *"xless-cargo:/cache/cargo"* ]] || fail "cargo step 2 caches: $s2"
+[[ "$s2" != *"/secrets/"* && "$s2" != *"ASC_"* && "$s2" != *"XLESS_DIST_KEY"* ]] || fail "secrets reach the cargo build step: $s2"
+[[ "$s3" == *"xless ship --platform ios --config /config/o.yml --source /source --from sign --to upload "* && "$s3" == *"dst=/secrets/dist-key.pem,readonly"* ]] || fail "cargo step 3: $s3"
+[[ "$s3" != *"/inputs"* && "$s3" != *"XLESS_INPUTS_MOUNTED"* && "$s3" != *"xless-cargo"* ]] || fail "cargo step 3 mounts inputs or build caches: $s3"
+# the path input: read-only on step 2 only, and the container is told
+[[ "$s2" == *"--mount type=bind,src=$t/fonts,dst=/inputs/fonts,readonly"* && "$s2" == *"-e XLESS_INPUTS_MOUNTED=1"* ]] || fail "cargo path input not mounted on step 2: $s2"
+[[ $(grep -c "dst=/inputs/fonts,readonly" <<<"$out") -eq 1 ]] || fail "cargo path input not on step 2 only: $out"
+[[ "$s1" != *"XLESS_INPUTS_MOUNTED"* ]] || fail "step 1 told about inputs: $s1"
+grep -q "^cargo inputs --config $t/cg/o.yml --source $t/cg/app\$" "$t/xinputs.log" || fail "cargo inputs not asked of the host xless: $(cat "$t/xinputs.log")"
+# XLESS_SELF names the host xless
+printf '#!/bin/sh\nprintf "fonts\\t%%s\\n" "$FONTS_DIR"; echo self >> "%s/xself.log"\n' "$t" > "$t/self"; chmod +x "$t/self"
+: > "$t/xself.log"; out=$("${cg[@]}" XLESS_SELF="$t/self" "$S" --config "$t/cg/o.yml" 2>/dev/null) || fail "XLESS_SELF run failed"
+[[ -s "$t/xself.log" && "$out" == *"dst=/inputs/fonts,readonly"* ]] || fail "XLESS_SELF not used for cargo inputs: $out"
+# no path inputs: nothing mounted at /inputs
+printf '#!/bin/sh\nexit 0\n' > "$t/bin/xless"
+out=$("${base[@]}" "$S" --config "$t/cg/o.yml" 2>/dev/null) || fail "cargo without inputs failed"
+[[ "$out" != *"dst=/inputs/"* ]] || fail "inputs mounted without any: $out"
+# a failing `xless cargo inputs` stops the run (exit 2) before docker is shown anything
+printf '#!/bin/sh\necho "bad overlay" >&2; exit 10\n' > "$t/bin/xless"
+code=0; "${cg[@]}" "$S" --config "$t/cg/o.yml" >/dev/null 2>"$t/err" || code=$?
+[[ $code -eq 2 ]] && grep -q "cargo inputs" "$t/err" || fail "failing cargo inputs: exit $code $(cat "$t/err")"
+cat > "$t/bin/xless" <<X
+#!/bin/sh
+echo "\$*" >> "$t/xinputs.log"
+if [ "\$1 \$2" = "cargo inputs" ]; then printf 'fonts\t%s\n' "\$FONTS_DIR"; fi
+X
+# a path input holding a secret, or the home directory (or what holds it), or / : refused (exit 2) naming the input
+printf 'x' > "$t/fonts/key.p8"
+code=0; "${cg[@]}" ASC_KEY_P8_FILE="$t/fonts/key.p8" "$S" --config "$t/cg/o.yml" >/dev/null 2>"$t/err" || code=$?
+[[ $code -eq 2 ]] && grep -q "ASC_KEY_P8_FILE" "$t/err" && grep -q "fonts" "$t/err" || fail "secret inside a path input: exit $code $(cat "$t/err")"
+rm -f "$t/fonts/key.p8"
+code=0; "${base[@]}" FONTS_DIR="$t/home" "$S" --config "$t/cg/o.yml" >/dev/null 2>"$t/err" || code=$?
+[[ $code -eq 2 ]] && grep -q "fonts" "$t/err" && grep -q "home directory" "$t/err" || fail "\$HOME as a path input: exit $code $(cat "$t/err")"
+code=0; "${base[@]}" FONTS_DIR="$t" "$S" --config "$t/cg/o.yml" >/dev/null 2>"$t/err" || code=$?
+[[ $code -eq 2 ]] && grep -q "home directory" "$t/err" || fail "a parent of \$HOME as a path input: exit $code $(cat "$t/err")"
+code=0; "${base[@]}" FONTS_DIR=/ "$S" --config "$t/cg/o.yml" >/dev/null 2>"$t/err" || code=$?
+[[ $code -eq 2 ]] || fail "/ as a path input: exit $code"
+# a path input that is the secret file itself
+code=0; "${base[@]}" FONTS_DIR="$t/key.p8" "$S" --config "$t/cg/o.yml" >/dev/null 2>"$t/err" || code=$?
+[[ $code -eq 2 ]] && grep -q "ASC_KEY_P8_FILE" "$t/err" || fail "a secret file as a path input: exit $code $(cat "$t/err")"
+code=0; "${base[@]}" FONTS_DIR="$t/nowhere" "$S" --config "$t/cg/o.yml" >/dev/null 2>"$t/err" || code=$?
+[[ $code -eq 2 ]] && grep -q "fonts" "$t/err" || fail "a missing path input: exit $code $(cat "$t/err")"
+# a step 3 only run asks for no inputs (and mounts none)
+: > "$t/xinputs.log"; out=$("${cg[@]}" "$S" --config "$t/cg/o.yml" --from sign 2>/dev/null) || fail "cargo --from sign failed"
+[[ $(wc -l <<<"$out") -eq 1 && "$out" != *"/inputs"* && ! -s "$t/xinputs.log" ]] || fail "cargo --from sign: $out"
+# natively xless reads the paths directly: nothing is mounted or listed
+: > "$t/xinputs.log"; out=$("${cg[@]}" XLESS_USE_DOCKER=0 "$S" --config "$t/cg/o.yml" 2>/dev/null) || fail "native cargo failed"
+[[ "$(sed -n 1p <<<"$out")" == "xless next-build --config $t/cg/o.yml " && "$out" != *"/inputs"* && ! -s "$t/xinputs.log" ]] || fail "native cargo: '$out'"
+# macOS: the same steps as a Tauri DMG; the path input reaches the build step
+out=$("${mac[@]}" FONTS_DIR="$t/fonts" "$S" --config "$t/cg/o.yml" --platform macos 2>"$t/err") || fail "cargo macos failed: $(cat "$t/err")"
+[[ $(wc -l <<<"$out") -eq 2 && "$out" != *"next-build"* ]] || fail "cargo macos: want two steps, no next-build: $out"
+s2=$(line "--to finalize"); s3=$(line "--from sign")
+[[ "$s2" == *"xless ship --platform macos "* && "$s2" == *"dst=/inputs/fonts,readonly"* && "$s2" == *"dst=/cache/inputs"* ]] || fail "cargo macos step 2: $s2"
+[[ "$s3" == *"--from sign --to package "* && "$s3" == *"devid-key.pem"* && "$s3" != *"/inputs"* ]] || fail "cargo macos step 3: $s3"
 # usage errors
 code=0; "${base[@]}" "$S" --config "$t/ov/none.yml" >/dev/null 2>&1 || code=$?
 [[ $code -eq 2 ]] || fail "missing overlay exits $code, want 2"

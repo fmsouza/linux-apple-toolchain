@@ -4,7 +4,8 @@
 #        scripts/testflight.sh --config <overlay.yml> [extra xless ship args...]   (or: make testflight CONFIG=<overlay.yml> [ARGS="…"])
 #
 # --config: an app described by an overlay file instead of an xless.yml project: a Tauri v2 app (`type: tauri`,
-#   docs/tauri.md) or a React Native / Expo app (`type: react-native`, docs/react-native.md). The script reads the
+#   docs/tauri.md), a plain Cargo app (`type: cargo`, docs/cargo.md) or a React Native / Expo app (`type: react-native`,
+#   docs/react-native.md). The script reads the
 #   overlay's top-level `type:` line to choose the images and caches below.
 #   The app source is the overlay's `source:` (`~` expanded, relative to the overlay file's directory), or $XLESS_SOURCE
 #   when set, which wins. `source:` and `type:` must be plain top-level `key: value` lines (optionally quoted, with a
@@ -29,9 +30,15 @@
 #        resolve inside /config too, which is why --source overrides it). Keep the overlay in its own directory: the
 #        script refuses an overlay directory, or a mounted source directory, that holds the env file or a secret file
 #        (compared by inode), and either one that is /, your home directory or a directory above it.
-#   Tauri (image xless-tauri:local-<arch>, or XLESS_IMAGE, for all three steps):
+#   Tauri and cargo (image xless-tauri:local-<arch>, or XLESS_IMAGE, for all three steps):
 #     ~/.cache/xless/work (steps 2 and 3) and ~/.cache/xless/downloads (step 2) at /cache/work and /cache/downloads
 #     volumes xless-rustup and xless-cargo at /cache/rustup and /cache/cargo (step 2; Rust toolchains survive between runs)
+#   Cargo only (step 1 is `xless next-build`, as for React Native):
+#     ~/.cache/xless/inputs (step 2) at /cache/inputs: the checkouts of the overlay's git inputs.
+#     The overlay's path inputs (`xless cargo inputs`, asked of $XLESS_SELF, else xless on PATH) are mounted read-only at
+#       /inputs/<name> on step 2 only, with XLESS_INPUTS_MOUNTED=1. Each gets the checks of the source and the overlay's
+#       folder: not /, your home directory or a directory above it, and holding no secret file. Natively nothing is
+#       mounted (xless reads the paths itself).
 #   React Native (step 2: xless-rn:local-<arch>, or XLESS_IMAGE; steps 1 and 3: xless-base:local-<arch>, or
 #   XLESS_SIGN_IMAGE, which holds xless and rcodesign and no build tool; the script stops when the two images hold
 #   different xless binaries):
@@ -66,7 +73,7 @@
 # With docker, secret files and the project must live under a directory the docker VM can see (on macOS typically somewhere under
 # $HOME; Colima shares $HOME, Docker Desktop shares the directories listed in its file-sharing settings).
 #
-# --platform macos (default ios; only with a Tauri --config): a notarized, stapled DMG of a Tauri macOS app (`make dmg`).
+# --platform macos (default ios; only with a Tauri or cargo --config): a notarized, stapled DMG of the macOS app (`make dmg`).
 #   Step 1 (next-build) is skipped: macOS builds have no App Store Connect build number, `dated` uses the clock when the run
 #   starts (XLESS_BUILD_NUMBER, if set, still wins and is passed on). Step 2 is unchanged (no secrets). Step 3 runs
 #   `xless ship --platform macos --from sign --to package` with XLESS_DEVID_KEY_FILE and the App Store Connect key (the
@@ -121,7 +128,7 @@ else
   PROJECT="$1"; shift
   for a in "$@"; do [[ "$a" != --config && "$a" != --config=* ]] || die "--config replaces <project-dir>; give one or the other"; done
   [[ $SIM == 0 ]] || die "--destination simulator needs --config <overlay.yml> (a React Native app)"
-  [[ "$PLATFORM" == ios ]] || die "--platform macos needs --config <overlay.yml> (a Tauri app)"
+  [[ "$PLATFORM" == ios ]] || die "--platform macos needs --config <overlay.yml> (a Tauri or cargo app)"
   [[ -f "$PROJECT/xless.yml" ]] || die "$PROJECT/xless.yml not found (is '$PROJECT' an xless project?)"
   PROJECT="$(cd "$PROJECT" && pwd)"
 fi
@@ -148,9 +155,11 @@ canonical_xcode() { local IFS=.; local p=($1); local v="$((10#${p[0]})).$((10#${
   [[ -z "${p[2]:-}" ]] || [[ $((10#${p[2]})) -eq 0 ]] || v+=".$((10#${p[2]}))"; echo "$v"; }
 XCODE_TAG=""; [[ -z "$XCODE_PIN" ]] || XCODE_TAG="$(canonical_xcode "$XCODE_PIN")"
 SOURCE=""
-RN=0
+RN=0; CARGO=0
 if [[ -n "$OVERLAY" ]]; then
-  [[ "$(top_value type)" != react-native ]] || RN=1
+  overlay_type="$(top_value type)"
+  [[ "$overlay_type" != react-native ]] || RN=1
+  [[ "$overlay_type" != cargo ]] || CARGO=1
   [[ $RN == 0 || "$PLATFORM" == ios ]] || die "React Native overlays build iOS apps only (drop --platform macos)"
   [[ $SIM == 0 || $RN == 1 ]] || die "--destination simulator builds React Native overlays only"
   SOURCE="${XLESS_SOURCE:-}"
@@ -260,21 +269,46 @@ inside() {   # FILE DIR: FILE (symlinks resolved) is somewhere below DIR, compar
     d="$(dirname "$d")"
   done
 }
+broad_dir() { [[ "$1" -ef / || "$1" -ef "$HOME" ]] || inside "$HOME/." "$1"; }   # DIR: is / , the home directory or a directory above it
+secret_vars=(ENV_FILE ASC_KEY_P8_FILE XLESS_DIST_KEY_FILE XLESS_DEVID_KEY_FILE ASC_ISSUER_ID_FILE)
+input_names=(); input_paths=()   # cargo path inputs mounted at /inputs/<name> (step 2, docker)
 if [[ -n "$OVERLAY" && $use_docker == 1 ]]; then
   overlay_dir="$(cd -P "$(dirname "$OVERLAY")" && pwd -P)"
   source_dir="$(cd -P "$SOURCE_MOUNT" && pwd -P)"
   # Both are mounted whole: never the file system root, the home directory or a directory above it.
   for d in "$overlay_dir" "$source_dir"; do
-    if [[ "$d" -ef / || "$d" -ef "$HOME" ]] || inside "$HOME/." "$d"; then
+    if broad_dir "$d"; then
       die "$d would be mounted into the build container, and it is / or holds your home directory; keep the overlay in its own directory and point source: at the app's checkout"
     fi
   done
-  for v in ENV_FILE ASC_KEY_P8_FILE XLESS_DIST_KEY_FILE XLESS_DEVID_KEY_FILE ASC_ISSUER_ID_FILE; do
+  for v in "${secret_vars[@]}"; do
     f="${!v:-}"
     [[ -n "$f" && -e "$f" ]] || continue
     ! inside "$f" "$overlay_dir" || die "$v (${!v}) is inside the overlay's directory $overlay_dir, which is mounted into the build container; keep the overlay in its own directory, away from secrets"
     ! inside "$f" "$source_dir" || die "$v (${!v}) is inside the app source $source_dir, which is mounted into the build container; keep secrets out of the source"
   done
+  # A cargo overlay's path inputs are mounted into step 2, the container that runs the app's build code: the same rules.
+  # (Only when step 2 runs; the host xless lists them.)
+  if [[ $CARGO == 1 && $fi_ -le 3 ]]; then
+    inputs_out="$("${XLESS_SELF:-xless}" cargo inputs --config "$OVERLAY" --source "$SOURCE")" \
+      || die "cannot list the path inputs of $OVERLAY (\"${XLESS_SELF:-xless}\" cargo inputs failed)"
+    while IFS=$'\t' read -r in_name in_path; do
+      [[ -n "$in_name" ]] || continue
+      [[ "$in_name" =~ ^[A-Za-z0-9._-]+$ && "$in_name" != . && "$in_name" != .. ]] || die "the path input '$in_name' has a name that cannot be a mount point"
+      [[ "$in_path" == /* && -e "$in_path" ]] || die "the path input '$in_name' ($in_path) does not exist"
+      if broad_dir "$in_path"; then
+        die "the path input '$in_name' ($in_path) would be mounted into the build container, and it is / or holds your home directory; point it at the folder the build needs"
+      fi
+      for v in "${secret_vars[@]}"; do
+        f="${!v:-}"
+        [[ -n "$f" && -e "$f" ]] || continue
+        if [[ "$f" -ef "$in_path" ]] || inside "$f" "$in_path"; then
+          die "$v (${!v}) is inside the path input '$in_name' ($in_path), which is mounted into the build container; keep secrets out of the path inputs"
+        fi
+      done
+      input_names+=("$in_name"); input_paths+=("$in_path")
+    done <<<"$inputs_out"
+  fi
 fi
 
 # With --config the overlay's `build:` decides (dated by default); an explicit XLESS_BUILD_NUMBER still wins.
@@ -375,7 +409,7 @@ if [[ -z "$OVERLAY" ]]; then
 fi
 
 # --config: the three steps. Images, caches and the step 1 command per overlay type.
-if [[ $RN == 1 ]]; then next_build=(xless next-build); else next_build=(xless tauri next-build); fi
+if [[ $RN == 1 || $CARGO == 1 ]]; then next_build=(xless next-build); else next_build=(xless tauri next-build); fi
 if [[ $use_docker == 1 ]]; then
   app=(--mount "$(bind "$SOURCE_MOUNT" /source ro)" --mount "$(bind "$(dirname "$OVERLAY")" /config ro)")
   xl=(--config "/config/$(basename "$OVERLAY")" --source "/source$SOURCE_SUB")
@@ -400,6 +434,14 @@ if [[ $use_docker == 1 ]]; then
     [[ "${XLESS_TESTFLIGHT_DRY_RUN:-0}" == 1 ]] || mkdir -p "$cache/work" "$cache/downloads"
     build_caches=(--mount "$(bind "$cache/work" /cache/work)" --mount "$(bind "$cache/downloads" /cache/downloads)" -e XLESS_CACHE=/cache
                   -v xless-rustup:/cache/rustup -v xless-cargo:/cache/cargo)
+    if [[ $CARGO == 1 ]]; then   # the checkouts of git inputs; the overlay's path inputs are mounted below
+      [[ "${XLESS_TESTFLIGHT_DRY_RUN:-0}" == 1 ]] || mkdir -p "$cache/inputs"
+      build_caches+=(--mount "$(bind "$cache/inputs" /cache/inputs)")
+      for ((k = 0; k < ${#input_names[@]}; k++)); do
+        build_caches+=(--mount "$(bind "${input_paths[$k]}" "/inputs/${input_names[$k]}" ro)")
+      done
+      build_caches+=(-e XLESS_INPUTS_MOUNTED=1)
+    fi
     sign_caches=(--mount "$(bind "$cache/work" /cache/work)")
   fi
 else
