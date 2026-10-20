@@ -264,7 +264,7 @@ private func writeOverlay(_ yaml: String, named file: String = "my.overlay.yml")
 
 /// Ruling R6: `xless cargo inputs` prints `name<TAB>path` lines, so a path input may not hold a tab or a line break.
 @Test func refusesControlCharactersInInputPath() {
-    for bad in ["a\\tb", "a\\nb", "a\\rb"] {
+    for bad in ["a\\tb", "a\\nb", "a\\rb", "a\\r\\nb"] {
         expectConfig(minimalIOS + "inputs:\n  - { name: fonts, path: \"../\(bad)\", env: FONTS_DIR }\n", mentioning: "fonts")
     }
     #expect((try? CargoOverlay.parse(yaml: minimalIOS + "inputs:\n  - { name: fonts, path: \"../my fonts\", env: FONTS_DIR }\n", name: "a")) != nil)
