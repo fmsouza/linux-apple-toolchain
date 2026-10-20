@@ -44,6 +44,12 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
         run: |
+          prev=$(git tag --merged HEAD --list 'v[0-9]*' --sort=-v:refname | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | head -n 1 || true)
+          # The base of the next version must be a tag this workflow made (it has a release), never one pushed by hand.
+          if [ -n "$prev" ] && ! why=$(scripts/release-tag-check.sh "$prev" 2>&1); then
+            echo "::error::not releasing: $why"
+            exit 1
+          fi
           version=$(scripts/next-version.sh ${FIRST_VERSION:+--first "$FIRST_VERSION"})
           SHA=$(git rev-parse HEAD)
           # Only a commit whose main CI (the pr workflow's push run) succeeded is released: a night without that skips,
@@ -53,10 +59,7 @@ jobs:
             if [ "$EVENT" != schedule ]; then exit 1; fi
             version=""
           fi
-          echo "version=$version" >> "$GITHUB_OUTPUT"
-          echo "sha=$SHA" >> "$GITHUB_OUTPUT"
-          prev=$(git tag --merged HEAD --list 'v[0-9]*' --sort=-v:refname | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | head -n 1 || true)
-          echo "prev=$prev" >> "$GITHUB_OUTPUT"
+          { echo "version=$version"; echo "sha=$SHA"; echo "prev=$prev"; } >> "$GITHUB_OUTPUT"
           if [ -n "$version" ]; then echo "Releasing v$version from $(git rev-parse HEAD)"; else echo "No releasable change."; fi
 
   build:
