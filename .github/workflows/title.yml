@@ -1,0 +1,25 @@
+name: title
+# Its own workflow so that editing a pull request's title or description (the `edited` event) re-runs this check only,
+# not the heavy jobs in pr.yml. The job keeps the required check name `title`.
+on:
+  pull_request:
+    types: [opened, edited, synchronize, reopened]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: title-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  # The squash-merge commit takes the PR title, so the title must be a Conventional Commit.
+  title:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - name: Check the PR title
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
+        run: scripts/check-commit-title.sh "$PR_TITLE"

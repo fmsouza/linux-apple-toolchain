@@ -31,7 +31,8 @@ Check a title locally with `scripts/check-commit-title.sh "feat(setup): accept a
 
 ## Checks on every pull request
 
-`.github/workflows/pr.yml` runs these; all six are required:
+All six are required. `title` is `.github/workflows/title.yml`, the only check that editing a pull request's title or
+description re-runs; the others are `.github/workflows/pr.yml`, which runs when commits are pushed:
 
 | Check | What it runs |
 |---|---|
