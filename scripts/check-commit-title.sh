@@ -40,7 +40,7 @@ cc_cancelled() {
     elif [[ "$body" =~ (^|[[:space:]])Reverts\ ([A-Za-z0-9._-]+/[A-Za-z0-9._-]+)?#([0-9]+) ]]; then
       n="${BASH_REMATCH[3]}"
       target=$(while IFS= read -r c; do
-                 [ -n "$c" ] && [ "$c" != "$sha" ] || continue
+                 if [ -z "$c" ] || [ "$c" = "$sha" ]; then continue; fi
                  [ "$(cc_subject_pr "$(git log -1 --format=%s "$c")")" = "#$n" ] && { echo "$c"; break; }
                done <<<"$all")
     fi
