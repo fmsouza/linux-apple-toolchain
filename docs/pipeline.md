@@ -4,7 +4,7 @@ xless takes an app's source and produces what Apple's own tools would:
 
 - **iOS and iPadOS:** a signed `.ipa`, uploaded to App Store Connect and delivered to TestFlight.
 - **macOS:** a Developer ID signed, notarized and stapled `.app` inside a `.zip`. A Tauri v2 macOS app gets a `.dmg`
-  instead ([tauri.md](tauri.md#macos)). There is no Mac App Store `.pkg` ([why](research/mas-pkg.md)) and no upload
+  instead ([tauri.md](tauri.md#macos), [cargo.md](cargo.md#macos)). There is no Mac App Store `.pkg` ([why](research/mas-pkg.md)) and no upload
   step for macOS.
 
 It does this on Linux, without Xcode on the build machine. The Darwin SDK comes from an Xcode release you download
@@ -33,7 +33,7 @@ from Apple ([apple-requirements.md](apple-requirements.md)). Two Xcode releases 
   tool replacements a React Native build calls. They are tagged `<image>:local-<arch>-xcode<version>` (for
   example `xless:local-arm64-xcode26.2`), and also plain `<image>:local-<arch>` for Xcode 27.0, the default.
 - **`xless docker`** runs a build in those images. With a project directory (an `xless.yml` project) it runs
-  `xless ship` in one container. With `--config <overlay.yml>` (a Tauri or React Native app) it runs three containers,
+  `xless ship` in one container. With `--config <overlay.yml>` (a Tauri, plain Cargo or React Native app) it runs three containers,
   so that the app's own build code never runs next to a signing key ([signing-and-testflight.md](signing-and-testflight.md#the-three-step-split)).
   The options after the project or overlay go to `xless ship`, for example `--to finalize` or `--from sign`.
 - **Natively.** On a Debian or Ubuntu machine with the toolset installed ([native-install.md](native-install.md)),
@@ -42,9 +42,9 @@ from Apple ([apple-requirements.md](apple-requirements.md)). Two Xcode releases 
 ## The project
 
 An `xless.yml` project is a Swift package with an `xless.yml` next to `Package.swift` ([xless-yml.md](xless-yml.md)).
-The installed sample `~/.local/share/xless/samples/HelloShip` is one. A Tauri or React Native app is described by an
+The installed sample `~/.local/share/xless/samples/HelloShip` is one. A Tauri, plain Cargo or React Native app is described by an
 **overlay** file that lives outside the app's repository and points at it: the app's repository is never changed
-([tauri.md](tauri.md), [react-native.md](react-native.md)).
+([tauri.md](tauri.md), [cargo.md](cargo.md), [react-native.md](react-native.md)).
 
 ## Stages
 
@@ -61,7 +61,7 @@ stage also removes its previous output.
 | assets | `xless assets` | `assets/` (iOS: `Assets.car`; macOS: `.icns`) | 13 |
 | finalize | `xless finalize` | `final/`: Xcode's metadata stamped into Info.plist, binaries patched. The app is complete but unsigned. | 14 |
 | sign | `xless sign` | `signed/` | 15 |
-| package | `xless package` | `out/`: the `.ipa`, the notarized `.zip`, or (Tauri macOS) the notarized and stapled `.dmg` | 16 |
+| package | `xless package` | `out/`: the `.ipa`, the notarized `.zip`, or (Tauri and Cargo macOS) the notarized and stapled `.dmg` | 16 |
 | upload | `xless upload` | `upload.json` (iOS only; rewritten at every state change, so it keeps the build ID if processing fails or times out). With a [`testflight:` block](xless-yml.md#testflight) it then delivers the processed build to your TestFlight groups. | 17 |
 
 Config errors exit 10 and SDK errors exit 11. `xless docker` itself exits 2 for a usage or configuration error of its
@@ -74,8 +74,8 @@ account and its keys ([signing-and-testflight.md](signing-and-testflight.md)); t
 ## Other commands
 
 - `xless inspect <bundle> --platform <p>` prints Info.plist and Mach-O build versions as JSON (useful when comparing
-  with an Xcode build); `xless inspect --config <overlay>` prints what an overlay's build would do.
-- `xless next-build --config <overlay>` (React Native) and `xless tauri next-build --config <overlay>` print the build
+  with an Xcode build); `xless inspect --config <overlay>` prints what a React Native or Tauri overlay's build would do (not a cargo one).
+- `xless next-build --config <overlay>` (React Native and cargo) and `xless tauri next-build --config <overlay>` print the build
   number the next run would use (a read-only App Store Connect query).
 - `xless sdk meta|install` manage a native SDK install ([native-install.md](native-install.md)).
 - `xless storyboard compile` compiles a launch storyboard without ibtool ([xless-yml.md](xless-yml.md#launch-storyboard)).

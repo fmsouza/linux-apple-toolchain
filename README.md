@@ -1,7 +1,7 @@
 # xless
 
-xless builds iOS and macOS apps on Linux, with no Mac. It compiles a Swift package, a React Native (Expo) app or a
-Tauri app against Apple's SDK, and can then sign it, package it and upload it to TestFlight. Everything runs in Docker
+xless builds iOS and macOS apps on Linux, with no Mac. It compiles a Swift package, a React Native (Expo) app, a
+Tauri app or a plain Cargo app against Apple's SDK, and can then sign it, package it and upload it to TestFlight. Everything runs in Docker
 images that you build once, on your own machine, from the Xcode download Apple gives you.
 
 ## What you need
@@ -66,8 +66,8 @@ gh attestation verify xless-<version>-linux-<arch>.tar.gz -R fmsouza/xless
 xless setup --xcode ~/Downloads/Xcode_27.xip
 ```
 
-This builds four Docker images on your machine: `xless-base`, `xless` (with Apple's SDK), `xless-tauri` and
-`xless-rn`. It first checks Docker and your free disk space, then prints each step with a rough time. The whole run
+This builds four Docker images on your machine: `xless-base`, `xless` (with Apple's SDK), `xless-tauri` (Tauri and
+plain Cargo apps) and `xless-rn`. It first checks Docker and your free disk space, then prints each step with a rough time. The whole run
 took about 13 minutes on an 8-core machine with a fast network; it depends on your CPU and network, and can take an
 hour on a slow one. You do this once per Xcode version. When it finishes it prints the next command to run. To see the
 plan and the disk space it asks for without running anything, add `--dry-run`.
@@ -107,6 +107,7 @@ The build runs as root inside the container, so the files it creates in `~/Hello
   membership for this.
 - [React Native and Expo apps](docs/react-native.md)
 - [Tauri v2 apps](docs/tauri.md), for iOS and macOS
+- [Plain Cargo apps](docs/cargo.md) (winit, egui…), for iOS and macOS
 - [Troubleshooting](docs/troubleshooting.md)
 - [Uninstall xless and free its disk space](docs/uninstall.md): `xless clean`
 - [All documentation](docs/README.md), including how xless works and how to contribute

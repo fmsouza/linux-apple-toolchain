@@ -13,6 +13,7 @@ build. The pages below go further.
 - [bootstrap.md](bootstrap.md): the one-time Apple setup (API key, certificates, bundle ID, app record).
 - [react-native.md](react-native.md): React Native / Expo iOS apps, with app extensions and simulator builds.
 - [tauri.md](tauri.md): Tauri v2 apps, for iOS and macOS.
+- [cargo.md](cargo.md): plain Cargo apps (a Rust binary with its own event loop), for iOS and macOS.
 - [troubleshooting.md](troubleshooting.md): install, setup, build and App Store Connect errors, and known gaps.
 
 ## Installing and images
@@ -45,4 +46,5 @@ Measurements and decisions behind the code, in [research/](research/):
 ## Acceptance records
 
 What each milestone checked, and how: [m2a](acceptance-m2a.md), [m2b](acceptance-m2b.md), [m2c](acceptance-m2c.md),
-[m3](acceptance-m3.md), [m4](acceptance-m4.md), [m5](acceptance-m5.md) (releases, and setup from a `.xip` on a fresh Linux VM).
+[m3](acceptance-m3.md), [m4](acceptance-m4.md), [m5](acceptance-m5.md) (releases, and setup from a `.xip` on a fresh Linux VM),
+[m6](acceptance-m6.md) (plain Cargo apps: a checklist for the maintainer, not yet run).
