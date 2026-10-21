@@ -103,6 +103,7 @@ private func git(_ root: URL, _ args: [String]) throws -> String {
                 x86_64-apple-darwin) cpu='\\007\\000\\000\\001' ;;
                 *) echo "unexpected target $t" >&2; exit 1 ;;
               esac
+              echo "$CARGO_PROFILE_RELEASE_STRIP" >> "$dir/strip.log"
               mkdir -p "\(root.path)/target/$t/release"
               { printf '\\317\\372\\355\\376'; printf "$cpu"; head -c 24 /dev/zero; printf '%s' "$t"; } > "\(root.path)/target/$t/release/$b"
               ;;
@@ -184,6 +185,10 @@ private func git(_ root: URL, _ args: [String]) throws -> String {
         #expect(calls.count == 2)
         #expect(calls[1].hasSuffix("|hi|[]|build --release --locked -p hello-mobile --bin hello-mobile --target aarch64-apple-ios"))
         #expect(calls[1].hasPrefix("|"), "no RUSTUP_TOOLCHAIN without rust.toolchain: \(calls[1])")
+        // rust-objcopy must not strip the Mach-O: cargo is told not to, and the linker wrapper drops local symbols.
+        #expect(try String(contentsOf: f.log.deletingLastPathComponent().appendingPathComponent("strip.log"), encoding: .utf8) == "false\n")
+        let wrapper = try String(contentsOf: f.ctx.workRoot.appendingPathComponent(".xless/bin/xless-ios-cc"), encoding: .utf8)
+        #expect(wrapper.contains(" -Wl,-x "))
     }
 
     @Test func prepareSyncsInstallsTheToolchainAndRecordsTheInputs() async throws {

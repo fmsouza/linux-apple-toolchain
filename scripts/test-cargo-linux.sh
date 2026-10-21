@@ -17,8 +17,9 @@
 # Variables: ARCH (arm64 or amd64; default the host's: ARCH=amd64 on an arm64 Mac runs the amd64 chain under emulation),
 #   XLESS_IMAGE (default xless-tauri:local-<arch>; with an Xcode pin, e.g. xless-tauri:local-arm64-xcode26.2),
 #   DOCKER_CONTEXT (default colima-xless if it exists).
-# The repository is mounted read-only and must be a git checkout (the sample's files are the tracked ones, and GIT_SHA is
-# its HEAD); the work copy lives in the xless-work volume, Rust toolchains in xless-rustup and xless-cargo (the first run
+# The repository is mounted read-only and must be a normal git checkout, not a git worktree (a worktree's .git file points
+# outside the mount, so the container cannot read the tracked files or GIT_SHA); the sample's files are the tracked ones,
+# and GIT_SHA is its HEAD; the work copy lives in the xless-work volume, Rust toolchains in xless-rustup and xless-cargo (the first run
 # downloads them and builds the dependencies, which takes a few minutes; later runs are faster).
 set -euo pipefail
 root="$(cd "$(dirname "$0")/.." && pwd)"
@@ -142,12 +143,12 @@ PY
 # prepare, build, assets, finalize; ship prints each stage's output directory, finalize's last
 if [[ "$PLATFORM" == ios || "$PLATFORM" == all ]]; then
   echo "==> HelloCargo iOS: ship to finalize"
-  final=$(XLESS_BUILD_NUMBER=1.0.0.2026010101 xless ship --config "$o" --source "$s" --platform ios --to finalize | tail -1)
+  final=$(XLESS_BUILD_NUMBER=1.0.0.2026010101 xless ship --config "$o" --source "$s" --platform ios --to finalize </dev/null | tail -1)
   check ios "$final"
 fi
 if [[ "$PLATFORM" == macos || "$PLATFORM" == all ]]; then
   echo "==> HelloCargo macOS: ship to finalize"
-  final=$(XLESS_BUILD_NUMBER=1.0.0.202601010000 xless ship --config "$o" --source "$s" --platform macos --to finalize | tail -1)
+  final=$(XLESS_BUILD_NUMBER=1.0.0.202601010000 xless ship --config "$o" --source "$s" --platform macos --to finalize </dev/null | tail -1)
   check macos "$final"
 fi
 echo "==> HelloCargo: the finalized apps pass the checks"

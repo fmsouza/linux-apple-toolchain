@@ -294,7 +294,7 @@ extension CargoOverlay {
             if let f = features.first(where: { $0.isEmpty || $0.contains(where: { $0.isWhitespace || $0 == "," }) }) {
                 throw invalid("\(which).features has an invalid feature '\(f)'", "list cargo features, e.g. features: [heif]")
             }
-            guard let product = r.product, !product.isEmpty else {
+            guard let product = r.product, !product.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
                 throw invalid("\(which).product is missing", "name the .app and CFBundleName, e.g. product: Hello")
             }
             if product.contains("/") || product.hasPrefix(".") || product.contains(where: \.isNewline) {

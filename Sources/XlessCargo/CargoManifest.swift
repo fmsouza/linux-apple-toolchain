@@ -55,8 +55,10 @@ public enum CargoManifest {
         }
     }
 
-    /// The nearest manifest above `path` that declares a workspace; failing that, the topmost one above it.
+    /// `path` itself when it declares a workspace (a root package inheriting from its own `[workspace.package]`); else the
+    /// nearest manifest above it that does; failing that, the topmost one above it.
     static func workspaceRoot(of path: String, in manifests: [String: Info]) -> String? {
+        if manifests[path]?.isWorkspace == true { return path }
         var dir = (path as NSString).deletingLastPathComponent
         var topmost: String?
         while true {

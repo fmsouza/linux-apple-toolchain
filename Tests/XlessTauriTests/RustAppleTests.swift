@@ -43,6 +43,16 @@ private func macSDK() throws -> DarwinSDK {
         #expect(env["CARGO_TARGET_AARCH64_APPLE_IOS_LINKER"] == work.appendingPathComponent(".xless/bin/xless-ios-cc").path)
         #expect(env.keys.allSatisfy { !$0.hasPrefix("TAURI_") })
         #expect(FileManager.default.isExecutableFile(atPath: work.appendingPathComponent(".xless/bin/xless-ios-cc").path))
+        // cargo must not run rust-objcopy on the Mach-O; the wrapper strips local symbols at link time instead.
+        #expect(env["CARGO_PROFILE_RELEASE_STRIP"] == "false")
+        let wrapper = try String(contentsOf: work.appendingPathComponent(".xless/bin/xless-ios-cc"), encoding: .utf8)
+        #expect(wrapper.contains(" -Wl,-x "))
+    }
+
+    @Test func tauriIOSLinkerWrapperKeepsLocalSymbols() throws {
+        let work = FileManager.default.temporaryDirectory.appendingPathComponent("ra-\(UUID().uuidString)")
+        let url = try RustApple.writeIOSLinkerWrapper(minOS: "17.0", sdk: fakeSDK(), workRoot: work)
+        #expect(try !String(contentsOf: url, encoding: .utf8).contains("-Wl,-x"))
     }
 
     @Test func macCargoEnvPerTarget() throws {

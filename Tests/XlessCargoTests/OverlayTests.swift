@@ -121,6 +121,12 @@ private func writeOverlay(_ yaml: String, named file: String = "my.overlay.yml")
     expectConfig(minimalIOS + "build: soon\n", mentioning: "build")
 }
 
+@Test func refusesEmptyOrBlankProduct() {
+    for blank in ["\"\"", "\"   \""] {
+        expectConfig(minimalIOS.replacingOccurrences(of: "  product: Hello", with: "  product: \(blank)"), mentioning: "ios.product")
+    }
+}
+
 @Test func refusesUnknownKey() {
     expectConfig(minimalIOS + "bundleId: com.example.x\n", mentioning: "bundleId")
     expectConfig(minimalIOS.replacingOccurrences(of: "  product: Hello", with: "  product: Hello\n  feature: [a]"), mentioning: "ios.feature")

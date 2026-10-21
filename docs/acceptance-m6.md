@@ -43,7 +43,11 @@ into its own folder, and set `bundleID`, `macos.bundleID`, `teamID`, `source` (t
   day is `…NN+1`.
 - [ ] The build reaches the TestFlight group with no processing warning (export compliance and privacy manifest
   included).
-- [ ] The app installs from TestFlight on an iPhone or iPad, opens and shows its window.
+- [ ] The app installs from TestFlight on an iPhone or iPad.
+- [ ] On a device running **iOS 26 or earlier** it also opens and shows its window. On iOS 27 skip this check and note
+  that you did: HelloCargo is built with the iOS 27 SDK (the images default to Xcode 27.0), and its winit 0.30 shell
+  does not adopt the UIScene life cycle, so UIKit stops it at launch ([cargo.md](cargo.md#known-gaps)). Launching on
+  iOS 27 is proven by item 4, whose shell adopts UIScene.
 
 ## 3. HelloCargo as a DMG
 

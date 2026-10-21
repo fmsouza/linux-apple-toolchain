@@ -82,6 +82,13 @@ private let hello = "[package]\nname = \"hello-mobile\"\nversion = \"1.2.3\"\n"
         #expect(try CargoManifest.version(package: "inline", source: dir) == "0.10.0")
     }
 
+    @Test func rootPackageInheritsFromItsOwnWorkspacePackage() throws {
+        let dir = try repo([
+            "sub/Cargo.toml": "[package]\nname = \"app\"\nversion.workspace = true\n[workspace]\n[workspace.package]\nversion = \"1.0.0\"\n",
+        ])
+        #expect(try CargoManifest.version(package: "app", source: dir) == "1.0.0")
+    }
+
     @Test func workspaceVersionMissing() throws {
         let dir = try repo([
             "Cargo.toml": "[workspace]\nmembers = [\"crates/*\"]\n",

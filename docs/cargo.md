@@ -187,7 +187,7 @@ The script and its options are those of Tauri ([tauri.md](tauri.md#shipping)): t
 
 What differs for cargo:
 
-- **Mounts.** As for Tauri, plus `~/.cache/xless/inputs` at `/cache/inputs` (the clones of git inputs) and each path input read-only at `/inputs/<name>`, with `XLESS_INPUTS_MOUNTED=1`, in step 2 only. The script lists the path inputs by running `xless cargo inputs` on the host (`$XLESS_SELF`, else `xless` on `PATH`). Its refusals (exit 2) are in [build inputs](#build-inputs).
+- **Mounts.** As for Tauri, plus `~/.cache/xless/inputs` at `/cache/inputs` (the clones of git inputs) and each path input read-only at `/inputs/<name>`, with `XLESS_INPUTS_MOUNTED=1`, in step 2 only. The script lists the path inputs by running `xless cargo inputs` on the host (`$XLESS_SELF`, else `xless` on `PATH`); `make testflight CONFIG=…` and `make dmg CONFIG=…` call the script directly, so for a cargo overlay they need `xless` on `PATH` (or `XLESS_SELF` set to a built one). Its refusals (exit 2) are in [build inputs](#build-inputs).
 - **Caches.** `~/.cache/xless/work`, `~/.cache/xless/downloads` and the docker volumes `xless-rustup` and `xless-cargo`: the Rust toolchains and the crates survive between runs. The first build downloads Rust and compiles the whole dependency graph, which takes several minutes and several GB.
 - **Stages.** `xless prepare|build|assets|finalize|sign|package|upload --config <overlay> [--source <dir>] --platform ios|macos`. Exit codes are the ones in [pipeline.md](pipeline.md#stages): config 10, prepare 19, build 12, assets 13, finalize 14, sign 15, package 16, upload 17.
 - **Native.** On a Linux machine with `xless` on `PATH` the same three steps run without docker, with the limits described for Tauri. Native cargo builds are untested in this milestone.
@@ -204,6 +204,7 @@ From the milestone's non-goals and what was left out:
 
 - iOS builds are release, arm64, device only. No simulator or debug builds, no x86_64 iOS.
 - No Android, Windows or Linux packaging, and no Mac App Store `.pkg` ([why](research/mas-pkg.md)).
+- **iOS 27 requires the UIKit scene life cycle.** An app built with the iOS 27 SDK that does not adopt UIScene is stopped by UIKit at launch on iOS 27 ("UIScene life cycle is required for apps built with this SDK"). The images default to Xcode 27.0, so a plain Cargo app has to adopt UIScene itself: winit 0.30 does not, so `samples/HelloCargo` installs from TestFlight but is stopped at launch on iOS 27 (it launches on iOS 26 and earlier), while an app with its own scene delegate works. Earlier iOS versions launch such an app as before; an app whose release pipeline uses an older Xcode is not affected (pin it with `xcode:`). The same note for React Native is in [react-native.md](react-native.md#known-gaps).
 - A plain Cargo app embeds no frameworks of its own and has no app extensions. The overlay has no launch storyboard key: use `UILaunchScreen` in the Info.plist.
 - No `cargo-bundle` or `cargo-xcode` compatibility. The overlay is the contract.
 - The DMG has a default layout: the app and an `/Applications` link on a plain volume, with no background image, window size, icon positions or volume icon.
