@@ -62,7 +62,8 @@ sdk-push:
 
 .PHONY: testflight
 # make testflight PROJECT=<dir> | CONFIG=<overlay.yml> [ARGS="…"]: build, sign, upload and deliver an iOS project (or an app
-# described by an overlay: Tauri, docs/tauri.md; React Native, docs/react-native.md) to TestFlight (see scripts/testflight.sh).
+# described by an overlay: Tauri, docs/tauri.md; React Native, docs/react-native.md; plain Cargo, docs/cargo.md) to TestFlight
+# (see scripts/testflight.sh). A cargo overlay's path inputs are listed with the host's `xless` (XLESS_SELF, else PATH).
 # ARGS go to the script, e.g. ARGS="--build-number 1.0.0.2026101601 --to finalize" (offline, no secrets) or "--from upload".
 testflight:
 	@test -n "$(PROJECT)$(CONFIG)" || { echo "usage: make testflight PROJECT=<dir>  or  make testflight CONFIG=<overlay.yml> [ARGS=…]" >&2; exit 2; }
@@ -83,8 +84,8 @@ sim-launch:
 	scripts/sim-launch.sh $(ARGS) "$(APP)"
 
 .PHONY: dmg
-# make dmg CONFIG=<overlay.yml>: build, sign (Developer ID), notarize and staple a Tauri macOS app's DMG, universal
-# (scripts/testflight.sh --platform macos; docs/tauri.md#macos).
+# make dmg CONFIG=<overlay.yml>: build, sign (Developer ID), notarize and staple a Tauri or cargo macOS app's DMG, universal
+# (scripts/testflight.sh --platform macos; docs/tauri.md#macos). Like testflight, a cargo overlay needs `xless` on PATH.
 dmg:
 	@test -n "$(CONFIG)" || { echo "usage: make dmg CONFIG=<overlay.yml>" >&2; exit 2; }
 	scripts/testflight.sh --config "$(CONFIG)" --platform macos
@@ -93,6 +94,11 @@ dmg:
 # Build samples/HelloTauri on Linux (docker) and compare it with the Mac reference (scripts/test-tauri-linux.sh).
 test-tauri-linux:
 	scripts/test-tauri-linux.sh
+
+.PHONY: test-cargo-linux
+# Build samples/HelloCargo for iOS and macOS on Linux (docker) and check the finalized apps (scripts/test-cargo-linux.sh).
+test-cargo-linux:
+	scripts/test-cargo-linux.sh
 
 .PHONY: test-rn-linux
 # Build samples/HelloRN on Linux (docker, xless-rn) from a fresh prepare and compare it with the Mac reference

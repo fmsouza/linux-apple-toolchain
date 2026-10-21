@@ -288,6 +288,24 @@ func fatWrappedArchive() -> Data {
     #expect(try failure(iosApp(plist: ["CFBundleExecutable": "X"]), config(privacyLine), .xlessYML)?.fix.contains("xless.yml") == true)
 }
 
+@Test func cargoFixTextsNameTheCargoOverlay() throws {
+    func failure(_ app: URL, _ config: ProjectConfig) throws -> XlessError? {
+        let out = FileManager.default.temporaryDirectory.appendingPathComponent("fo-\(UUID())")
+        return #expect(throws: XlessError.self) { try Finalizer.run(input: app, outputDir: out, platform: .ios, config: config, meta: meta, kind: .cargo) }
+    }
+    // The deployment target comes from the overlay's minimumOS (cargo's deployment-target variables), not Package.swift.
+    let target = try failure(iosApp(minos: "16.0"), config(privacyLine))
+    #expect(target?.cause == "binary deployment target 16.0 ≠ the cargo overlay's ios.minimumOS 17.0")
+    #expect(target?.fix.contains("Package.swift") == false)
+    let privacy = try failure(iosApp(), config())
+    #expect(privacy?.fix.contains("the cargo overlay") == true && privacy?.fix.contains("xless.yml") == false)
+    let encryption = try failure(iosApp(plist: ["CFBundleExecutable": "X"]), config(privacyLine))
+    #expect(encryption?.fix.contains("the cargo overlay") == true && encryption?.fix.contains("xless.yml") == false)
+    let disagree = try failure(iosApp(plist: ["CFBundleExecutable": "X", "ITSAppUsesNonExemptEncryption": true]),
+                               config(privacyLine + "\nusesNonExemptEncryption: false"))
+    #expect(disagree?.cause.contains("in the cargo overlay is false") == true)
+}
+
 // MARK: Ruling R8: stamped from the SDK actually used; R9: identifiers in Info.plist
 
 let meta262 = ToolchainMeta(

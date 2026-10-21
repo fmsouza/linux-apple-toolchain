@@ -120,35 +120,14 @@ public enum TauriBuilder {
         try bootstrapRust(ctx, targets: rustTargets)
     }
 
-    /// rustup itself (`rustup-init` when missing), then `rustupSteps`.
+    /// rustup itself (`rustup-init` when missing), then `RustApple.rustupSteps`, run in the Tauri directory.
     static func bootstrapRust(_ ctx: some TauriWorkContext, targets: [String]) throws {
-        if (try? Shell.run("sh", ["-c", "command -v rustup"], env: ctx.tools, baseEnvironment: ctx.env, stage: .prepare)) == nil {
-            log("rustup-init (toolchains in \(ctx.env["RUSTUP_HOME"] ?? "~/.rustup"))")
-            try run(["rustup-init", "-y", "--no-modify-path", "--default-toolchain", "none"], cwd: nil, env: ctx.tools, ctx: ctx, stage: .prepare)
-        }
-        let fm = FileManager.default
-        var dir = ctx.tauriDir.standardizedFileURL
-        let root = ctx.workRoot.standardizedFileURL.path
-        var toolchainFile = false
-        while dir.path.hasPrefix(root) {
-            if ["rust-toolchain.toml", "rust-toolchain"].contains(where: { fm.fileExists(atPath: dir.appendingPathComponent($0).path) }) { toolchainFile = true; break }
-            if dir.path == root { break }
-            dir = dir.deletingLastPathComponent()
-        }
-        let active = toolchainFile || (try? Shell.run("rustup", ["show", "active-toolchain"], cwd: ctx.tauriDir, env: ctx.tools,
-                                                      baseEnvironment: ctx.env, stage: .prepare)) != nil
-        for step in rustupSteps(toolchainFile: toolchainFile, activeToolchain: active, targets: targets) {
-            try run(step, cwd: ctx.tauriDir, env: ctx.tools, ctx: ctx, stage: .prepare)
-        }
+        try RustApple.bootstrap(searchFrom: ctx.tauriDir, workRoot: ctx.workRoot, toolchain: nil, targets: targets,
+                                env: ctx.tools, baseEnvironment: ctx.env, log: { log($0) })
     }
 
-    /// The toolchain `rust-toolchain.toml` selects; without one (apps from `tauri create`), stable, made the default when
-    /// nothing else is. Then, because an app's toolchain file need not list them, the build's targets (the iOS target, or
-    /// both darwin targets) and `llvm-tools` (spike B difference 1; macOS spike B step 1).
     static func rustupSteps(toolchainFile: Bool, activeToolchain: Bool, targets: [String] = [TauriEnvironment.target]) -> [[String]] {
-        var steps = [toolchainFile ? ["rustup", "toolchain", "install"] : ["rustup", "toolchain", "install", "stable", "--profile", "minimal"]]
-        if !toolchainFile && !activeToolchain { steps.append(["rustup", "default", "stable"]) }
-        return steps + [["rustup", "target", "add"] + targets, ["rustup", "component", "add", "llvm-tools"]]
+        RustApple.rustupSteps(toolchainFile: toolchainFile, activeToolchain: activeToolchain, targets: targets)
     }
 
     /// The frozen install for the app root's lockfile; nil without a package.json.
@@ -368,30 +347,8 @@ public enum TauriBuilder {
         return (bin, URL(fileURLWithPath: m.target_directory, isDirectory: true))
     }
 
-    /// One thin executable per darwin target → a universal file (x86_64 slice first, like `lipo -create`). Refuses a
-    /// missing slice, a file that is not a thin Mach-O of its target's architecture, and the same architecture twice.
     static func universalExecutable(_ thins: [(triple: String, url: URL)], binary: String) throws -> Data {
-        var slices: [String: Data] = [:]
-        for (triple, url) in thins {
-            let want = try TauriMacEnvironment.arch(of: triple)
-            guard let data = try? Data(contentsOf: url) else {
-                throw XlessError(.build, "no \(want) slice: cargo left no \(binary) for \(triple) (\(url.path))", fix: "check the cargo output above")
-            }
-            guard !MachO.isFat(data), let arch = try? MachO.sliceArchitectures(in: data).first?.name else {
-                throw XlessError(.build, "\(url.path) is not a thin Mach-O executable", fix: "check the linker wrapper and the cargo output above")
-            }
-            guard slices[arch] == nil else {
-                throw XlessError(.build, "both executables are \(arch); the universal app needs one arm64 and one x86_64 slice", fix: "check CARGO_TARGET_*_LINKER and the cargo output above")
-            }
-            guard arch == want else {
-                throw XlessError(.build, "the \(triple) executable is \(arch), not \(want)", fix: "check CARGO_TARGET_*_LINKER and the cargo output above")
-            }
-            slices[arch] = data
-        }
-        for arch in ["arm64", "x86_64"] where slices[arch] == nil {
-            throw XlessError(.build, "no \(arch) slice for the universal executable \(binary)", fix: "build both aarch64-apple-darwin and x86_64-apple-darwin")
-        }
-        return try MachO.makeFat([slices["x86_64"]!, slices["arm64"]!])
+        try RustApple.universal(thins, binary: binary)
     }
 
     /// The build-setting variables of a release device build of the target in the work copy.

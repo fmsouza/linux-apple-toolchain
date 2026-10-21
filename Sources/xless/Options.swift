@@ -16,7 +16,7 @@ struct ProjectOptions: ParsableArguments {
     @Option(help: "Project directory containing xless.yml and Package.swift.")
     var project: String = "."
 
-    @Option(help: "Overlay file (type: tauri or type: react-native) instead of a project directory; cannot be combined with --project.")
+    @Option(help: "Overlay file (type: tauri, type: react-native or type: cargo) instead of a project directory; cannot be combined with --project.")
     var config: String?
 
     @Option(help: "With --config: use this directory as the app source instead of the overlay's `source:`.")

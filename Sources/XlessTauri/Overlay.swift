@@ -128,7 +128,7 @@ extension TauriOverlay {
             throw XlessError(.config, "overlay \(name) is invalid: \(error)", fix: "see samples/HelloTauri/xless.overlay.example.yml for the schema")
         }
         guard raw.type == "tauri" else {
-            throw XlessError(.config, "overlay \(name): type '\(raw.type)' is not supported", fix: "set type: tauri (type: react-native is a React Native / Expo overlay)")
+            throw XlessError(.config, "overlay \(name): type '\(raw.type)' is not supported", fix: "set type: tauri (type: react-native is a React Native / Expo overlay, type: cargo a plain Cargo app)")
         }
         if raw.teamID.wholeMatch(of: /[A-Z0-9]{10}/) == nil {
             throw XlessError(.config, "overlay \(name): teamID '\(raw.teamID)' is not a 10-character Apple team ID", fix: "copy it from developer.apple.com → Membership")
@@ -181,6 +181,30 @@ public struct OverlayLocation: Sendable, Equatable {
         let sourceRoot = try paths.sourceRoot(source: overlay.source, sourceOverride: sourceOverride)
         let workRoot = paths.workRoot
         return OverlayLocation(overlay: overlay, sourceRoot: sourceRoot, workRoot: workRoot)
+    }
+}
+
+/// The overlay types `--config` accepts, told apart by the file's `type:` before it is parsed as that type.
+public enum OverlayKind: Sendable, Equatable {
+    case tauri, reactNative, cargo
+
+    /// `react-native` and `cargo` by name; anything else is read as a Tauri overlay (whose parser refuses a wrong `type:`).
+    public init(type: String?) {
+        switch type {
+        case "react-native": self = .reactNative
+        case "cargo": self = .cargo
+        default: self = .tauri
+        }
+    }
+
+    /// The kind of the overlay file at `url`.
+    public static func of(_ url: URL) throws -> OverlayKind { OverlayKind(type: OverlayPaths.type(of: try OverlayPaths.read(url))) }
+
+    /// `xless inspect --config` reports on Tauri and React Native overlays; cargo overlays have no report yet.
+    public func requireInspectable() throws {
+        guard self == .cargo else { return }
+        throw XlessError(.config, "xless inspect --config is not supported for cargo overlays yet",
+                         fix: "run `xless ship --config <overlay> --platform <ios|macos> --to build` to see what the build does")
     }
 }
 
