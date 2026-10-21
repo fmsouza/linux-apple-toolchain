@@ -1,0 +1,30 @@
+# Example xless overlay for a plain Cargo app (`type: cargo`): a winit app for iOS and macOS, packaged without Xcode.
+# An overlay lives outside the app repository; xless syncs the tracked files of `source:` into a work copy
+# (~/.cache/xless/work/<name>) and never writes to the source.
+#
+#   xless ship --config xless.overlay.example.yml --platform ios
+#   xless ship --config xless.overlay.example.yml --platform macos
+type: cargo
+source: .                              # read-only; relative paths resolve against this file's directory
+bundleID: com.example.hellocargo       # the macos block overrides it
+teamID: ABCDE12345
+version: cargo                         # take the version from the package (Cargo.toml: 1.0.0)
+build: dated                           # CFBundleVersion "<version>.<YYYYMMDDNN>" (macOS: ...YYYYMMDDHHMM)
+privacyManifest: PrivacyInfo.xcprivacy # copied into the iOS app; relative to this file, may live outside the source
+usesNonExemptEncryption: false
+testflight: { groups: [Internal] }
+# The Rust toolchain comes from rust-toolchain.toml next to Cargo.toml, so there is no `rust:` key here.
+# Other keys: rust.toolchain, env, inputs (extra read-only directories), plistVars, xcode.
+ios:
+  package: hello-cargo                 # cargo -p
+  product: HelloCargo                  # the .app and CFBundleName
+  minimumOS: "17.0"
+  infoPlist: ios/Info.plist            # relative to the source root
+  assets: Assets.xcassets              # required on iOS: compiled to Assets.car
+macos:
+  package: hello-cargo
+  product: HelloCargo
+  bundleID: com.example.hellocargo.mac
+  minimumOS: "12.0"
+  infoPlist: macos/Info.plist.in       # @SHORT_VERSION@ and @GIT_SHA@ are filled in
+  assets: Assets.xcassets              # its AppIcon becomes Contents/Resources/AppIcon.icns

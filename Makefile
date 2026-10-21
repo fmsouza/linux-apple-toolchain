@@ -94,6 +94,11 @@ dmg:
 test-tauri-linux:
 	scripts/test-tauri-linux.sh
 
+.PHONY: test-cargo-linux
+# Build samples/HelloCargo for iOS and macOS on Linux (docker) and check the finalized apps (scripts/test-cargo-linux.sh).
+test-cargo-linux:
+	scripts/test-cargo-linux.sh
+
 .PHONY: test-rn-linux
 # Build samples/HelloRN on Linux (docker, xless-rn) from a fresh prepare and compare it with the Mac reference
 # (scripts/test-rn-linux.sh).

@@ -269,3 +269,27 @@ private func writeOverlay(_ yaml: String, named file: String = "my.overlay.yml")
     }
     #expect((try? CargoOverlay.parse(yaml: minimalIOS + "inputs:\n  - { name: fonts, path: \"../my fonts\", env: FONTS_DIR }\n", name: "a")) != nil)
 }
+
+/// The overlay shipped with samples/HelloCargo parses, and every file it names is in the sample.
+@Test func parsesTheShippedExampleOverlay() throws {
+    var dir = URL(fileURLWithPath: #filePath)
+    for _ in 0..<3 { dir.deleteLastPathComponent() }
+    let sample = dir.appendingPathComponent("samples/HelloCargo")
+    let url = sample.appendingPathComponent("xless.overlay.example.yml")
+    let loaded = try CargoOverlay.load(from: url, env: ["HOME": "/home/u"])
+    let o = loaded.overlay
+    #expect(o.name == "xless.overlay.example" && o.bundleID == "com.example.hellocargo" && o.teamID == "ABCDE12345")
+    #expect(o.toolchain == nil && o.version == nil && o.build == "dated" && o.inputs.isEmpty)
+    #expect(o.ios?.package == "hello-cargo" && o.ios?.product == "HelloCargo" && o.ios?.minimumOS == "17.0" && o.ios?.bundleID == nil)
+    #expect(o.macos?.package == "hello-cargo" && o.macos?.bundleID == "com.example.hellocargo.mac")
+    #expect(o.macos?.assets == "Assets.xcassets" && o.macos?.icon == nil)
+    #expect(loaded.sourceRoot.standardizedFileURL.path == sample.standardizedFileURL.path)
+    #expect(o.privacyManifest == sample.appendingPathComponent("PrivacyInfo.xcprivacy").standardizedFileURL.path)
+    // The files it names exist: relative to the source root, except the privacy manifest.
+    let named = [o.ios?.infoPlist, o.ios?.assets, o.macos?.infoPlist, o.macos?.assets].compactMap { $0 }
+    for path in named { #expect(FileManager.default.fileExists(atPath: sample.appendingPathComponent(path).path), "\(path)") }
+    #expect(FileManager.default.fileExists(atPath: o.privacyManifest ?? ""))
+    // The toolchain is pinned by rust-toolchain.toml, not by the overlay.
+    #expect(FileManager.default.fileExists(atPath: sample.appendingPathComponent("rust-toolchain.toml").path))
+    #expect(FileManager.default.fileExists(atPath: sample.appendingPathComponent("Cargo.lock").path))
+}

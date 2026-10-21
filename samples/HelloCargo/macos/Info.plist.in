@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CFBundleDisplayName</key>
+	<string>HelloCargo</string>
+	<key>CFBundleGetInfoString</key>
+	<string>HelloCargo @SHORT_VERSION@ (@GIT_SHA@)</string>
+	<key>NSHumanReadableCopyright</key>
+	<string>Example app, build @GIT_SHA@</string>
+	<key>NSHighResolutionCapable</key>
+	<true/>
+	<key>NSPrincipalClass</key>
+	<string>NSApplication</string>
+	<key>LSApplicationCategoryType</key>
+	<string>public.app-category.developer-tools</string>
+</dict>
+</plist>
